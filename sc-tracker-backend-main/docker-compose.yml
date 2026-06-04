@@ -1,0 +1,40 @@
+services:
+  mongo:
+    image: mongo:7
+    container_name: sc-tracker-mongo
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_DATABASE: sc-tracker
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/development/Dockerfile
+    container_name: sc-tracker-api
+    restart: unless-stopped
+    env_file:
+      - .env.development
+    environment:
+      DB_URL: mongodb://mongo:27017/sc-tracker
+    ports:
+      - "${PORT:-3003}:3003"
+    volumes:
+      - .:/usr/src/backend
+      - /usr/src/backend/node_modules
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+volumes:
+  mongo-data:
+    driver: local

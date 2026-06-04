@@ -1,0 +1,407 @@
+{
+  "info": {
+    "_postman_id": "sc-tracker-backend-v1",
+    "name": "SC Tracker Backend",
+    "description": "Stablecoin Tracker — backend API running at http://localhost:3003/v1",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3003/v1" },
+    { "key": "countryId", "value": "840" },
+    { "key": "issuerId", "value": "1" },
+    { "key": "stablecoinId", "value": "1" }
+  ],
+  "item": [
+    {
+      "name": "Countries",
+      "item": [
+        {
+          "name": "List countries",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/countries?page=1&pageSize=200",
+              "host": ["{{baseUrl}}"],
+              "path": ["countries"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "pageSize", "value": "200" },
+                { "key": "region", "value": "EU", "disabled": true },
+                { "key": "q", "value": "united", "disabled": true },
+                { "key": "sort", "value": "name", "disabled": true }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get country by ID",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/countries/{{countryId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["countries", "{{countryId}}"]
+            },
+            "description": "Full detail including stage, collateral flags (fiatBacked, cryptoBacked, commodityBacked, algorithmBacked), currency, regulator info. Use 999 for the European Union."
+          }
+        },
+        {
+          "name": "Get country — EU (999)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/countries/999",
+              "host": ["{{baseUrl}}"],
+              "path": ["countries", "999"]
+            }
+          }
+        },
+        {
+          "name": "Get regulated issuers for country",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/countries/{{countryId}}/regulated-issuers",
+              "host": ["{{baseUrl}}"],
+              "path": ["countries", "{{countryId}}", "regulated-issuers"]
+            }
+          }
+        },
+        {
+          "name": "Get regulated reserve types for country",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/countries/{{countryId}}/regulated-reserve-types",
+              "host": ["{{baseUrl}}"],
+              "path": ["countries", "{{countryId}}", "regulated-reserve-types"]
+            }
+          }
+        },
+        {
+          "name": "Get licenses for country",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/countries/{{countryId}}/licenses",
+              "host": ["{{baseUrl}}"],
+              "path": ["countries", "{{countryId}}", "licenses"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Issuers",
+      "item": [
+        {
+          "name": "List issuers",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/issuers?page=1&pageSize=25",
+              "host": ["{{baseUrl}}"],
+              "path": ["issuers"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "pageSize", "value": "25" },
+                { "key": "originCountry", "value": "US", "disabled": true, "description": "ISO 3166-1 alpha-2" },
+                { "key": "q", "value": "circle", "disabled": true }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get issuer by ID",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/issuers/{{issuerId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["issuers", "{{issuerId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Stablecoins",
+      "item": [
+        {
+          "name": "List stablecoins",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/stablecoins?page=1&pageSize=25",
+              "host": ["{{baseUrl}}"],
+              "path": ["stablecoins"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "pageSize", "value": "25" },
+                { "key": "issuerId", "value": "1", "disabled": true },
+                { "key": "referenceAsset", "value": "USD", "disabled": true },
+                { "key": "q", "value": "usdc", "disabled": true }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get stablecoin by ID",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/stablecoins/{{stablecoinId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["stablecoins", "{{stablecoinId}}"]
+            }
+          }
+        },
+        {
+          "name": "Stablecoins by issuer",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/stablecoins?issuerId={{issuerId}}&pageSize=50",
+              "host": ["{{baseUrl}}"],
+              "path": ["stablecoins"],
+              "query": [
+                { "key": "issuerId", "value": "{{issuerId}}" },
+                { "key": "pageSize", "value": "50" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Licenses",
+      "item": [
+        {
+          "name": "List licenses",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/licenses?page=1&pageSize=25",
+              "host": ["{{baseUrl}}"],
+              "path": ["licenses"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "pageSize", "value": "25" },
+                { "key": "countryId", "value": "US", "disabled": true, "description": "ISO 3166-1 alpha-2" },
+                { "key": "type", "value": "EMI", "disabled": true }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reserve Types",
+      "item": [
+        {
+          "name": "List reserve types",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/reserve-types?page=1&pageSize=25",
+              "host": ["{{baseUrl}}"],
+              "path": ["reserve-types"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "pageSize", "value": "25" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reference Assets",
+      "item": [
+        {
+          "name": "List reference assets",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/reference-assets?page=1&pageSize=25",
+              "host": ["{{baseUrl}}"],
+              "path": ["reference-assets"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "pageSize", "value": "25" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Exchange Rates",
+      "item": [
+        {
+          "name": "List exchange rates",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/exchange-rates?page=1&pageSize=25",
+              "host": ["{{baseUrl}}"],
+              "path": ["exchange-rates"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "pageSize", "value": "25" },
+                { "key": "referenceAsset", "value": "USD", "disabled": true },
+                { "key": "currencyOriginal", "value": "EUR", "disabled": true },
+                { "key": "dateFrom", "value": "2025-01-01", "disabled": true },
+                { "key": "dateTo", "value": "2025-12-31", "disabled": true }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Wallets",
+      "item": [
+        {
+          "name": "List wallets",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/wallets?page=1&pageSize=25&status=any",
+              "host": ["{{baseUrl}}"],
+              "path": ["wallets"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "pageSize", "value": "25" },
+                { "key": "status", "value": "any", "description": "active | closed | any" },
+                { "key": "countryId", "value": "US", "disabled": true },
+                { "key": "openedFrom", "value": "2025-01-01", "disabled": true },
+                { "key": "openedTo", "value": "2025-12-31", "disabled": true }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Transactions",
+      "item": [
+        {
+          "name": "List transactions",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/transactions?page=1&pageSize=25",
+              "host": ["{{baseUrl}}"],
+              "path": ["transactions"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "pageSize", "value": "25" },
+                { "key": "senderCountryId", "value": "US", "disabled": true },
+                { "key": "receiverCountryId", "value": "MX", "disabled": true },
+                { "key": "stablecoinId", "value": "1", "disabled": true },
+                { "key": "type", "value": "remittance", "disabled": true, "description": "p2p | b2b | b2c | remittance | exchange | other" },
+                { "key": "dateFrom", "value": "2025-01-01", "disabled": true },
+                { "key": "dateTo", "value": "2025-12-31", "disabled": true }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Analytics",
+      "item": [
+        {
+          "name": "Adoption analytics",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/analytics/adoption?year=2025",
+              "host": ["{{baseUrl}}"],
+              "path": ["analytics", "adoption"],
+              "query": [
+                { "key": "year", "value": "2025" },
+                { "key": "month", "value": "6", "disabled": true },
+                { "key": "referenceAsset", "value": "USD", "disabled": true },
+                { "key": "stablecoinId", "value": "1", "disabled": true },
+                { "key": "countryId", "value": "US", "disabled": true, "description": "ISO alpha-2 or 'All'" },
+                { "key": "region", "value": "EU", "disabled": true }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Corridor analytics",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/analytics/corridors?year=2025",
+              "host": ["{{baseUrl}}"],
+              "path": ["analytics", "corridors"],
+              "query": [
+                { "key": "year", "value": "2025" },
+                { "key": "month", "value": "6", "disabled": true },
+                { "key": "referenceAsset", "value": "USD", "disabled": true },
+                { "key": "stablecoinId", "value": "1", "disabled": true },
+                { "key": "countryId", "value": "US", "disabled": true },
+                { "key": "regionFrom", "value": "North America", "disabled": true },
+                { "key": "regionTo", "value": "EU", "disabled": true },
+                { "key": "bidirectional", "value": "true", "disabled": true }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Country overview analytics",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/analytics/countries/{{countryId}}/overview?year=2025",
+              "host": ["{{baseUrl}}"],
+              "path": ["analytics", "countries", "{{countryId}}", "overview"],
+              "query": [
+                { "key": "year", "value": "2025" },
+                { "key": "month", "value": "6", "disabled": true },
+                { "key": "referenceAsset", "value": "USD", "disabled": true }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Country corridors analytics",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/analytics/countries/{{countryId}}/corridors?year=2025&direction=both&topStablecoins=3",
+              "host": ["{{baseUrl}}"],
+              "path": ["analytics", "countries", "{{countryId}}", "corridors"],
+              "query": [
+                { "key": "year", "value": "2025" },
+                { "key": "month", "value": "6", "disabled": true },
+                { "key": "direction", "value": "both", "description": "inflow | outflow | both" },
+                { "key": "topStablecoins", "value": "3", "description": "0–10" },
+                { "key": "referenceAsset", "value": "USD", "disabled": true }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health check",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "http://localhost:3003/api/health",
+              "raw": "http://localhost:3003/api/health"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

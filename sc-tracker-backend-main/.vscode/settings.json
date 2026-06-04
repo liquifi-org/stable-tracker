@@ -1,0 +1,18 @@
+{
+    "conventionalCommits.scopes": [
+        "commitlint",
+        "husky",
+        "eslint",
+        "nodemon",
+        "Express",
+        "constants",
+        "utils",
+        "router",
+        "core",
+        "controller",
+        "middleware",
+        "vscode",
+        "logging",
+        "database"
+    ]
+}

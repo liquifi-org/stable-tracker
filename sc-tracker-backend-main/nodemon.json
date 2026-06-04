@@ -1,0 +1,6 @@
+{
+    "watch": ["src", ".env.development"],
+    "ext": "ts,js,json",
+    "ignore": ["dist", "node_modules"],
+    "exec": "npx tsc --sourceMap && node --enable-source-maps --env-file=.env.development dist/src/server.js"
+}
