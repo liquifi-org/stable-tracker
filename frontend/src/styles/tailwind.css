@@ -1,0 +1,19 @@
+@import 'tailwindcss' source(none);
+@source '../**/*.{js,ts,jsx,tsx}';
+
+@import 'tw-animate-css';
+
+@theme {
+  /* Tailwind blue-* palette → brand variables (theme.css is the single source) */
+  --color-blue-50:  var(--brand-50);
+  --color-blue-100: var(--brand-100);
+  --color-blue-200: var(--brand-200);
+  --color-blue-300: var(--brand-300);
+  --color-blue-400: var(--brand-400);
+  --color-blue-500: var(--brand);
+  --color-blue-600: var(--brand-600);
+  --color-blue-700: var(--brand-700);
+  --color-blue-800: var(--brand-800);
+  --color-blue-900: var(--brand-900);
+  --color-blue-950: var(--brand-950);
+}
