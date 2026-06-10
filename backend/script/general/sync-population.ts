@@ -107,19 +107,4 @@ if (process.argv[1]?.endsWith('sync-population.js')) {
         });
 }
 
-// ── Standalone entry ─────────────────────────────────────────────────────────
-
-if (process.argv[1]?.endsWith('sync-population.js')) {
-    mongoose
-        .connect(DB_URL)
-        .then(() => {
-            console.log('✓  MongoDB connected\n');
-            return run();
-        })
-        .then(() => mongoose.disconnect())
-        .catch((err) => {
-            console.error('❌  Fatal:', err);
-            process.exit(1);
-        });
-}
 

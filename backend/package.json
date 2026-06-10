@@ -28,7 +28,11 @@
     "allium:sync:wallets": "npx tsc --sourceMap && node --enable-source-maps --env-file=.env.development dist/script/allium/sync-wallets.js",
     "allium:sync:wallets:local": "npx tsc --sourceMap && cross-env DB_URL=mongodb://localhost:27017/sc-tracker node --enable-source-maps --env-file=.env.development dist/script/allium/sync-wallets.js",
     "population:sync": "npx tsc --sourceMap && node --enable-source-maps --env-file=.env.development dist/script/general/sync-population.js",
-    "population:sync:local": "npx tsc --sourceMap && cross-env DB_URL=mongodb://localhost:27017/sc-tracker node --enable-source-maps --env-file=.env.development dist/script/general/sync-population.js"
+    "population:sync:local": "npx tsc --sourceMap && cross-env DB_URL=mongodb://localhost:27017/sc-tracker node --enable-source-maps --env-file=.env.development dist/script/general/sync-population.js",
+    "db:seed": "npm run migrate:dev && npm run population:sync && npm run allium:sync:wallets",
+    "db:seed:local": "npm run migrate:local && npm run population:sync:local && npm run allium:sync:wallets:local",
+    "db:seed:full": "npm run db:seed && npm run stride:sync",
+    "db:seed:full:local": "npm run db:seed:local && npm run stride:sync:local"
   },
   "author": "Pedro Frias",
   "license": "ISC",
