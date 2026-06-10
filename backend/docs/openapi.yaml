@@ -1,0 +1,1081 @@
+openapi: 3.1.0
+info:
+  title: Stablecoin Tracker API
+  version: 1.0.0
+  description: |
+    Interface agreement for the Stablecoin Tracker frontend.
+
+    The contract is split in two layers, following the Single Responsibility Principle:
+
+      1. **Master data / entities** (`/countries`, `/issuers`, `/stablecoins`,
+         `/licenses`, `/reserve-types`, `/reference-assets`, `/exchange-rates`,
+         `/wallets`, `/transactions`) — one resource per entity in the data model.
+      2. **Analytics / aggregates** (`/analytics/*`) — read-only, pre-computed
+         views that feed the dashboard (adoption heatmap, corridor flows,
+         country deep dive). They never expose persistence concerns and always
+         return values normalized to USD using the `USD Exchange Rates` table.
+
+    Design principles:
+      - **SRP**: each path owns one responsibility (entity CRUD vs. analytic view).
+      - **OCP**: new analytics endpoints can be added without breaking existing ones.
+      - **LSP / ISP**: filter parameters are componentized (`#/components/parameters/*`)
+        and only the relevant ones are referenced per endpoint.
+      - **DIP**: the frontend depends on these schemas, not on the underlying tables.
+      - Clean code: stable resource names, consistent pagination envelope,
+        ISO codes (ISO 3166-1 numeric for countries, ISO 4217 for currencies,
+        ISO 8601 for dates), and a single error schema (RFC 7807-style).
+  contact:
+    name: EY Parthenon — Stablecoin Tracker
+  license:
+    name: Proprietary
+
+servers:
+  - url: http://localhost:3003/v1
+    description: Local development server (npm run dev / docker compose)
+  - url: https://api.stablecoin-tracker.local/v1
+    description: Local / mock
+  - url: https://{environment}.api.stablecoin-tracker.ey.com/v1
+    description: EY environments
+    variables:
+      environment:
+        enum: [dev, qa, prod]
+        default: dev
+
+tags:
+  - name: Countries
+  - name: Issuers
+  - name: Stablecoins
+  - name: Licenses
+  - name: Reserve Types
+  - name: Reference Assets
+  - name: Exchange Rates
+  - name: Wallets
+  - name: Transactions
+  - name: Analytics
+  - name: Admin
+
+security:
+  - bearerAuth: []
+
+paths:
+  # ---------------------------------------------------------------------------
+  # Countries
+  # ---------------------------------------------------------------------------
+  /countries:
+    get:
+      tags: [Countries]
+      summary: List countries
+      operationId: listCountries
+      parameters:
+        - $ref: '#/components/parameters/RegionQuery'
+        - $ref: '#/components/parameters/SearchQuery'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Sort'
+      responses:
+        '200':
+          description: Paginated list of countries
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CountryPage'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /countries/{countryId}:
+    parameters:
+      - $ref: '#/components/parameters/CountryIdPath'
+    get:
+      tags: [Countries]
+      summary: Get a country by ISO 3166-1 numeric code
+      operationId: getCountry
+      responses:
+        '200':
+          description: Country
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Country'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /countries/{countryId}/regulated-issuers:
+    parameters:
+      - $ref: '#/components/parameters/CountryIdPath'
+    get:
+      tags: [Countries, Issuers]
+      summary: Issuers regulated/compliant in this country (m:n join)
+      operationId: listCountryRegulatedIssuers
+      responses:
+        '200':
+          description: Issuers compliant in the given country
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Issuer'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /countries/{countryId}/regulated-reserve-types:
+    parameters:
+      - $ref: '#/components/parameters/CountryIdPath'
+    get:
+      tags: [Countries, Reserve Types]
+      summary: Reserve types accepted by regulation in this country
+      operationId: listCountryRegulatedReserveTypes
+      responses:
+        '200':
+          description: Reserve types accepted in the given country
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ReserveType'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /countries/{countryId}/licenses:
+    parameters:
+      - $ref: '#/components/parameters/CountryIdPath'
+    get:
+      tags: [Countries, Licenses]
+      summary: Licenses / regulatory frameworks defined in this country
+      operationId: listCountryLicenses
+      responses:
+        '200':
+          description: Licenses
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/License'
+        default:
+          $ref: '#/components/responses/Error'
+
+  # ---------------------------------------------------------------------------
+  # Issuers
+  # ---------------------------------------------------------------------------
+  /issuers:
+    get:
+      tags: [Issuers]
+      summary: List stablecoin issuers
+      operationId: listIssuers
+      parameters:
+        - in: query
+          name: originCountry
+          schema: { $ref: '#/components/schemas/CountryCode' }
+        - $ref: '#/components/parameters/SearchQuery'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Paginated list of issuers
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IssuerPage'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /issuers/{issuerId}:
+    parameters:
+      - $ref: '#/components/parameters/IssuerIdPath'
+    get:
+      tags: [Issuers]
+      summary: Get issuer by id
+      operationId: getIssuer
+      responses:
+        '200':
+          description: Issuer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Issuer'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ---------------------------------------------------------------------------
+  # Stablecoins
+  # ---------------------------------------------------------------------------
+  /stablecoins:
+    get:
+      tags: [Stablecoins]
+      summary: List stablecoins
+      operationId: listStablecoins
+      parameters:
+        - in: query
+          name: issuerId
+          schema: { type: string }
+        - in: query
+          name: referenceAsset
+          schema: { $ref: '#/components/schemas/ReferenceAssetCode' }
+        - $ref: '#/components/parameters/SearchQuery'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Paginated list of stablecoins
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StablecoinPage'
+
+  /stablecoins/{stablecoinId}:
+    parameters:
+      - in: path
+        name: stablecoinId
+        required: true
+        schema: { type: string }
+    get:
+      tags: [Stablecoins]
+      summary: Get stablecoin by id
+      operationId: getStablecoin
+      responses:
+        '200':
+          description: Stablecoin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Stablecoin'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ---------------------------------------------------------------------------
+  # Licenses
+  # ---------------------------------------------------------------------------
+  /licenses:
+    get:
+      tags: [Licenses]
+      summary: List licenses / regulatory frameworks
+      operationId: listLicenses
+      parameters:
+        - in: query
+          name: countryId
+          schema: { $ref: '#/components/schemas/CountryCode' }
+        - in: query
+          name: type
+          schema: { type: string }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Paginated list of licenses
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LicensePage'
+
+  # ---------------------------------------------------------------------------
+  # Reserve Types & Reference Assets
+  # ---------------------------------------------------------------------------
+  /reserve-types:
+    get:
+      tags: [Reserve Types]
+      summary: List reserve type classes (fiat, commodity, crypto, algorithmic, ...)
+      operationId: listReserveTypes
+      responses:
+        '200':
+          description: Reserve types
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ReserveType'
+
+  /reference-assets:
+    get:
+      tags: [Reference Assets]
+      summary: List reference assets (EUR, USD, Gold, ...)
+      operationId: listReferenceAssets
+      parameters:
+        - in: query
+          name: reserveType
+          schema: { $ref: '#/components/schemas/ReserveTypeCode' }
+      responses:
+        '200':
+          description: Reference assets
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ReferenceAsset'
+
+  # ---------------------------------------------------------------------------
+  # USD exchange rates
+  # ---------------------------------------------------------------------------
+  /exchange-rates:
+    get:
+      tags: [Exchange Rates]
+      summary: USD exchange rates used to normalize transaction values
+      operationId: listExchangeRates
+      parameters:
+        - in: query
+          name: referenceAsset
+          schema: { $ref: '#/components/schemas/ReferenceAssetCode' }
+        - in: query
+          name: currencyOriginal
+          schema: { type: string, description: ISO 4217 code }
+        - $ref: '#/components/parameters/DateFrom'
+        - $ref: '#/components/parameters/DateTo'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Paginated exchange rate observations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExchangeRatePage'
+
+  # ---------------------------------------------------------------------------
+  # Wallets
+  # ---------------------------------------------------------------------------
+  /wallets:
+    get:
+      tags: [Wallets]
+      summary: List wallets
+      operationId: listWallets
+      parameters:
+        - in: query
+          name: countryId
+          schema: { $ref: '#/components/schemas/CountryCode' }
+        - in: query
+          name: openedFrom
+          schema: { type: string, format: date }
+        - in: query
+          name: openedTo
+          schema: { type: string, format: date }
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [active, closed, any]
+            default: any
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Paginated list of wallets
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WalletPage'
+
+  # ---------------------------------------------------------------------------
+  # Transactions
+  # ---------------------------------------------------------------------------
+  /transactions:
+    get:
+      tags: [Transactions]
+      summary: List transactions (raw fact table, USD-normalized)
+      operationId: listTransactions
+      parameters:
+        - in: query
+          name: senderCountryId
+          schema: { $ref: '#/components/schemas/CountryCode' }
+        - in: query
+          name: receiverCountryId
+          schema: { $ref: '#/components/schemas/CountryCode' }
+        - in: query
+          name: stablecoinId
+          schema: { type: string }
+        - in: query
+          name: type
+          schema: { $ref: '#/components/schemas/TransactionType' }
+        - $ref: '#/components/parameters/DateFrom'
+        - $ref: '#/components/parameters/DateTo'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Paginated list of transactions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionPage'
+
+  # ===========================================================================
+  # Analytics (read-only aggregates that feed the dashboard)
+  # ===========================================================================
+
+  /analytics/adoption:
+    get:
+      tags: [Analytics]
+      summary: Adoption heatmap data per country
+      description: |
+        Feeds the **Adoption Heatmap** view. One row per country with:
+        active wallets holding stablecoins, stablecoin transaction value as a
+        % of total transaction value, and population adoption.
+      operationId: getAdoptionAnalytics
+      parameters:
+        - $ref: '#/components/parameters/Year'
+        - $ref: '#/components/parameters/Month'
+        - $ref: '#/components/parameters/ReferenceAssetFilter'
+        - $ref: '#/components/parameters/StablecoinFilter'
+        - $ref: '#/components/parameters/CountryFilter'
+        - $ref: '#/components/parameters/RegionQuery'
+      responses:
+        '200':
+          description: Country-level adoption metrics
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CountryAdoptionMetric'
+
+  /analytics/corridors:
+    get:
+      tags: [Analytics]
+      summary: Cross-border stablecoin flow corridors
+      description: |
+        Feeds the **Corridor Flows** map and table. Each item represents the
+        directed flow between two countries during the selected period.
+      operationId: getCorridorAnalytics
+      parameters:
+        - $ref: '#/components/parameters/Year'
+        - $ref: '#/components/parameters/Month'
+        - $ref: '#/components/parameters/ReferenceAssetFilter'
+        - $ref: '#/components/parameters/StablecoinFilter'
+        - $ref: '#/components/parameters/CountryFilter'
+        - in: query
+          name: regionFrom
+          schema: { type: string }
+        - in: query
+          name: regionTo
+          schema: { type: string }
+        - in: query
+          name: bidirectional
+          schema: { type: boolean, default: false }
+          description: If true, collapse A→B and B→A into a single bidirectional record.
+      responses:
+        '200':
+          description: List of corridor flows
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  oneOf:
+                    - $ref: '#/components/schemas/CorridorFlow'
+                    - $ref: '#/components/schemas/BidirectionalCorridorFlow'
+
+  /analytics/countries/{countryId}/overview:
+    parameters:
+      - $ref: '#/components/parameters/CountryIdPath'
+    get:
+      tags: [Analytics]
+      summary: Country deep-dive overview
+      description: Feeds the **CountryView** page (KPIs + regulation block).
+      operationId: getCountryOverview
+      parameters:
+        - $ref: '#/components/parameters/Year'
+        - $ref: '#/components/parameters/Month'
+        - $ref: '#/components/parameters/ReferenceAssetFilter'
+      responses:
+        '200':
+          description: Country overview
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CountryOverview'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /analytics/countries/{countryId}/corridors:
+    parameters:
+      - $ref: '#/components/parameters/CountryIdPath'
+    get:
+      tags: [Analytics]
+      summary: Inflow / outflow corridors for a country
+      operationId: getCountryCorridors
+      parameters:
+        - $ref: '#/components/parameters/Year'
+        - $ref: '#/components/parameters/Month'
+        - $ref: '#/components/parameters/ReferenceAssetFilter'
+        - in: query
+          name: direction
+          schema:
+            type: string
+            enum: [inflow, outflow, both]
+            default: both
+        - in: query
+          name: topStablecoins
+          schema: { type: integer, minimum: 0, maximum: 10, default: 3 }
+          description: Number of top stablecoins to break down per corridor.
+      responses:
+        '200':
+          description: Inflow / outflow corridors with top-N stablecoin breakdown
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CountryCorridorBreakdown'
+
+  # ---------------------------------------------------------------------------
+  # Admin (private — "Plan B" for populating the database over HTTP)
+  # ---------------------------------------------------------------------------
+  /admin/sync/all:
+    post:
+      tags: [Admin]
+      summary: Populate the database (population + Allium wallets)
+      description: |
+        Private maintenance endpoint. Runs the World Bank population sync and the
+        Allium wallet-count sync sequentially. The Allium step is skipped if
+        `ALLIUM_API_KEY` is not configured on the server.
+
+        Requires the secret admin token (env `ADMIN_SYNC_TOKEN`) sent in the
+        `x-admin-token` header.
+      operationId: adminSyncAll
+      security:
+        - adminToken: []
+      responses:
+        '200':
+          description: Sync completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminSyncResult'
+        '401':
+          $ref: '#/components/responses/AdminUnauthorized'
+        '403':
+          $ref: '#/components/responses/AdminDisabled'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /admin/sync/wallets:
+    post:
+      tags: [Admin]
+      summary: Sync Allium stablecoin-holding wallet counts
+      description: |
+        Private maintenance endpoint. Triggers the Allium Explorer query (async),
+        waits for the result and stores one historical snapshot per country for
+        the current month.
+
+        Requires the secret admin token (env `ADMIN_SYNC_TOKEN`) sent in the
+        `x-admin-token` header.
+      operationId: adminSyncWallets
+      security:
+        - adminToken: []
+      responses:
+        '200':
+          description: Allium wallet sync completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminSyncResult'
+        '401':
+          $ref: '#/components/responses/AdminUnauthorized'
+        '403':
+          $ref: '#/components/responses/AdminDisabled'
+        '503':
+          description: ALLIUM_API_KEY is not configured on the server
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminSyncResult'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /admin/sync/population:
+    post:
+      tags: [Admin]
+      summary: Sync country population figures (World Bank)
+      description: |
+        Private maintenance endpoint. Fetches the latest population per country
+        from the World Bank Open Data API and upserts it onto the Country docs.
+
+        Requires the secret admin token (env `ADMIN_SYNC_TOKEN`) sent in the
+        `x-admin-token` header.
+      operationId: adminSyncPopulation
+      security:
+        - adminToken: []
+      responses:
+        '200':
+          description: Population sync completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminSyncResult'
+        '401':
+          $ref: '#/components/responses/AdminUnauthorized'
+        '403':
+          $ref: '#/components/responses/AdminDisabled'
+        default:
+          $ref: '#/components/responses/Error'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    adminToken:
+      type: apiKey
+      in: header
+      name: x-admin-token
+      description: |
+        Secret token for the private admin sync endpoints. Must match the
+        `ADMIN_SYNC_TOKEN` value configured on the server (application properties).
+
+  # ---------------------------------------------------------------------------
+  # Reusable parameters
+  # ---------------------------------------------------------------------------
+  parameters:
+    CountryIdPath:
+      in: path
+      name: countryId
+      required: true
+      schema: { $ref: '#/components/schemas/CountryCode' }
+
+    IssuerIdPath:
+      in: path
+      name: issuerId
+      required: true
+      schema: { type: string }
+
+    Page:
+      in: query
+      name: page
+      schema: { type: integer, minimum: 1, default: 1 }
+
+    PageSize:
+      in: query
+      name: pageSize
+      schema: { type: integer, minimum: 1, maximum: 200, default: 25 }
+
+    Sort:
+      in: query
+      name: sort
+      description: 'Sort expression, e.g. `name,-adoption`'
+      schema: { type: string }
+
+    SearchQuery:
+      in: query
+      name: q
+      schema: { type: string }
+      description: Free-text search.
+
+    RegionQuery:
+      in: query
+      name: region
+      schema: { type: string }
+
+    DateFrom:
+      in: query
+      name: dateFrom
+      schema: { type: string, format: date }
+
+    DateTo:
+      in: query
+      name: dateTo
+      schema: { type: string, format: date }
+
+    Year:
+      in: query
+      name: year
+      required: true
+      schema: { type: integer, minimum: 2000, maximum: 2100 }
+
+    Month:
+      in: query
+      name: month
+      schema: { type: integer, minimum: 1, maximum: 12 }
+      description: Optional. If omitted, the endpoint aggregates the full year.
+
+    ReferenceAssetFilter:
+      in: query
+      name: referenceAsset
+      schema: { $ref: '#/components/schemas/ReferenceAssetCode' }
+
+    StablecoinFilter:
+      in: query
+      name: stablecoinId
+      schema:
+        type: string
+        description: Stablecoin id or `All`.
+
+    CountryFilter:
+      in: query
+      name: countryId
+      schema:
+        oneOf:
+          - $ref: '#/components/schemas/CountryCode'
+          - { type: string, enum: [All] }
+
+  # ---------------------------------------------------------------------------
+  # Reusable responses
+  # ---------------------------------------------------------------------------
+  responses:
+    NotFound:
+      description: Resource not found
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Error:
+      description: Unexpected error
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    AdminUnauthorized:
+      description: Missing or invalid admin token
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/AdminSyncResult' }
+    AdminDisabled:
+      description: Admin sync endpoint is disabled (ADMIN_SYNC_TOKEN not configured)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/AdminSyncResult' }
+
+  # ---------------------------------------------------------------------------
+  # Schemas
+  # ---------------------------------------------------------------------------
+  schemas:
+    # --- Primitive value objects -------------------------------------------
+    CountryCode:
+      type: string
+      description: ISO 3166-1 numeric (zero-padded up to 3 digits, e.g. "840" for the United States).
+      pattern: '^[0-9]{1,3}$'
+      example: '840'
+
+    ReferenceAssetCode:
+      type: string
+      description: Reference asset code (ISO 4217 for fiat; symbolic for commodities/crypto).
+      example: USD
+
+    ReserveTypeCode:
+      type: string
+      enum: [fiat, commodity, crypto, algorithmic, other]
+
+    TransactionType:
+      type: string
+      enum: [p2p, b2b, b2c, remittance, exchange, other]
+
+    # --- Admin sync response envelope --------------------------------------
+    AdminSyncResult:
+      type: object
+      required: [success, statusCode, message]
+      properties:
+        success: { type: boolean, example: true }
+        statusCode: { type: integer, example: 200 }
+        request:
+          type: object
+          properties:
+            ip: { type: string }
+            method: { type: string, example: POST }
+            url: { type: string, example: /v1/admin/sync/all }
+        message: { type: string, example: Database population completed. }
+        data:
+          type: object
+          nullable: true
+          additionalProperties: { type: string }
+          example:
+            population: completed
+            wallets: completed
+
+    Money:
+      type: object
+      required: [amount, currency]
+      properties:
+        amount:
+          type: number
+          format: double
+          description: Amount expressed in `currency`.
+        currency:
+          type: string
+          description: ISO 4217 code (`USD` for normalized analytic values).
+          example: USD
+
+    # --- Pagination envelope -----------------------------------------------
+    PageMeta:
+      type: object
+      required: [page, pageSize, total]
+      properties:
+        page: { type: integer, minimum: 1 }
+        pageSize: { type: integer, minimum: 1 }
+        total: { type: integer, minimum: 0 }
+        totalPages: { type: integer, minimum: 0 }
+
+    Problem:
+      type: object
+      description: RFC 7807 problem details.
+      required: [type, title, status]
+      properties:
+        type: { type: string, format: uri }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string }
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              field: { type: string }
+              message: { type: string }
+
+    # --- Entities (1:1 with the data model) --------------------------------
+    Country:
+      type: object
+      required: [countryId, name, region]
+      properties:
+        countryId: { $ref: '#/components/schemas/CountryCode' }
+        name: { type: string }
+        region: { type: string, example: South America }
+
+    Issuer:
+      type: object
+      required: [issuerId, name, originCountry]
+      properties:
+        issuerId: { type: string }
+        name: { type: string, example: Circle }
+        originCountry: { $ref: '#/components/schemas/CountryCode' }
+
+    Stablecoin:
+      type: object
+      required: [stablecoinId, name, issuerId, referenceAsset]
+      properties:
+        stablecoinId: { type: string }
+        name: { type: string, example: USDC }
+        issuerId: { type: string }
+        referenceAsset: { $ref: '#/components/schemas/ReferenceAssetCode' }
+
+    License:
+      type: object
+      required: [licenseId, name, type, countryId]
+      properties:
+        licenseId: { type: string }
+        name: { type: string }
+        type: { type: string, description: e.g. Money Transmitter, Trust Charter, ... }
+        countryId: { $ref: '#/components/schemas/CountryCode' }
+
+    ReserveType:
+      type: object
+      required: [reserveType]
+      properties:
+        reserveType: { $ref: '#/components/schemas/ReserveTypeCode' }
+        description: { type: string }
+
+    ReferenceAsset:
+      type: object
+      required: [referenceAsset, reserveType]
+      properties:
+        referenceAsset: { $ref: '#/components/schemas/ReferenceAssetCode' }
+        reserveType: { $ref: '#/components/schemas/ReserveTypeCode' }
+
+    ExchangeRate:
+      type: object
+      required: [referenceAsset, currencyOriginal, usdExchangeRate, date]
+      properties:
+        type: { type: string }
+        referenceAsset: { $ref: '#/components/schemas/ReferenceAssetCode' }
+        currencyOriginal: { type: string, description: ISO 4217 }
+        usdExchangeRate: { type: number, format: double }
+        date: { type: string, format: date }
+
+    Wallet:
+      type: object
+      required: [walletId, countryId, dateOpened]
+      properties:
+        walletId: { type: string }
+        countryId: { $ref: '#/components/schemas/CountryCode' }
+        dateOpened: { type: string, format: date }
+        dateClosed: { type: string, format: date, nullable: true }
+
+    Transaction:
+      type: object
+      required:
+        [transactionId, senderCountryId, receiverCountryId, date, type, stablecoinId, value]
+      properties:
+        transactionId: { type: string }
+        senderCountryId: { $ref: '#/components/schemas/CountryCode' }
+        receiverCountryId: { $ref: '#/components/schemas/CountryCode' }
+        date: { type: string, format: date }
+        type: { $ref: '#/components/schemas/TransactionType' }
+        stablecoinId: { type: string }
+        value: { $ref: '#/components/schemas/Money' }
+
+    # --- Paginated wrappers (composition; OCP) -----------------------------
+    CountryPage:
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: '#/components/schemas/Country' }
+
+    IssuerPage:
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: '#/components/schemas/Issuer' }
+
+    StablecoinPage:
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: '#/components/schemas/Stablecoin' }
+
+    LicensePage:
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: '#/components/schemas/License' }
+
+    ExchangeRatePage:
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: '#/components/schemas/ExchangeRate' }
+
+    WalletPage:
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: '#/components/schemas/Wallet' }
+
+    TransactionPage:
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: '#/components/schemas/Transaction' }
+
+    # --- Analytics DTOs ----------------------------------------------------
+    CountryAdoptionMetric:
+      type: object
+      required: [countryId, name, region, adoptionRate, activeWallets, txValueShare]
+      description: One row of the adoption heatmap.
+      properties:
+        countryId: { $ref: '#/components/schemas/CountryCode' }
+        name: { type: string }
+        region: { type: string }
+        adoptionRate:
+          type: number
+          format: double
+          description: Share of population using stablecoins (0..1 or %, see `unit`).
+        activeWallets:
+          type: integer
+          description: Number of active wallets holding stablecoins.
+        txValueShare:
+          type: number
+          format: double
+          description: Stablecoin transaction value as % of total transaction value.
+        unit:
+          type: string
+          enum: [ratio, percent]
+          default: percent
+
+    CorridorFlow:
+      type: object
+      required: [from, to, value, dollarizationIndex]
+      properties:
+        from: { $ref: '#/components/schemas/CountryCode' }
+        to: { $ref: '#/components/schemas/CountryCode' }
+        value: { $ref: '#/components/schemas/Money' }
+        dollarizationIndex:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 1
+        topStablecoins:
+          type: array
+          items: { $ref: '#/components/schemas/StablecoinShare' }
+
+    BidirectionalCorridorFlow:
+      type: object
+      required: [country1, country2, valueFromCountry1, valueFromCountry2, totalValue]
+      properties:
+        country1: { $ref: '#/components/schemas/CountryCode' }
+        country2: { $ref: '#/components/schemas/CountryCode' }
+        valueFromCountry1: { $ref: '#/components/schemas/Money' }
+        valueFromCountry2: { $ref: '#/components/schemas/Money' }
+        totalValue: { $ref: '#/components/schemas/Money' }
+        dollarizationIndex:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 1
+
+    StablecoinShare:
+      type: object
+      required: [stablecoinId, name, share]
+      properties:
+        stablecoinId: { type: string }
+        name: { type: string }
+        share:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 1
+          description: Share of corridor value held in this stablecoin.
+
+    CountryOverview:
+      type: object
+      required:
+        [countryId, name, adoptionRate, activeWallets, txValueShare, dollarizationIndex,
+         compliantIssuers, licenses, reserveTypes]
+      properties:
+        countryId: { $ref: '#/components/schemas/CountryCode' }
+        name: { type: string }
+        region: { type: string }
+        adoptionRate: { type: number, format: double }
+        activeWallets: { type: integer, description: Wallets holding stablecoins (latest monthly Allium snapshot) }
+        txValueShare: { type: number, format: double }
+        dollarizationIndex: { type: number, format: double, minimum: 0, maximum: 1 }
+        compliantIssuers:
+          type: array
+          items: { $ref: '#/components/schemas/Issuer' }
+        licenses:
+          type: array
+          items: { $ref: '#/components/schemas/License' }
+        reserveTypes:
+          type: array
+          items: { $ref: '#/components/schemas/ReserveType' }
+        economicIntegration: { type: string }
+        currencySovereignty: { type: string }
+
+    CountryCorridorBreakdown:
+      type: object
+      required: [countryId, inflows, outflows]
+      properties:
+        countryId: { $ref: '#/components/schemas/CountryCode' }
+        inflows:
+          type: array
+          items: { $ref: '#/components/schemas/CorridorFlow' }
+        outflows:
+          type: array
+          items: { $ref: '#/components/schemas/CorridorFlow' }
