@@ -1,4 +1,4 @@
-export type TransactionTypeValue = 'p2p' | 'b2b' | 'b2c' | 'remittance' | 'exchange' | 'other';
+export type TransactionTypeValue = 'p2p' | 'b2b' | 'b2c' | 'remittance' | 'exchange' | 'other' | 'corridor';
 
 const VALID: ReadonlyArray<TransactionTypeValue> = [
     'p2p',
@@ -7,6 +7,7 @@ const VALID: ReadonlyArray<TransactionTypeValue> = [
     'remittance',
     'exchange',
     'other',
+    'corridor',
 ];
 
 export class TransactionType {

@@ -14,6 +14,9 @@ export const DB_URL = process.env.DB_URL ?? 'mongodb://localhost:27017/sc-tracke
 export const WALLETS_QUERY_ID =
     process.env.ALLIUM_WALLETS_QUERY_ID ?? 'o0VH4UGyeKr55L34qxPG';
 
+export const CORRIDORS_QUERY_ID =
+    process.env.ALLIUM_CORRIDORS_QUERY_ID ?? 'MxaKAhHTsM0QohPMPqne';
+
 export const RUN_LIMIT = 10000;
 export const POLL_INTERVAL_MS = 5000;
 export const MAX_POLLS = 120;

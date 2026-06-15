@@ -7,8 +7,15 @@ export interface ITransactionDoc extends Document {
     receiverCountryId: string;
     date: Date;
     type: TransactionTypeValue;
-    stablecoinId: string;
+    stablecoinId?: string;
     value: { amount: number; currency: string };
+    // Allium corridor snapshot fields (type === 'corridor')
+    tokenSymbol?: string;
+    transactionCount?: number;
+    usdStablecoinVolume?: number;
+    pctUsdStablecoins?: number;
+    period?: string;
+    source?: string;
 }
 
 const TransactionSchema = new Schema<ITransactionDoc>(
@@ -20,13 +27,19 @@ const TransactionSchema = new Schema<ITransactionDoc>(
         type: {
             type: String,
             required: true,
-            enum: ['p2p', 'b2b', 'b2c', 'remittance', 'exchange', 'other'],
+            enum: ['p2p', 'b2b', 'b2c', 'remittance', 'exchange', 'other', 'corridor'],
         },
-        stablecoinId: { type: String, required: true, index: true },
+        stablecoinId: { type: String, index: true },
         value: {
             amount: { type: Number, required: true },
             currency: { type: String, required: true },
         },
+        tokenSymbol: { type: String, index: true },
+        transactionCount: { type: Number },
+        usdStablecoinVolume: { type: Number },
+        pctUsdStablecoins: { type: Number },
+        period: { type: String, index: true },
+        source: { type: String },
     },
     { timestamps: true },
 );

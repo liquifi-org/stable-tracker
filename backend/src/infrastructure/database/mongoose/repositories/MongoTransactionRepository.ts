@@ -18,7 +18,7 @@ export class MongoTransactionRepository implements ITransactionRepository {
             dateTo,
         } = params;
 
-        const filter: Record<string, unknown> = {};
+        const filter: Record<string, unknown> = { type: { $ne: 'corridor' } };
         if (senderCountryId) filter['senderCountryId'] = senderCountryId;
         if (receiverCountryId) filter['receiverCountryId'] = receiverCountryId;
         if (stablecoinId) filter['stablecoinId'] = stablecoinId;
@@ -44,7 +44,7 @@ export class MongoTransactionRepository implements ITransactionRepository {
                     receiverCountryId: d.receiverCountryId,
                     date: d.date,
                     type: d.type as TransactionTypeValue,
-                    stablecoinId: d.stablecoinId,
+                    stablecoinId: d.stablecoinId ?? '',
                     value: { amount: d.value.amount, currency: d.value.currency },
                 }),
         );
