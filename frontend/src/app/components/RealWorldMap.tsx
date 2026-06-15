@@ -45,13 +45,6 @@ export function RealWorldMap({ countries }: RealWorldMapProps) {
       .catch(err => console.error('Error loading world map:', err));
   }, []);
 
-  // Reset selected country if it's filtered out
-  useEffect(() => {
-    if (selectedId && !countries.find(c => c.countryId === selectedId)) {
-      setSelectedId(null);
-    }
-  }, [countries, selectedId]);
-
   if (!worldData) {
     return (
       <div className="bg-slate-900 rounded-xl border border-slate-700/50 p-8 flex items-center justify-center" style={{ height: '600px' }}>
@@ -67,10 +60,7 @@ export function RealWorldMap({ countries }: RealWorldMapProps) {
   const pathGenerator = geoPath().projection(projection);
   const geojson = feature(worldData, worldData.objects.countries);
 
-  // Only countries with activeWallets > 0 are interactive/coloured
-  const countryDataMap = new Map(
-    countries.filter(c => c.activeWallets > 0).map(c => [c.countryId, c])
-  );
+  const countryDataMap = new Map(countries.map(c => [c.countryId, c]));
 
   const handleCountryClick = (id: string) => setSelectedId(id);
 
@@ -140,15 +130,15 @@ export function RealWorldMap({ countries }: RealWorldMapProps) {
               let strokeWidth = 0.5;
               let opacity = 0.8;
 
-              if (countryData) {
+              if (countryData && countryData.activeWallets > 0) {
                 fillColor = getColor(countryData.adoptionRate);
                 strokeColor = '#64748b';
                 strokeWidth = 1;
                 opacity = 0.9;
               }
 
-              const isHovered  = hoveredId  === numericId && !!countryData;
-              const isSelected = selectedId === numericId && !!countryData;
+              const isHovered  = hoveredId  === numericId;
+              const isSelected = selectedId === numericId;
 
               if (isHovered || isSelected) {
                 strokeColor = isSelected ? 'var(--brand)' : 'var(--brand-400)';
@@ -167,10 +157,10 @@ export function RealWorldMap({ countries }: RealWorldMapProps) {
                   stroke={strokeColor}
                   strokeWidth={strokeWidth}
                   opacity={opacity}
-                  onMouseEnter={countryData ? (e) => handleMouseMove(e, numericId) : undefined}
+                  onMouseEnter={(e) => handleMouseMove(e, numericId)}
                   onMouseLeave={() => setHoveredId(null)}
-                  onClick={countryData ? () => handleCountryClick(numericId) : undefined}
-                  className={countryData ? 'cursor-pointer transition-all' : 'pointer-events-none'}
+                  onClick={() => handleCountryClick(numericId)}
+                  className="cursor-pointer transition-all"
                   filter={isHovered || isSelected ? 'url(#world-glow)' : undefined}
                 />
               );
@@ -179,7 +169,7 @@ export function RealWorldMap({ countries }: RealWorldMapProps) {
         </div>
       </div>
 
-      {hoveredData && (
+      {hoveredId && hoveredData && (
         <div
           className="fixed z-50 bg-slate-900/98 backdrop-blur-md border border-[var(--brand)]/50 rounded-lg shadow-lg pointer-events-none transition-all"
           style={{ left: tooltipPos.x + 15, top: tooltipPos.y - 120, minWidth: '650px' }}
@@ -189,55 +179,71 @@ export function RealWorldMap({ countries }: RealWorldMapProps) {
             <p className="text-xs text-slate-400">{hoveredData.region}</p>
           </div>
 
-          <div className="grid grid-cols-2 divide-x divide-slate-700">
-            <div className="px-4 py-3">
-              <div className="text-xs font-semibold text-[var(--brand-300)] italic mb-3">Adoption</div>
-              <div className="space-y-2 text-xs">
-                <div className="flex justify-between items-center">
-                  <span className="text-slate-400">% of population</span>
-                  <span className="text-white font-bold text-base">{fmtPct(hoveredData.adoptionRate)}</span>
+          {hoveredData.activeWallets > 0 ? (
+            <div className="grid grid-cols-2 divide-x divide-slate-700">
+              <div className="px-4 py-3">
+                <div className="text-xs font-semibold text-[var(--brand-300)] italic mb-3">Adoption</div>
+                <div className="space-y-2 text-xs">
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-400">% of population</span>
+                    <span className="text-white font-bold text-base">{fmtPct(hoveredData.adoptionRate)}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-400">Active wallets</span>
+                    <span className="text-white font-semibold">{fmtWallets(hoveredData.activeWallets)}</span>
+                  </div>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-slate-400">Active wallets</span>
-                  <span className="text-white font-semibold">{fmtWallets(hoveredData.activeWallets)}</span>
+              </div>
+              <div className="px-4 py-3">
+                <div className="text-xs font-semibold text-[var(--brand-300)] italic mb-3">Economic integration</div>
+                <div className="space-y-2 text-xs">
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-400">Stablecoin TX value share</span>
+                    <span className="text-white font-bold text-base">{fmtPct(hoveredData.txValueShare)}</span>
+                  </div>
                 </div>
               </div>
             </div>
-
-            <div className="px-4 py-3">
-              <div className="text-xs font-semibold text-[var(--brand-300)] italic mb-3">Economic integration</div>
-              <div className="space-y-2 text-xs">
-                <div className="flex justify-between items-center">
-                  <span className="text-slate-400">Stablecoin TX value share</span>
-                  <span className="text-white font-bold text-base">{fmtPct(hoveredData.txValueShare)}</span>
-                </div>
-              </div>
-            </div>
-          </div>
+          ) : (
+            <div className="px-4 py-3 text-xs text-slate-400 italic">No data available for this period</div>
+          )}
         </div>
       )}
 
-      {selectedData && (
+      {selectedId && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 backdrop-blur-sm" onClick={() => setSelectedId(null)}>
           <div className="bg-white dark:bg-neutral-800 border border-[var(--brand)]/30 rounded-xl p-8 max-w-lg w-full mx-4 shadow-lg transition-all" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">{selectedData.name}</h3>
-            <p className="text-sm text-slate-600 dark:text-slate-400 mb-6">{selectedData.region}</p>
-            <div className="space-y-4">
-              <div className="flex justify-between items-center p-4 bg-[var(--brand-50)] dark:bg-slate-800 rounded-lg">
-                <span className="text-gray-600 dark:text-slate-300">% of population using stablecoins</span>
-                <span className="text-gray-900 dark:text-white font-bold text-xl">{fmtPct(selectedData.adoptionRate)}</span>
-              </div>
-              <div className="border-t border-[var(--brand)]/20 pt-4 space-y-3">
-                <div className="flex justify-between text-gray-600 dark:text-slate-300">
-                  <span>Active wallets</span>
-                  <span className="font-semibold text-gray-900 dark:text-white">{fmtWallets(selectedData.activeWallets)}</span>
-                </div>
-                <div className="flex justify-between text-gray-600 dark:text-slate-300">
-                  <span>Stablecoin TX value share</span>
-                  <span className="font-semibold text-gray-900 dark:text-white">{fmtPct(selectedData.txValueShare)}</span>
-                </div>
-              </div>
-            </div>
+            {selectedData ? (
+              <>
+                <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">{selectedData.name}</h3>
+                <p className="text-sm text-slate-600 dark:text-slate-400 mb-6">{selectedData.region}</p>
+                {selectedData.activeWallets > 0 ? (
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center p-4 bg-[var(--brand-50)] dark:bg-slate-800 rounded-lg">
+                      <span className="text-gray-600 dark:text-slate-300">% of population using stablecoins</span>
+                      <span className="text-gray-900 dark:text-white font-bold text-xl">{fmtPct(selectedData.adoptionRate)}</span>
+                    </div>
+                    <div className="border-t border-[var(--brand)]/20 pt-4 space-y-3">
+                      <div className="flex justify-between text-gray-600 dark:text-slate-300">
+                        <span>Active wallets</span>
+                        <span className="font-semibold text-gray-900 dark:text-white">{fmtWallets(selectedData.activeWallets)}</span>
+                      </div>
+                      <div className="flex justify-between text-gray-600 dark:text-slate-300">
+                        <span>Stablecoin TX value share</span>
+                        <span className="font-semibold text-gray-900 dark:text-white">{fmtPct(selectedData.txValueShare)}</span>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-slate-500 dark:text-slate-400 italic mb-6">No data available for this period</p>
+                )}
+              </>
+            ) : (
+              <>
+                <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">Country {selectedId}</h3>
+                <p className="text-slate-500 dark:text-slate-400 italic mb-6">No data available</p>
+              </>
+            )}
             <div className="flex gap-3 mt-8">
               <button
                 onClick={handleViewDetails}

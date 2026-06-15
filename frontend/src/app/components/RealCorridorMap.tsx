@@ -1,6 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { geoPath, geoMercator } from 'd3-geo';
 import { feature } from 'topojson-client';
+
+interface StablecoinEntry {
+  name: string;
+  share: number;
+}
 
 interface BidirectionalCorridor {
   country1: string;
@@ -8,81 +13,32 @@ interface BidirectionalCorridor {
   valueFromCountry1: number;
   valueFromCountry2: number;
   totalValue: number;
-  dollarization: number;
+  dollarizationIndex: number;
+  topStablecoinsFrom1?: StablecoinEntry[];
+  topStablecoinsFrom2?: StablecoinEntry[];
 }
 
 interface RealCorridorMapProps {
   corridors: BidirectionalCorridor[];
   getCountryName: (code: string) => string;
+  limit?: number;
 }
 
-const countryCodeToId: Record<string, string> = {
-  US: '840',
-  MX: '484',
-  BR: '076',
-  AR: '032',
-  VE: '862',
-  GB: '826',
-  FR: '250',
-  DE: '276',
-  TR: '792',
-  NG: '566',
-  KE: '404',
-  IN: '356',
-  CN: '156',
-  JP: '392',
-  PH: '608',
-};
-
 const countryCodeToISO2: Record<string, string> = {
-  US: 'us',
-  MX: 'mx',
-  BR: 'br',
-  AR: 'ar',
-  VE: 've',
-  GB: 'gb',
-  FR: 'fr',
-  DE: 'de',
-  TR: 'tr',
-  NG: 'ng',
-  KE: 'ke',
-  IN: 'in',
-  CN: 'cn',
-  JP: 'jp',
-  PH: 'ph',
+  US: 'us', MX: 'mx', BR: 'br', AR: 'ar', VE: 've',
+  GB: 'gb', FR: 'fr', DE: 'de', TR: 'tr', NG: 'ng',
+  KE: 'ke', IN: 'in', CN: 'cn', JP: 'jp', PH: 'ph',
+  AU: 'au', AT: 'at', TW: 'tw', ID: 'id', KR: 'kr',
+  NL: 'nl', ZA: 'za', UA: 'ua', IR: 'ir',
 };
 
 const countryCentroids: Record<string, [number, number]> = {
-  US: [-95, 38],
-  MX: [-102, 23],
-  BR: [-47, -14],
-  AR: [-64, -34],
-  VE: [-66, 8],
-  GB: [-2, 54],
-  FR: [2, 47],
-  DE: [10, 51],
-  TR: [35, 39],
-  NG: [8, 9],
-  KE: [38, 1],
-  IN: [78, 22],
-  CN: [105, 35],
-  JP: [138, 36],
-  PH: [122, 12],
+  US: [-95, 38],   MX: [-102, 23],  BR: [-47, -14],  AR: [-64, -34],  VE: [-66, 8],
+  GB: [-2, 54],    FR: [2, 47],     DE: [10, 51],    TR: [35, 39],    NG: [8, 9],
+  KE: [38, 1],     IN: [78, 22],    CN: [105, 35],   JP: [138, 36],   PH: [122, 12],
+  AU: [134, -25],  AT: [14.5, 47.5], TW: [121, 23.5], ID: [118, -2],  KR: [128, 36],
+  NL: [5.3, 52.4], ZA: [25, -29],   UA: [32, 48.4],  IR: [53, 32],
 };
-
-function getStrokeWidth(value: number): number {
-  if (value >= 5000000000) return 4;
-  if (value >= 2000000000) return 3;
-  if (value >= 1000000000) return 2;
-  return 1.5;
-}
-
-function getCorridorColor(value: number): string {
-  if (value >= 5000000000) return '#8b5cf6'; // purple
-  if (value >= 2000000000) return '#06b6d4'; // cyan
-  if (value >= 1000000000) return '#f59e0b'; // amber
-  return '#ec4899'; // pink
-}
 
 function formatValue(value: number): string {
   if (value >= 1000000000) return `$${(value / 1000000000).toFixed(1)}B`;
@@ -90,11 +46,36 @@ function formatValue(value: number): string {
   return `$${value}`;
 }
 
-export function RealCorridorMap({ corridors, getCountryName }: RealCorridorMapProps) {
+export function RealCorridorMap({ corridors, getCountryName, limit }: RealCorridorMapProps) {
   const [worldData, setWorldData] = useState<any>(null);
   const [hoveredCorridor, setHoveredCorridor] = useState<number | null>(null);
   const [selectedCorridor, setSelectedCorridor] = useState<number | null>(null);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
+
+  // Sort by total volume descending; apply optional limit
+  const top20 = useMemo(() => {
+    const sorted = [...corridors].sort((a, b) => b.totalValue - a.totalValue);
+    return limit !== undefined ? sorted.slice(0, limit) : sorted;
+  }, [corridors, limit]);
+
+  const maxVolume = top20[0]?.totalValue ?? 1;
+  const minVolume = top20[top20.length - 1]?.totalValue ?? 0;
+  const volumeRange = Math.max(maxVolume - minVolume, 1);
+
+  // Stroke width: 1.5px (lowest) → 5px (highest), relative to the visible set
+  function lineWidth(value: number): number {
+    return 1.5 + ((value - minVolume) / volumeRange) * 3.5;
+  }
+
+  // Monochromatic violet palette matching the brand aesthetic
+  function lineColor(value: number): string {
+    const ratio = (value - minVolume) / volumeRange;
+    if (ratio >= 0.8) return '#4c1d95'; // violet-900
+    if (ratio >= 0.6) return '#5b21b6'; // violet-800
+    if (ratio >= 0.4) return '#6d28d9'; // violet-700
+    if (ratio >= 0.2) return '#7c3aed'; // violet-600
+    return '#8b5cf6';                   // violet-500
+  }
 
   useEffect(() => {
     fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json')
@@ -103,12 +84,11 @@ export function RealCorridorMap({ corridors, getCountryName }: RealCorridorMapPr
       .catch(err => console.error('Error loading world map:', err));
   }, []);
 
-  // Reset selected corridor if it's filtered out
   useEffect(() => {
-    if (selectedCorridor !== null && selectedCorridor >= corridors.length) {
+    if (selectedCorridor !== null && selectedCorridor >= top20.length) {
       setSelectedCorridor(null);
     }
-  }, [corridors, selectedCorridor]);
+  }, [top20, selectedCorridor]);
 
   if (!worldData) {
     return (
@@ -130,40 +110,33 @@ export function RealCorridorMap({ corridors, getCountryName }: RealCorridorMapPr
     setTooltipPos({ x: e.clientX, y: e.clientY });
   };
 
-  const hoveredData = hoveredCorridor !== null ? corridors[hoveredCorridor] : null;
-  const selectedData = selectedCorridor !== null ? corridors[selectedCorridor] : null;
+  const hoveredData = hoveredCorridor !== null ? top20[hoveredCorridor] : null;
+  const selectedData = selectedCorridor !== null ? top20[selectedCorridor] : null;
 
   const legendItems = [
-    { label: '<$1B', width: 1.5, color: '#ec4899' },
-    { label: '$1-2B', width: 2, color: '#f59e0b' },
-    { label: '$2-5B', width: 3, color: '#06b6d4' },
-    { label: '$5B+', width: 4, color: '#8b5cf6' },
+    { label: 'Low', width: 1.5, color: '#8b5cf6' },
+    { label: 'Mid', width: 2.5, color: '#7c3aed' },
+    { label: 'High', width: 3.5, color: '#5b21b6' },
+    { label: 'Peak', width: 5, color: '#4c1d95' },
   ];
 
   return (
     <div className="relative">
       <div className="bg-white dark:bg-neutral-800 rounded-xl border border-slate-200/50 dark:border-neutral-700 overflow-hidden shadow-md transition-all">
-        <div className="p-6 border-b border-slate-200/50 dark:border-neutral-700 flex justify-between items-center" style={{ backgroundColor: 'var(--brand)' }}>
-          <div className="flex items-center gap-6">
-            <span className="text-sm text-white font-medium">Transfer volume (line thickness)</span>
-            <div className="flex items-center gap-4">
-              {legendItems.map((item, idx) => (
-                <div key={idx} className="flex items-center gap-2">
-                  <svg width="30" height="12">
-                    <line
-                      x1="0"
-                      y1="6"
-                      x2="30"
-                      y2="6"
-                      stroke={item.color}
-                      strokeWidth={item.width}
-                      strokeLinecap="round"
-                    />
-                  </svg>
-                  <span className="text-xs text-white">{item.label}</span>
-                </div>
-              ))}
-            </div>
+        <div className="px-6 py-4 border-b border-slate-200/50 dark:border-neutral-700 flex justify-between items-center" style={{ backgroundColor: 'var(--brand)' }}>
+          <span className="text-sm text-white font-medium">
+            {limit !== undefined ? `Top ${top20.length} corridors by volume` : `${top20.length} corridors`} · line width = relative volume
+          </span>
+          <div className="flex items-center gap-4">
+            <span className="text-xs text-white/70">{formatValue(minVolume)}</span>
+            {legendItems.map((item, idx) => (
+              <div key={idx} className="flex items-center gap-1">
+                <svg width="28" height="12">
+                  <line x1="0" y1="6" x2="28" y2="6" stroke={item.color} strokeWidth={item.width} strokeLinecap="round" />
+                </svg>
+              </div>
+            ))}
+            <span className="text-xs text-white/70">{formatValue(maxVolume)}</span>
           </div>
         </div>
 
@@ -198,7 +171,7 @@ export function RealCorridorMap({ corridors, getCountryName }: RealCorridorMapPr
               );
             })}
 
-            {corridors.map((corridor, index) => {
+            {top20.map((corridor, index) => {
               const fromCoords = countryCentroids[corridor.country1];
               const toCoords = countryCentroids[corridor.country2];
               if (!fromCoords || !toCoords) return null;
@@ -209,8 +182,8 @@ export function RealCorridorMap({ corridors, getCountryName }: RealCorridorMapPr
 
               const isHovered = hoveredCorridor === index;
               const isSelected = selectedCorridor === index;
-              const strokeWidth = getStrokeWidth(corridor.totalValue);
-              const corridorColor = getCorridorColor(corridor.totalValue);
+              const sw = lineWidth(corridor.totalValue);
+              const color = lineColor(corridor.totalValue);
 
               const dx = toPoint[0] - fromPoint[0];
               const dy = toPoint[1] - fromPoint[1];
@@ -230,10 +203,10 @@ export function RealCorridorMap({ corridors, getCountryName }: RealCorridorMapPr
                 <path
                   key={index}
                   d={path}
-                  stroke={isHovered || isSelected ? '#fff' : corridorColor}
-                  strokeWidth={isHovered || isSelected ? strokeWidth + 1.5 : strokeWidth}
+                  stroke={isHovered || isSelected ? '#fff' : color}
+                  strokeWidth={isHovered || isSelected ? sw + 1.5 : sw}
                   fill="none"
-                  opacity={isHovered || isSelected ? 1 : 0.8}
+                  opacity={isHovered || isSelected ? 1 : 0.85}
                   onMouseEnter={(e) => handleMouseMove(e, index)}
                   onMouseLeave={() => setHoveredCorridor(null)}
                   onClick={() => setSelectedCorridor(index)}
@@ -311,62 +284,24 @@ export function RealCorridorMap({ corridors, getCountryName }: RealCorridorMapPr
                   </td>
                 </tr>
                 <tr className="border-b border-slate-700">
-                  <td rowSpan={4} className="p-2 text-slate-300 bg-slate-800/30 align-top">
-                    <div>Stablecoin share (%)</div>
+                  <td className="p-2 text-slate-300 bg-slate-800/30 align-top">Stablecoin share (%)</td>
+                  <td className="p-2 border-l border-slate-700 bg-slate-800/20">
+                    {(hoveredData.topStablecoinsFrom1 ?? []).map(s => (
+                      <div key={s.name} className="flex justify-between">
+                        <span className="text-slate-400 italic">{s.name}</span>
+                        <span className="text-white font-semibold">{Math.round(s.share * 100)}%</span>
+                      </div>
+                    ))}
+                    {!hoveredData.topStablecoinsFrom1?.length && <span className="text-slate-500">—</span>}
                   </td>
                   <td className="p-2 border-l border-slate-700 bg-slate-800/20">
-                    <div className="flex justify-between">
-                      <span className="text-slate-400 italic">USDT</span>
-                      <span className="text-white font-semibold">49%</span>
-                    </div>
-                  </td>
-                  <td className="p-2 border-l border-slate-700 bg-slate-800/20">
-                    <div className="flex justify-between">
-                      <span className="text-slate-400 italic">USDT</span>
-                      <span className="text-white font-semibold">54%</span>
-                    </div>
-                  </td>
-                </tr>
-                <tr className="border-b border-slate-700">
-                  <td className="p-2 border-l border-slate-700 bg-slate-800/20">
-                    <div className="flex justify-between">
-                      <span className="text-slate-400 italic">USDC</span>
-                      <span className="text-white font-semibold">35%</span>
-                    </div>
-                  </td>
-                  <td className="p-2 border-l border-slate-700 bg-slate-800/20">
-                    <div className="flex justify-between">
-                      <span className="text-slate-400 italic">USDC</span>
-                      <span className="text-white font-semibold">31%</span>
-                    </div>
-                  </td>
-                </tr>
-                <tr className="border-b border-slate-700">
-                  <td className="p-2 border-l border-slate-700 bg-slate-800/20">
-                    <div className="flex justify-between">
-                      <span className="text-slate-400 italic">DAI</span>
-                      <span className="text-white font-semibold">10%</span>
-                    </div>
-                  </td>
-                  <td className="p-2 border-l border-slate-700 bg-slate-800/20">
-                    <div className="flex justify-between">
-                      <span className="text-slate-400 italic">DAI</span>
-                      <span className="text-white font-semibold">8%</span>
-                    </div>
-                  </td>
-                </tr>
-                <tr>
-                  <td className="p-2 border-l border-slate-700 bg-slate-800/20">
-                    <div className="flex justify-between">
-                      <span className="text-slate-400 italic">Other</span>
-                      <span className="text-white font-semibold">6%</span>
-                    </div>
-                  </td>
-                  <td className="p-2 border-l border-slate-700 bg-slate-800/20">
-                    <div className="flex justify-between">
-                      <span className="text-slate-400 italic">Other</span>
-                      <span className="text-white font-semibold">7%</span>
-                    </div>
+                    {(hoveredData.topStablecoinsFrom2 ?? []).map(s => (
+                      <div key={s.name} className="flex justify-between">
+                        <span className="text-slate-400 italic">{s.name}</span>
+                        <span className="text-white font-semibold">{Math.round(s.share * 100)}%</span>
+                      </div>
+                    ))}
+                    {!hoveredData.topStablecoinsFrom2?.length && <span className="text-slate-500">—</span>}
                   </td>
                 </tr>
               </tbody>
@@ -401,7 +336,7 @@ export function RealCorridorMap({ corridors, getCountryName }: RealCorridorMapPr
                 </div>
                 <div className="flex justify-between text-gray-600 dark:text-slate-300">
                   <span>Dollarization index</span>
-                  <span className="font-semibold text-gray-900 dark:text-white">{(selectedData.dollarization * 100).toFixed(0)}%</span>
+                  <span className="font-semibold text-gray-900 dark:text-white">{(selectedData.dollarizationIndex * 100).toFixed(0)}%</span>
                 </div>
               </div>
             </div>

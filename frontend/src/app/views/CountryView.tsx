@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router';
-import { getCountryData, getCorridorsForCountry, getCountryName } from '../data/mockData';
 import { DataTable } from '../components/DataTable';
 import { ArrowLeft, CheckCircle2, Loader2 } from 'lucide-react';
-import { api, ALPHA2_TO_NUMERIC, NUMERIC_TO_ALPHA2, type ApiCountry, type ApiIssuer, type ApiLicense, type ApiReserveType } from '../services/api';
+import { api, resolveToNumericId, type ApiCountry, type ApiIssuer, type ApiLicense, type ApiReserveType, type CountryOverview, type CountryCorridorBreakdown } from '../services/api';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
 
 /** Map of known stablecoin issuer name keywords → Clearbit logo domain */
@@ -76,9 +75,32 @@ function IssuerLogo({ name }: { name: string }) {
   );
 }
 
+const CURRENT_YEAR = new Date().getFullYear();
+
+function fmtPct(ratio: number) {
+  const pct = ratio * 100;
+  if (pct < 0.01) return pct.toFixed(4) + '%';
+  if (pct < 1) return pct.toFixed(2) + '%';
+  return pct.toFixed(1) + '%';
+}
+
+function fmtValue(amount: number) {
+  if (amount >= 1e9) return `$${(amount / 1e9).toFixed(1)}B`;
+  if (amount >= 1e6) return `$${(amount / 1e6).toFixed(0)}M`;
+  return `$${amount.toLocaleString()}`;
+}
+
 export function CountryView() {
   const { countryCode } = useParams<{ countryCode: string }>();
   const navigate = useNavigate();
+
+  const numericId = countryCode ? resolveToNumericId(countryCode) : null;
+
+  const [overview, setOverview] = useState<CountryOverview | null>(null);
+  const [overviewLoading, setOverviewLoading] = useState(false);
+
+  const [corridors, setCorridors] = useState<CountryCorridorBreakdown | null>(null);
+  const [corridorsLoading, setCorridorsLoading] = useState(false);
 
   const [regulatoryLoading, setRegulatoryLoading] = useState(false);
   const [licensesDialogOpen, setLicensesDialogOpen] = useState(false);
@@ -91,16 +113,22 @@ export function CountryView() {
   } | null>(null);
 
   useEffect(() => {
-    if (!countryCode) return;
-    // Accept either ISO alpha-2 (e.g. "US") or ISO numeric string (e.g. "840")
-    const numericId = /^\d+$/.test(countryCode)
-      ? parseInt(countryCode, 10)
-      : ALPHA2_TO_NUMERIC[countryCode];
     if (!numericId) return;
+
+    setOverviewLoading(true);
+    api.getCountryOverview(numericId, CURRENT_YEAR)
+      .then(setOverview)
+      .catch(() => setOverview(null))
+      .finally(() => setOverviewLoading(false));
+
+    setCorridorsLoading(true);
+    api.getCountryCorridors(numericId, CURRENT_YEAR)
+      .then(setCorridors)
+      .catch(() => setCorridors(null))
+      .finally(() => setCorridorsLoading(false));
 
     setRegulatoryLoading(true);
     setApiRegulatory(null);
-
     Promise.all([
       api.getCountry(numericId),
       api.getCountryIssuers(numericId),
@@ -110,63 +138,31 @@ export function CountryView() {
       .then(([countryDetail, issuers, licenses, reserveTypes]) => {
         setApiRegulatory({ countryDetail, issuers, licenses, reserveTypes });
       })
-      .catch(() => {
-        setApiRegulatory(null);
-      })
-      .finally(() => {
-        setRegulatoryLoading(false);
-      });
-  }, [countryCode]);
+      .catch(() => setApiRegulatory(null))
+      .finally(() => setRegulatoryLoading(false));
+  }, [numericId]);
 
-  if (!countryCode) {
-    return <div>Country not found</div>;
-  }
-
-  // Resolve to alpha-2 for mock data lookups (numeric IDs come from map navigation)
-  const alpha2 = /^\d+$/.test(countryCode)
-    ? NUMERIC_TO_ALPHA2[countryCode] ?? countryCode
-    : countryCode;
-
-  const data = getCountryData(alpha2);
-  const { outflows, inflows } = getCorridorsForCountry(alpha2);
-
-  if (!data) {
+  if (!numericId) {
     return <div>Country not found</div>;
   }
 
   const outflowColumns = [
-    {
-      key: 'to',
-      header: 'To',
-    },
+    { key: 'toName', header: 'To' },
     {
       key: 'value',
-      header: 'Stablecoin value ($m)',
-      render: (value: number) => Number((value / 1000000).toFixed(0)).toLocaleString()
+      header: 'Stablecoin volume',
+      render: (v: { amount: number }) => fmtValue(v.amount),
     },
   ];
 
   const inflowColumns = [
-    {
-      key: 'from',
-      header: 'From',
-    },
+    { key: 'fromName', header: 'From' },
     {
       key: 'value',
-      header: 'Stablecoin value ($m)',
-      render: (value: number) => Number((value / 1000000).toFixed(0)).toLocaleString()
+      header: 'Stablecoin volume',
+      render: (v: { amount: number }) => fmtValue(v.amount),
     },
   ];
-
-  const outflowData = outflows.map(c => ({
-    to: getCountryName(c.to),
-    value: c.value,
-  }));
-
-  const inflowData = inflows.map(c => ({
-    from: getCountryName(c.from),
-    value: c.value,
-  }));
 
   return (
     <div className="space-y-6">
@@ -178,7 +174,9 @@ export function CountryView() {
           <ArrowLeft className="w-5 h-5" />
         </button>
         <div>
-          <h2 className="text-2xl font-semibold text-slate-800 dark:text-slate-100">{data.name}</h2>
+          <h2 className="text-2xl font-semibold text-slate-800 dark:text-slate-100">
+            {overview?.name ?? apiRegulatory?.countryDetail?.name ?? `Country ${numericId}`}
+          </h2>
           <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">Country deep dive analysis</p>
         </div>
       </div>
@@ -186,15 +184,21 @@ export function CountryView() {
       <div className="grid grid-cols-3 gap-4">
         <div className="bg-white dark:bg-neutral-800 border border-slate-200/50 dark:border-neutral-700 rounded-lg p-6 shadow-md">
           <div className="text-sm text-slate-600 dark:text-slate-400 mb-2">Population Using Stablecoins</div>
-          <div className="text-3xl font-semibold text-slate-800 dark:text-slate-100">{data.adoption}%</div>
+          <div className="text-3xl font-semibold text-slate-800 dark:text-slate-100">
+            {overviewLoading ? <Loader2 className="w-6 h-6 animate-spin text-slate-400" /> : overview ? fmtPct(overview.adoptionRate) : '—'}
+          </div>
         </div>
         <div className="bg-white dark:bg-neutral-800 border border-slate-200/50 dark:border-neutral-700 rounded-lg p-6 shadow-md">
           <div className="text-sm text-slate-600 dark:text-slate-400 mb-2">Stablecoin TX Value (% of total)</div>
-          <div className="text-3xl font-semibold text-slate-800 dark:text-slate-100">{data.txValue}%</div>
+          <div className="text-3xl font-semibold text-slate-800 dark:text-slate-100">
+            {overviewLoading ? <Loader2 className="w-6 h-6 animate-spin text-slate-400" /> : overview ? fmtPct(overview.txValueShare) : '—'}
+          </div>
         </div>
         <div className="bg-white dark:bg-neutral-800 border border-slate-200/50 dark:border-neutral-700 rounded-lg p-6 shadow-md">
           <div className="text-sm text-slate-600 dark:text-slate-400 mb-2">Dollarization Index</div>
-          <div className="text-3xl font-semibold text-slate-800 dark:text-slate-100">{(data.dollarization * 100).toFixed(0)}%</div>
+          <div className="text-3xl font-semibold text-slate-800 dark:text-slate-100">
+            {overviewLoading ? <Loader2 className="w-6 h-6 animate-spin text-slate-400" /> : overview ? fmtPct(overview.dollarizationIndex) : '—'}
+          </div>
         </div>
       </div>
 
@@ -351,24 +355,13 @@ export function CountryView() {
             </div>
           </div>
 
-          {/* Regulatory context / fallback to mock */}
+          {/* Regulatory context */}
           <div className="space-y-3">
-            {apiRegulatory?.countryDetail?.regulatorDescription ? (
+            {apiRegulatory?.countryDetail?.regulatorDescription && (
               <div>
                 <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Regulatory Overview</h4>
                 <p className="text-sm text-slate-600 dark:text-slate-400">{apiRegulatory.countryDetail.regulatorDescription}</p>
               </div>
-            ) : (
-              <>
-                <div>
-                  <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Economic Integration</h4>
-                  <p className="text-sm text-slate-600 dark:text-slate-400">{data.economicIntegration}</p>
-                </div>
-                <div>
-                  <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Currency Sovereignty</h4>
-                  <p className="text-sm text-slate-600 dark:text-slate-400">{data.currencySovereignty}</p>
-                </div>
-              </>
             )}
             {apiRegulatory?.countryDetail?.currency && (
               <div>
@@ -383,8 +376,10 @@ export function CountryView() {
       <div className="space-y-6">
         <div>
           <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4">Outflow Corridors</h3>
-          {outflowData.length > 0 ? (
-            <DataTable data={outflowData} columns={outflowColumns} pageSize={5} />
+          {corridorsLoading ? (
+            <div className="flex items-center gap-2 text-slate-400 text-sm p-4"><Loader2 className="w-4 h-4 animate-spin" /> Loading…</div>
+          ) : corridors && corridors.outflows.length > 0 ? (
+            <DataTable data={corridors.outflows} columns={outflowColumns} pageSize={5} />
           ) : (
             <div className="bg-white dark:bg-neutral-800 border border-slate-200/50 dark:border-neutral-700 rounded-lg p-6 text-center text-slate-500 dark:text-slate-400">
               No outflow corridors available
@@ -394,8 +389,10 @@ export function CountryView() {
 
         <div>
           <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4">Inflow Corridors</h3>
-          {inflowData.length > 0 ? (
-            <DataTable data={inflowData} columns={inflowColumns} pageSize={5} />
+          {corridorsLoading ? (
+            <div className="flex items-center gap-2 text-slate-400 text-sm p-4"><Loader2 className="w-4 h-4 animate-spin" /> Loading…</div>
+          ) : corridors && corridors.inflows.length > 0 ? (
+            <DataTable data={corridors.inflows} columns={inflowColumns} pageSize={5} />
           ) : (
             <div className="bg-white dark:bg-neutral-800 border border-slate-200/50 dark:border-neutral-700 rounded-lg p-6 text-center text-slate-500 dark:text-slate-400">
               No inflow corridors available
