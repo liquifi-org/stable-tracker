@@ -48,7 +48,7 @@ export function FilterPanel() {
                   <div className="relative h-1 w-full bg-slate-300 dark:bg-neutral-700 rounded">
                     <div className="absolute h-1 rounded" style={{ width: `${((year - 2020) / 6) * 100}%`, backgroundColor: 'var(--brand)' }} />
                   </div>
-                  <div className="absolute h-4 w-4 rounded-full shadow-md cursor-pointer border-2 border-white" style={{ left: `${((year - 2020) / 6) * 100}%`, transform: 'translateX(-50%)', backgroundColor: 'var(--brand)' }} />
+                  <div className="absolute h-4 w-4 rounded-full shadow-md cursor-pointer border border-white" style={{ left: `${((year - 2020) / 6) * 100}%`, transform: 'translateX(-50%)', backgroundColor: 'var(--brand)' }} />
                 </Slider>
               </div>
 
@@ -68,7 +68,7 @@ export function FilterPanel() {
                   <div className="relative h-1 w-full bg-slate-300 dark:bg-neutral-700 rounded">
                     <div className="absolute h-1 rounded" style={{ width: `${((month - 1) / 11) * 100}%`, backgroundColor: 'var(--brand)' }} />
                   </div>
-                  <div className="absolute h-4 w-4 rounded-full shadow-md cursor-pointer border-2 border-white" style={{ left: `${((month - 1) / 11) * 100}%`, transform: 'translateX(-50%)', backgroundColor: 'var(--brand)' }} />
+                  <div className="absolute h-4 w-4 rounded-full shadow-md cursor-pointer border border-white" style={{ left: `${((month - 1) / 11) * 100}%`, transform: 'translateX(-50%)', backgroundColor: 'var(--brand)' }} />
                 </Slider>
               </div>
             </div>
@@ -79,7 +79,7 @@ export function FilterPanel() {
             <select
               value={referenceAsset}
               onChange={(e) => setReferenceAsset(e.target.value)}
-              className="w-full bg-white dark:bg-neutral-900 border-2 border-slate-300 dark:border-neutral-700 rounded-lg px-3 py-2 text-sm text-slate-700 dark:text-slate-200 focus:border-[var(--brand)] focus:outline-none"
+              className="w-full bg-white dark:bg-neutral-900 border border-slate-200/50 dark:border-neutral-700 rounded-lg px-3 py-2 text-sm text-slate-700 dark:text-slate-200 focus:border-[var(--brand)] focus:outline-none transition-all duration-300"
             >
               <option value="USD">USD</option>
               <option value="EUR">EUR</option>
@@ -93,7 +93,7 @@ export function FilterPanel() {
             <select
               value={stablecoin}
               onChange={(e) => setStablecoin(e.target.value)}
-              className="w-full bg-white dark:bg-neutral-900 border-2 border-slate-300 dark:border-neutral-700 rounded-lg px-3 py-2 text-sm text-slate-700 dark:text-slate-200 focus:border-[var(--brand)] focus:outline-none"
+              className="w-full bg-white dark:bg-neutral-900 border border-slate-200/50 dark:border-neutral-700 rounded-lg px-3 py-2 text-sm text-slate-700 dark:text-slate-200 focus:border-[var(--brand)] focus:outline-none transition-all duration-300"
             >
               <option value="All">All</option>
               <option value="USDT">USDT</option>
@@ -109,7 +109,7 @@ export function FilterPanel() {
             <select
               value={country}
               onChange={(e) => setCountry(e.target.value)}
-              className="w-full bg-white dark:bg-neutral-900 border-2 border-slate-300 dark:border-neutral-700 rounded-lg px-3 py-2 text-sm text-slate-700 dark:text-slate-200 focus:border-[var(--brand)] focus:outline-none"
+              className="w-full bg-white dark:bg-neutral-900 border border-slate-200/50 dark:border-neutral-700 rounded-lg px-3 py-2 text-sm text-slate-700 dark:text-slate-200 focus:border-[var(--brand)] focus:outline-none transition-all duration-300"
             >
               <option value="All">All</option>
               <option value="US">United States</option>
@@ -130,7 +130,7 @@ export function FilterPanel() {
             <select
               value={regionFrom}
               onChange={(e) => setRegionFrom(e.target.value)}
-              className="w-full bg-white dark:bg-neutral-900 border-2 border-slate-300 dark:border-neutral-700 rounded-lg px-3 py-2 text-sm text-slate-700 dark:text-slate-200 focus:border-[var(--brand)] focus:outline-none"
+              className="w-full bg-white dark:bg-neutral-900 border border-slate-200/50 dark:border-neutral-700 rounded-lg px-3 py-2 text-sm text-slate-700 dark:text-slate-200 focus:border-[var(--brand)] focus:outline-none transition-all duration-300"
             >
               <option value="All">All</option>
               <option value="North America">North America</option>
@@ -146,7 +146,7 @@ export function FilterPanel() {
             <select
               value={regionTo}
               onChange={(e) => setRegionTo(e.target.value)}
-              className="w-full bg-white dark:bg-neutral-900 border-2 border-slate-300 dark:border-neutral-700 rounded-lg px-3 py-2 text-sm text-slate-700 dark:text-slate-200 focus:border-[var(--brand)] focus:outline-none"
+              className="w-full bg-white dark:bg-neutral-900 border border-slate-200/50 dark:border-neutral-700 rounded-lg px-3 py-2 text-sm text-slate-700 dark:text-slate-200 focus:border-[var(--brand)] focus:outline-none transition-all duration-300"
             >
               <option value="All">All</option>
               <option value="North America">North America</option>
@@ -159,7 +159,7 @@ export function FilterPanel() {
         </div>
       </div>
 
-      <div className="pt-4 border-t-2 border-slate-200 dark:border-neutral-700">
+      <div className="pt-4 border-t border-slate-200/50 dark:border-neutral-700">
         <div className="text-xs text-slate-600 dark:text-slate-400">
           <div className="mb-2 font-semibold text-slate-800 dark:text-slate-100">Active filters:</div>
           <div className="space-y-1">
@@ -180,7 +180,7 @@ export function FilterPanel() {
               setRegionTo('All');
               setStablecoin('All');
             }}
-            className="mt-3 w-full text-xs border-2 border-slate-300 dark:border-neutral-700 hover:border-[var(--brand)] hover:bg-slate-50 dark:hover:bg-neutral-700 text-slate-700 dark:text-slate-200 px-3 py-2 rounded-lg transition-colors font-medium"
+            className="mt-3 w-full text-xs border border-slate-200/50 dark:border-neutral-700 hover:border-[var(--brand)] hover:bg-slate-50 dark:hover:bg-neutral-700 text-slate-700 dark:text-slate-200 px-3 py-2 rounded-lg transition-all duration-300 font-medium"
           >
             Clear All Filters
           </button>

@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router';
 import { getCountryData, getCorridorsForCountry, getCountryName } from '../data/mockData';
 import { DataTable } from '../components/DataTable';
 import { ArrowLeft, CheckCircle2, Loader2 } from 'lucide-react';
-import { api, ALPHA2_TO_NUMERIC, type ApiCountry, type ApiIssuer, type ApiLicense, type ApiReserveType } from '../services/api';
+import { api, ALPHA2_TO_NUMERIC, NUMERIC_TO_ALPHA2, type ApiCountry, type ApiIssuer, type ApiLicense, type ApiReserveType } from '../services/api';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
 
 /** Map of known stablecoin issuer name keywords → Clearbit logo domain */
@@ -92,7 +92,10 @@ export function CountryView() {
 
   useEffect(() => {
     if (!countryCode) return;
-    const numericId = ALPHA2_TO_NUMERIC[countryCode];
+    // Accept either ISO alpha-2 (e.g. "US") or ISO numeric string (e.g. "840")
+    const numericId = /^\d+$/.test(countryCode)
+      ? parseInt(countryCode, 10)
+      : ALPHA2_TO_NUMERIC[countryCode];
     if (!numericId) return;
 
     setRegulatoryLoading(true);
@@ -119,8 +122,13 @@ export function CountryView() {
     return <div>Country not found</div>;
   }
 
-  const data = getCountryData(countryCode);
-  const { outflows, inflows } = getCorridorsForCountry(countryCode);
+  // Resolve to alpha-2 for mock data lookups (numeric IDs come from map navigation)
+  const alpha2 = /^\d+$/.test(countryCode)
+    ? NUMERIC_TO_ALPHA2[countryCode] ?? countryCode
+    : countryCode;
+
+  const data = getCountryData(alpha2);
+  const { outflows, inflows } = getCorridorsForCountry(alpha2);
 
   if (!data) {
     return <div>Country not found</div>;
@@ -170,29 +178,29 @@ export function CountryView() {
           <ArrowLeft className="w-5 h-5" />
         </button>
         <div>
-          <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100">{data.name}</h2>
+          <h2 className="text-2xl font-semibold text-slate-800 dark:text-slate-100">{data.name}</h2>
           <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">Country deep dive analysis</p>
         </div>
       </div>
 
       <div className="grid grid-cols-3 gap-4">
-        <div className="bg-white dark:bg-neutral-800 border border-slate-200/50 dark:border-neutral-700 rounded-lg p-6 shadow-md transition-all duration-300">
+        <div className="bg-white dark:bg-neutral-800 border border-slate-200/50 dark:border-neutral-700 rounded-lg p-6 shadow-md">
           <div className="text-sm text-slate-600 dark:text-slate-400 mb-2">Population Using Stablecoins</div>
-          <div className="text-3xl font-bold text-slate-800 dark:text-slate-100">{data.adoption}%</div>
+          <div className="text-3xl font-semibold text-slate-800 dark:text-slate-100">{data.adoption}%</div>
         </div>
-        <div className="bg-white dark:bg-neutral-800 border border-slate-200/50 dark:border-neutral-700 rounded-lg p-6 shadow-md transition-all duration-300">
+        <div className="bg-white dark:bg-neutral-800 border border-slate-200/50 dark:border-neutral-700 rounded-lg p-6 shadow-md">
           <div className="text-sm text-slate-600 dark:text-slate-400 mb-2">Stablecoin TX Value (% of total)</div>
-          <div className="text-3xl font-bold text-slate-800 dark:text-slate-100">{data.txValue}%</div>
+          <div className="text-3xl font-semibold text-slate-800 dark:text-slate-100">{data.txValue}%</div>
         </div>
-        <div className="bg-white dark:bg-neutral-800 border border-slate-200/50 dark:border-neutral-700 rounded-lg p-6 shadow-md transition-all duration-300">
+        <div className="bg-white dark:bg-neutral-800 border border-slate-200/50 dark:border-neutral-700 rounded-lg p-6 shadow-md">
           <div className="text-sm text-slate-600 dark:text-slate-400 mb-2">Dollarization Index</div>
-          <div className="text-3xl font-bold text-slate-800 dark:text-slate-100">{(data.dollarization * 100).toFixed(0)}%</div>
+          <div className="text-3xl font-semibold text-slate-800 dark:text-slate-100">{(data.dollarization * 100).toFixed(0)}%</div>
         </div>
       </div>
 
-      <div className="bg-white dark:bg-neutral-800 border border-slate-200/50 dark:border-neutral-700 rounded-lg p-6 shadow-md transition-all duration-300">
+      <div className="bg-white dark:bg-neutral-800 border border-slate-200/50 dark:border-neutral-700 rounded-lg p-6 shadow-md">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">Regulation</h3>
+          <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100">Regulation</h3>
           <div className="flex items-center gap-2">
             {regulatoryLoading && <Loader2 className="w-4 h-4 animate-spin text-slate-400" />}
             {apiRegulatory?.countryDetail && (() => {
@@ -250,7 +258,7 @@ export function CountryView() {
               ) : apiRegulatory?.licenses && apiRegulatory.licenses.length > 0 ? (
                 <>
                   {apiRegulatory.licenses.slice(0, LICENSE_PREVIEW).map((license) => (
-                    <div key={license.licenseId} className="flex items-start gap-2 text-sm text-slate-600 dark:text-slate-300 transition-all">
+                    <div key={license.licenseId} className="flex items-start gap-2 text-sm text-slate-600 dark:text-slate-300">
                       <CheckCircle2 className="w-4 h-4 text-[var(--brand)] shrink-0 mt-0.5" />
                       <div>
                         <span className="font-medium">{license.name}</span>
@@ -276,7 +284,7 @@ export function CountryView() {
                       </DialogHeader>
                       <div className="overflow-y-auto flex-1 space-y-3 pr-1">
                         {apiRegulatory.licenses.map((license) => (
-                          <div key={license.licenseId} className="flex items-start gap-3 text-sm text-slate-600 dark:text-slate-300 border-b border-slate-100 dark:border-neutral-700 pb-3 last:border-0 transition-all">
+                          <div key={license.licenseId} className="flex items-start gap-3 text-sm text-slate-600 dark:text-slate-300 border-b border-slate-100 dark:border-neutral-700 pb-3 last:border-0">
                             <CheckCircle2 className="w-4 h-4 text-[var(--brand)] shrink-0 mt-0.5" />
                             <div>
                               <p className="font-medium">{license.name}</p>
@@ -304,8 +312,8 @@ export function CountryView() {
                 <div className="text-sm text-slate-400 dark:text-slate-500">Loading...</div>
               ) : apiRegulatory?.reserveTypes && apiRegulatory.reserveTypes.length > 0 ? (
                 apiRegulatory.reserveTypes.map((rt) => (
-                  <div key={rt.id} className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300 transition-all">
-                    <CheckCircle2 className="w-4 h-4 text-[var(--brand)] shrink-0" />
+                  <div key={rt.id} className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+                    <CheckCircle2 className="w-4 h-4 text-purple-500 shrink-0" />
                     {rt.name}
                   </div>
                 ))
@@ -314,25 +322,25 @@ export function CountryView() {
                 <>
                   {apiRegulatory.countryDetail.fiatBacked === 1 && (
                     <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-                      <CheckCircle2 className="w-4 h-4 text-[var(--brand)] shrink-0" />Fiat-backed
+                      <CheckCircle2 className="w-4 h-4 text-purple-500 shrink-0" />Fiat-backed
                       {apiRegulatory.countryDetail.fiatAlert && <span className="text-xs text-slate-400">({apiRegulatory.countryDetail.fiatAlert})</span>}
                     </div>
                   )}
                   {apiRegulatory.countryDetail.cryptoBacked === 1 && (
                     <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-                      <CheckCircle2 className="w-4 h-4 text-[var(--brand)] shrink-0" />Crypto-backed
+                      <CheckCircle2 className="w-4 h-4 text-purple-500 shrink-0" />Crypto-backed
                       {apiRegulatory.countryDetail.cryptoAlert && <span className="text-xs text-slate-400">({apiRegulatory.countryDetail.cryptoAlert})</span>}
                     </div>
                   )}
                   {apiRegulatory.countryDetail.commodityBacked === 1 && (
                     <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-                      <CheckCircle2 className="w-4 h-4 text-[var(--brand)] shrink-0" />Commodity-backed
+                      <CheckCircle2 className="w-4 h-4 text-purple-500 shrink-0" />Commodity-backed
                       {apiRegulatory.countryDetail.commodityAlert && <span className="text-xs text-slate-400">({apiRegulatory.countryDetail.commodityAlert})</span>}
                     </div>
                   )}
                   {apiRegulatory.countryDetail.algorithmBacked === 1 && (
                     <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-                      <CheckCircle2 className="w-4 h-4 text-[var(--brand)] shrink-0" />Algorithm-backed
+                      <CheckCircle2 className="w-4 h-4 text-purple-500 shrink-0" />Algorithm-backed
                       {apiRegulatory.countryDetail.algorithmAlert && <span className="text-xs text-slate-400">({apiRegulatory.countryDetail.algorithmAlert})</span>}
                     </div>
                   )}
@@ -374,7 +382,7 @@ export function CountryView() {
 
       <div className="space-y-6">
         <div>
-          <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-4">Outflow Corridors</h3>
+          <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4">Outflow Corridors</h3>
           {outflowData.length > 0 ? (
             <DataTable data={outflowData} columns={outflowColumns} pageSize={5} />
           ) : (
@@ -385,7 +393,7 @@ export function CountryView() {
         </div>
 
         <div>
-          <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-4">Inflow Corridors</h3>
+          <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4">Inflow Corridors</h3>
           {inflowData.length > 0 ? (
             <DataTable data={inflowData} columns={inflowColumns} pageSize={5} />
           ) : (

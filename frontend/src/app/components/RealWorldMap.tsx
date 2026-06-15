@@ -2,71 +2,59 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { geoPath, geoMercator } from 'd3-geo';
 import { feature } from 'topojson-client';
-
-interface Country {
-  code: string;
-  name: string;
-  adoption: number;
-  wallets: number;
-  txPercentage: number;
-}
+import type { CountryAdoptionMetric } from '../services/api';
 
 interface RealWorldMapProps {
-  countries: Country[];
+  countries: CountryAdoptionMetric[];
 }
 
-const countryCodeToId: Record<string, string> = {
-  US: '840',
-  MX: '484',
-  BR: '076',
-  AR: '032',
-  VE: '862',
-  GB: '826',
-  FR: '250',
-  DE: '276',
-  TR: '792',
-  NG: '566',
-  KE: '404',
-  IN: '356',
-  CN: '156',
-  JP: '392',
-  PH: '608',
-};
+/** Color by adoption rate (0..1 ratio). Only called when activeWallets > 0. */
+function getColor(adoptionRate: number): string {
+  if (adoptionRate < 0.0001) return '#D1FAE5';   // < 0.01 %
+  if (adoptionRate < 0.001)  return '#6EE7B7';   // 0.01 – 0.1 %
+  if (adoptionRate < 0.005)  return '#34D399';   // 0.1 – 0.5 %
+  if (adoptionRate < 0.02)   return '#10B981';   // 0.5 – 2 %
+  return '#047857';                              // > 2 %
+}
 
-function getColor(adoption: number): string {
-  if (adoption < 8) return '#D1FAE5';
-  if (adoption < 16) return '#6EE7B7';
-  if (adoption < 24) return '#34D399';
-  if (adoption < 32) return '#10B981';
-  return '#047857';
+function fmtPct(ratio: number): string {
+  const pct = ratio * 100;
+  if (pct < 0.01) return pct.toFixed(4) + '%';
+  if (pct < 1)    return pct.toFixed(2) + '%';
+  return pct.toFixed(1) + '%';
+}
+
+function fmtWallets(n: number): string {
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
+  if (n >= 1_000)     return (n / 1_000).toFixed(1) + 'K';
+  return n.toLocaleString();
 }
 
 export function RealWorldMap({ countries }: RealWorldMapProps) {
   const [worldData, setWorldData] = useState<any>(null);
-  const [hoveredCountry, setHoveredCountry] = useState<string | null>(null);
-  const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
+  /** numeric countryId of hovered / selected feature */
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
   const navigate = useNavigate();
 
   useEffect(() => {
-    fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json')
+    fetch('/world.json')
       .then(res => res.json())
-      .then(data => {
-        setWorldData(data);
-      })
+      .then(data => setWorldData(data))
       .catch(err => console.error('Error loading world map:', err));
   }, []);
 
   // Reset selected country if it's filtered out
   useEffect(() => {
-    if (selectedCountry && !countries.find(c => c.code === selectedCountry)) {
-      setSelectedCountry(null);
+    if (selectedId && !countries.find(c => c.countryId === selectedId)) {
+      setSelectedId(null);
     }
-  }, [countries, selectedCountry]);
+  }, [countries, selectedId]);
 
   if (!worldData) {
     return (
-      <div className="bg-slate-900 rounded-xl border-2 border-slate-700 p-8 flex items-center justify-center" style={{ height: '600px' }}>
+      <div className="bg-slate-900 rounded-xl border border-slate-700/50 p-8 flex items-center justify-center" style={{ height: '600px' }}>
         <div className="text-slate-400">Loading world map...</div>
       </div>
     );
@@ -79,40 +67,39 @@ export function RealWorldMap({ countries }: RealWorldMapProps) {
   const pathGenerator = geoPath().projection(projection);
   const geojson = feature(worldData, worldData.objects.countries);
 
+  // Only countries with activeWallets > 0 are interactive/coloured
   const countryDataMap = new Map(
-    countries.map(c => [countryCodeToId[c.code], c])
+    countries.filter(c => c.activeWallets > 0).map(c => [c.countryId, c])
   );
 
-  const handleCountryClick = (countryCode: string) => {
-    setSelectedCountry(countryCode);
-  };
+  const handleCountryClick = (id: string) => setSelectedId(id);
 
   const handleViewDetails = () => {
-    if (selectedCountry) {
-      navigate(`/country/${selectedCountry}`);
-      setSelectedCountry(null);
+    if (selectedId) {
+      navigate(`/country/${selectedId}`);
+      setSelectedId(null);
     }
   };
 
-  const handleMouseMove = (e: React.MouseEvent, countryCode: string) => {
-    setHoveredCountry(countryCode);
+  const handleMouseMove = (e: React.MouseEvent, id: string) => {
+    setHoveredId(id);
     setTooltipPos({ x: e.clientX, y: e.clientY });
   };
 
-  const hoveredData = hoveredCountry ? countryDataMap.get(countryCodeToId[hoveredCountry]) : null;
-  const selectedData = selectedCountry ? countryDataMap.get(countryCodeToId[selectedCountry]) : null;
+  const hoveredData  = hoveredId  ? countryDataMap.get(hoveredId)  : null;
+  const selectedData = selectedId ? countryDataMap.get(selectedId) : null;
 
   const legendItems = [
-    { min: '0%', max: '7%', color: '#D1FAE5' },
-    { min: '8%', max: '15%', color: '#6EE7B7' },
-    { min: '16%', max: '23%', color: '#34D399' },
-    { min: '24%', max: '31%', color: '#10B981' },
-    { min: '32%', max: '+', color: '#047857' },
+    { label: '< 0.01%',    color: '#D1FAE5' },
+    { label: '0.01–0.1%',  color: '#6EE7B7' },
+    { label: '0.1–0.5%',   color: '#34D399' },
+    { label: '0.5–2%',     color: '#10B981' },
+    { label: '> 2%',       color: '#047857' },
   ];
 
   return (
     <div className="relative">
-      <div className="bg-white dark:bg-neutral-800 rounded-xl border border-slate-200/50 dark:border-neutral-700 overflow-hidden shadow-md transition-all">
+      <div className="bg-white dark:bg-neutral-800 rounded-xl border border-slate-200/50 dark:border-neutral-700 overflow-hidden shadow-md transition-all duration-300">
         <div className="p-6 border-b border-slate-200/50 dark:border-neutral-700" style={{ backgroundColor: 'var(--brand)' }}>
           <div className="flex items-center justify-between">
             <span className="text-sm text-white font-medium">% Population using stablecoins</span>
@@ -120,12 +107,10 @@ export function RealWorldMap({ countries }: RealWorldMapProps) {
               {legendItems.map((item, idx) => (
                 <div key={idx} className="flex items-center gap-2">
                   <div
-                    className="w-6 h-6 rounded border-2 border-white/30"
+                    className="w-6 h-6 rounded border border-white/30"
                     style={{ backgroundColor: item.color }}
                   />
-                  <span className="text-xs text-white font-medium">
-                    {item.min} - {item.max}
-                  </span>
+                  <span className="text-xs text-white font-medium">{item.label}</span>
                 </div>
               ))}
             </div>
@@ -147,8 +132,8 @@ export function RealWorldMap({ countries }: RealWorldMapProps) {
             <rect width="800" height="500" className="fill-[#F7FAFC] dark:fill-neutral-900" />
 
             {geojson.features.map((geo: any, i: number) => {
-              const countryId = geo.id;
-              const countryData = Array.from(countryDataMap.entries()).find(([id]) => id === countryId)?.[1];
+              const numericId = String(geo.id);
+              const countryData = countryDataMap.get(numericId);
 
               let fillColor = '#e2e8f0';
               let strokeColor = '#cbd5e1';
@@ -156,14 +141,14 @@ export function RealWorldMap({ countries }: RealWorldMapProps) {
               let opacity = 0.8;
 
               if (countryData) {
-                fillColor = getColor(countryData.adoption);
+                fillColor = getColor(countryData.adoptionRate);
                 strokeColor = '#64748b';
                 strokeWidth = 1;
                 opacity = 0.9;
               }
 
-              const isHovered = hoveredCountry === countryData?.code;
-              const isSelected = selectedCountry === countryData?.code;
+              const isHovered  = hoveredId  === numericId && !!countryData;
+              const isSelected = selectedId === numericId && !!countryData;
 
               if (isHovered || isSelected) {
                 strokeColor = isSelected ? 'var(--brand)' : 'var(--brand-400)';
@@ -182,10 +167,10 @@ export function RealWorldMap({ countries }: RealWorldMapProps) {
                   stroke={strokeColor}
                   strokeWidth={strokeWidth}
                   opacity={opacity}
-                  onMouseEnter={countryData ? (e) => handleMouseMove(e, countryData.code) : undefined}
-                  onMouseLeave={() => setHoveredCountry(null)}
-                  onClick={countryData ? () => handleCountryClick(countryData.code) : undefined}
-                  className={countryData ? 'cursor-pointer transition-all duration-300' : 'pointer-events-none'}
+                  onMouseEnter={countryData ? (e) => handleMouseMove(e, numericId) : undefined}
+                  onMouseLeave={() => setHoveredId(null)}
+                  onClick={countryData ? () => handleCountryClick(numericId) : undefined}
+                  className={countryData ? 'cursor-pointer transition-all' : 'pointer-events-none'}
                   filter={isHovered || isSelected ? 'url(#world-glow)' : undefined}
                 />
               );
@@ -201,78 +186,30 @@ export function RealWorldMap({ countries }: RealWorldMapProps) {
         >
           <div className="bg-gradient-to-r from-[var(--brand)]/30 to-[var(--brand-700)]/20 px-4 py-2 border-b border-slate-700">
             <h3 className="font-bold text-[var(--brand-300)] text-lg">{hoveredData.name}</h3>
+            <p className="text-xs text-slate-400">{hoveredData.region}</p>
           </div>
 
-          <div className="grid grid-cols-3 divide-x divide-slate-700">
+          <div className="grid grid-cols-2 divide-x divide-slate-700">
             <div className="px-4 py-3">
               <div className="text-xs font-semibold text-[var(--brand-300)] italic mb-3">Adoption</div>
-              <div className="space-y-2">
-                <div className="text-slate-300 text-xs">% of population using stablecoins</div>
-                <div className="text-white font-bold text-xl mb-3">{hoveredData.adoption}%</div>
-
-                <div className="space-y-1.5 text-xs border-t border-slate-700 pt-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-400">USDT</span>
-                    <div className="text-slate-200">
-                      <span className="font-semibold">52%</span>
-                      <span className="text-slate-500 ml-1">(${(hoveredData.wallets * 0.52 / 1000000).toFixed(0)}m)</span>
-                    </div>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-400">USDC</span>
-                    <div className="text-slate-200">
-                      <span className="font-semibold">31%</span>
-                      <span className="text-slate-500 ml-1">(${(hoveredData.wallets * 0.31 / 1000000).toFixed(0)}m)</span>
-                    </div>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-400">DAI</span>
-                    <div className="text-slate-200">
-                      <span className="font-semibold">12%</span>
-                      <span className="text-slate-500 ml-1">(${(hoveredData.wallets * 0.12 / 1000000).toFixed(0)}m)</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="px-4 py-3">
-              <div className="text-xs font-semibold text-[var(--brand-300)] italic mb-3">Regulation</div>
               <div className="space-y-2 text-xs">
-                <div>
-                  <div className="text-slate-400 mb-1">Compliant issuers</div>
-                  <ul className="text-slate-200 space-y-0.5">
-                    <li>• Circle</li>
-                    <li>• Paxos</li>
-                    <li>• Tether</li>
-                  </ul>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-400">% of population</span>
+                  <span className="text-white font-bold text-base">{fmtPct(hoveredData.adoptionRate)}</span>
                 </div>
-                <div>
-                  <div className="text-slate-400 mb-1">Compliant reserve types</div>
-                  <ul className="text-slate-200 space-y-0.5">
-                    <li>• Fiat</li>
-                    <li>• T-Bills</li>
-                  </ul>
-                </div>
-                <div>
-                  <div className="text-slate-400 mb-1">Key license/law</div>
-                  <div className="text-slate-200">Pending</div>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-400">Active wallets</span>
+                  <span className="text-white font-semibold">{fmtWallets(hoveredData.activeWallets)}</span>
                 </div>
               </div>
             </div>
 
             <div className="px-4 py-3">
-              <div className="text-xs font-semibold text-[var(--brand-300)] italic mb-3">Economic integration & currency sovereignty</div>
-              <div className="space-y-3 text-xs">
-                <div>
-                  <div className="text-slate-300">Stablecoin transactions as % of total transactions</div>
-                  <div className="text-white font-bold text-lg mt-1">{hoveredData.txPercentage}%</div>
-                </div>
-                <div>
-                  <div className="text-slate-300">Dollarization index</div>
-                  <div className="text-white font-bold text-lg mt-1">
-                    {((hoveredData.adoption / 100) * 80).toFixed(0)}%
-                  </div>
+              <div className="text-xs font-semibold text-[var(--brand-300)] italic mb-3">Economic integration</div>
+              <div className="space-y-2 text-xs">
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-400">Stablecoin TX value share</span>
+                  <span className="text-white font-bold text-base">{fmtPct(hoveredData.txValueShare)}</span>
                 </div>
               </div>
             </div>
@@ -281,35 +218,36 @@ export function RealWorldMap({ countries }: RealWorldMapProps) {
       )}
 
       {selectedData && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 backdrop-blur-sm" onClick={() => setSelectedCountry(null)}>
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 backdrop-blur-sm" onClick={() => setSelectedId(null)}>
           <div className="bg-white dark:bg-neutral-800 border border-[var(--brand)]/30 rounded-xl p-8 max-w-lg w-full mx-4 shadow-lg transition-all" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">{selectedData.name}</h3>
+            <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">{selectedData.name}</h3>
+            <p className="text-sm text-slate-600 dark:text-slate-400 mb-6">{selectedData.region}</p>
             <div className="space-y-4">
               <div className="flex justify-between items-center p-4 bg-[var(--brand-50)] dark:bg-slate-800 rounded-lg">
-                <span className="text-gray-600 dark:text-slate-300">Population using stablecoins</span>
-                <span className="text-gray-900 dark:text-white font-bold text-xl">{selectedData.adoption}%</span>
+                <span className="text-gray-600 dark:text-slate-300">% of population using stablecoins</span>
+                <span className="text-gray-900 dark:text-white font-bold text-xl">{fmtPct(selectedData.adoptionRate)}</span>
               </div>
               <div className="border-t border-[var(--brand)]/20 pt-4 space-y-3">
                 <div className="flex justify-between text-gray-600 dark:text-slate-300">
                   <span>Active wallets</span>
-                  <span className="font-semibold text-gray-900 dark:text-white">{(selectedData.wallets / 1000000).toFixed(1)}M</span>
+                  <span className="font-semibold text-gray-900 dark:text-white">{fmtWallets(selectedData.activeWallets)}</span>
                 </div>
                 <div className="flex justify-between text-gray-600 dark:text-slate-300">
-                  <span>TX percentage</span>
-                  <span className="font-semibold text-gray-900 dark:text-white">{selectedData.txPercentage}%</span>
+                  <span>Stablecoin TX value share</span>
+                  <span className="font-semibold text-gray-900 dark:text-white">{fmtPct(selectedData.txValueShare)}</span>
                 </div>
               </div>
             </div>
             <div className="flex gap-3 mt-8">
               <button
                 onClick={handleViewDetails}
-                className="flex-1 bg-[var(--brand)] hover:bg-[var(--brand-700)] text-white px-6 py-3 rounded-lg font-semibold transition-colors shadow-lg"
+                className="flex-1 bg-[var(--brand)] hover:bg-[var(--brand-700)] text-white px-6 py-3 rounded-lg font-semibold transition-all duration-300 shadow-lg"
               >
                 View Full Details
               </button>
               <button
-                onClick={() => setSelectedCountry(null)}
-                className="px-6 py-3 border-2 border-[var(--brand)]/30 hover:bg-[var(--brand-50)] text-gray-600 dark:text-slate-300 rounded-lg font-semibold transition-colors"
+                onClick={() => setSelectedId(null)}
+                className="px-6 py-3 border border-[var(--brand)]/30 hover:bg-[var(--brand-50)] text-gray-600 dark:text-slate-300 rounded-lg font-semibold transition-all duration-300"
               >
                 Close
               </button>

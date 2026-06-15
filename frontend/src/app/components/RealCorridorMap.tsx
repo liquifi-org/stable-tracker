@@ -112,7 +112,7 @@ export function RealCorridorMap({ corridors, getCountryName }: RealCorridorMapPr
 
   if (!worldData) {
     return (
-      <div className="bg-slate-900 rounded-xl border-2 border-slate-700 p-8 flex items-center justify-center" style={{ height: '600px' }}>
+      <div className="bg-slate-900 rounded-xl border border-slate-700/50 p-8 flex items-center justify-center" style={{ height: '600px' }}>
         <div className="text-slate-400">Loading world map...</div>
       </div>
     );

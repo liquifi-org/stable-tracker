@@ -19,6 +19,11 @@ export const ALPHA2_TO_NUMERIC: Record<string, number> = {
   PH: 608,
 };
 
+/** ISO numeric (string) → ISO alpha-2, for backwards-compatible navigation */
+export const NUMERIC_TO_ALPHA2: Record<string, string> = Object.fromEntries(
+  Object.entries(ALPHA2_TO_NUMERIC).map(([alpha2, numeric]) => [String(numeric), alpha2])
+);
+
 export interface ApiCountry {
   id: number;
   name: string;
@@ -57,6 +62,16 @@ export interface ApiReserveType {
   type?: string;
 }
 
+export interface CountryAdoptionMetric {
+  countryId: string;
+  name: string;
+  region: string;
+  adoptionRate: number;
+  activeWallets: number;
+  txValueShare: number;
+  unit?: string;
+}
+
 async function fetchJson<T>(path: string): Promise<T> {
   const response = await fetch(`${BASE_URL}${path}`);
   if (!response.ok) {
@@ -77,4 +92,10 @@ export const api = {
 
   getCountryReserveTypes: (numericId: number) =>
     fetchJson<ApiReserveType[]>(`/countries/${numericId}/regulated-reserve-types`),
+
+  getAdoptionAnalytics: (year: number, month?: number) => {
+    const params = new URLSearchParams({ year: String(year) });
+    if (month !== undefined) params.set('month', String(month));
+    return fetchJson<CountryAdoptionMetric[]>(`/analytics/adoption?${params}`);
+  },
 };

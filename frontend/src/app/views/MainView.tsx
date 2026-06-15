@@ -1,31 +1,45 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { RealWorldMap } from '../components/RealWorldMap';
 import { RealCorridorMap } from '../components/RealCorridorMap';
 import { DataTable } from '../components/DataTable';
-import { countries, corridors, getCountryName } from '../data/mockData';
+import { corridors, getCountryName } from '../data/mockData';
 import { useFilters } from '../context/FilterContext';
+import { api, ALPHA2_TO_NUMERIC, type CountryAdoptionMetric } from '../services/api';
 
 type MapType = 'adoption' | 'corridors';
 
 export function MainView() {
   const [selectedMap, setSelectedMap] = useState<MapType>('adoption');
+  const [adoptionData, setAdoptionData] = useState<CountryAdoptionMetric[]>([]);
+  const [adoptionLoading, setAdoptionLoading] = useState(false);
   const filters = useFilters();
 
-  const filteredCountries = useMemo(() => {
-    let filtered = [...countries];
+  useEffect(() => {
+    setAdoptionLoading(true);
+    api.getAdoptionAnalytics(filters.year)
+      .then(data => setAdoptionData(data))
+      .catch(() => setAdoptionData([]))
+      .finally(() => setAdoptionLoading(false));
+  }, [filters.year]);
 
-    // Filter by specific country
+  const filteredCountries = useMemo(() => {
+    let filtered = [...adoptionData];
+
+    // Filter by specific country (alpha-2 → numeric)
     if (filters.country !== 'All') {
-      filtered = filtered.filter(country => country.code === filters.country);
+      const numericId = String(ALPHA2_TO_NUMERIC[filters.country] ?? '');
+      if (numericId) {
+        filtered = filtered.filter(c => c.countryId === numericId);
+      }
     }
 
     // Filter by region
     if (filters.regionFrom !== 'All') {
-      filtered = filtered.filter(country => country.region === filters.regionFrom);
+      filtered = filtered.filter(c => c.region === filters.regionFrom);
     }
 
     return filtered;
-  }, [filters.country, filters.regionFrom, filters.stablecoin, filters.year, filters.month]);
+  }, [adoptionData, filters.country, filters.regionFrom]);
 
   const filteredCorridors = useMemo(() => {
     let filtered = [...corridors];
@@ -91,14 +105,19 @@ export function MainView() {
   const heatmapColumns = [
     { key: 'name', header: 'Country' },
     {
-      key: 'wallets',
-      header: '# active wallets holding stablecoins (m)',
-      render: (value: number) => (value / 1000000).toFixed(2)
+      key: 'activeWallets',
+      header: '# active wallets holding stablecoins',
+      render: (value: number) => value.toLocaleString()
     },
     {
-      key: 'txPercentage',
-      header: 'Stablecoin transaction value as % of total transaction value',
-      render: (value: number) => value.toFixed(2) + '%'
+      key: 'adoptionRate',
+      header: '% of population using stablecoins',
+      render: (value: number) => (value * 100).toFixed(4) + '%'
+    },
+    {
+      key: 'txValueShare',
+      header: 'Stablecoin TX value as % of total',
+      render: (value: number) => (value * 100).toFixed(2) + '%'
     },
   ];
 
@@ -127,14 +146,14 @@ export function MainView() {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Global Overview</h2>
+      <h2 className="text-2xl font-semibold text-slate-800 dark:text-slate-100">Global Overview</h2>
 
       <div className="flex gap-3">
         <button
           onClick={() => setSelectedMap('adoption')}
-          className={`px-6 py-3 rounded-lg font-semibold transition-all duration-300 shadow-sm ${
+          className={`px-6 py-3 rounded-lg font-semibold transition-all shadow-md ${
             selectedMap === 'adoption'
-              ? 'text-white shadow-md'
+              ? 'text-white'
               : 'bg-white dark:bg-neutral-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-neutral-700 border border-slate-200/50 dark:border-neutral-700'
           }`}
           style={selectedMap === 'adoption' ? { backgroundColor: 'var(--brand)' } : {}}
@@ -143,9 +162,9 @@ export function MainView() {
         </button>
         <button
           onClick={() => setSelectedMap('corridors')}
-          className={`px-6 py-3 rounded-lg font-semibold transition-all duration-300 shadow-sm ${
+          className={`px-6 py-3 rounded-lg font-semibold transition-all shadow-md ${
             selectedMap === 'corridors'
-              ? 'text-white shadow-md'
+              ? 'text-white'
               : 'bg-white dark:bg-neutral-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-neutral-700 border border-slate-200/50 dark:border-neutral-700'
           }`}
           style={selectedMap === 'corridors' ? { backgroundColor: 'var(--brand)' } : {}}
@@ -156,7 +175,13 @@ export function MainView() {
 
       <div className="space-y-6">
         {selectedMap === 'adoption' ? (
-          <RealWorldMap countries={filteredCountries} key={`adoption-${filters.country}-${filters.regionFrom}`} />
+          adoptionLoading ? (
+            <div className="bg-slate-50 dark:bg-neutral-900 rounded-xl border border-slate-200/50 dark:border-neutral-700 p-8 flex items-center justify-center" style={{ height: '600px' }}>
+              <div className="text-slate-400">Loading adoption data…</div>
+            </div>
+          ) : (
+            <RealWorldMap countries={filteredCountries} key={`adoption-${filters.country}-${filters.regionFrom}`} />
+          )
         ) : (
           <RealCorridorMap corridors={bidirectionalCorridors} getCountryName={getCountryName} key={`corridors-${filters.country}-${filters.regionFrom}-${filters.regionTo}`} />
         )}
