@@ -38,12 +38,14 @@ export interface CountryCorridorsParams {
 
 export interface CountryAdoptionMetric {
     countryId: string;
+    isoAlpha2: string;
     name: string;
     region: string;
     adoptionRate: number;
     activeWallets: number;
     txValueShare: number;
     unit: 'ratio' | 'percent';
+    remittancesSent?: number;
 }
 
 export interface StablecoinShare {
@@ -55,6 +57,8 @@ export interface StablecoinShare {
 export interface CorridorFlow {
     from: string;
     to: string;
+    fromName?: string;
+    toName?: string;
     value: { amount: number; currency: string };
     dollarizationIndex: number;
     topStablecoins?: StablecoinShare[];

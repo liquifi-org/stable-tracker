@@ -1,5 +1,8 @@
+import { ISO_COUNTRIES } from '../../../../../script/shared/iso3166';
 import { TransactionModel } from '../models/TransactionModel';
 import { WalletModel } from '../models/WalletModel';
+
+const NUMERIC_TO_ALPHA2 = new Map<string, string>(ISO_COUNTRIES.map((c) => [c.numeric, c.alpha2]));
 import { WalletCountSnapshotModel } from '../models/WalletCountSnapshotModel';
 import { CountryModel } from '../models/CountryModel';
 import { IssuerModel } from '../models/IssuerModel';
@@ -128,12 +131,14 @@ export class MongoAnalyticsRepository implements IAnalyticsRepository {
 
             return {
                 countryId: c.countryId,
+                isoAlpha2: NUMERIC_TO_ALPHA2.get(c.countryId) ?? '',
                 name: c.name,
                 region: c.region,
                 adoptionRate: parseFloat(adoptionRate.toFixed(6)),
                 activeWallets,
                 txValueShare: parseFloat(txValueShare.toFixed(6)),
                 unit: 'ratio' as const,
+                remittancesSent: c.remittancesSent,
             };
         });
     }
@@ -292,8 +297,9 @@ export class MongoAnalyticsRepository implements IAnalyticsRepository {
                 $or: [{ dateClosed: null }, { dateClosed: { $gt: end } }],
             }));
 
-        // Transaction value share
+        // Transaction value share (corridor snapshots excluded — they are aggregate monthly data)
         const txFilter: Record<string, unknown> = {
+            type: { $ne: 'corridor' },
             date: { $gte: start, $lte: end },
         };
         if (stablecoinIds) txFilter['stablecoinId'] = { $in: stablecoinIds };
@@ -314,22 +320,34 @@ export class MongoAnalyticsRepository implements IAnalyticsRepository {
         const globalTxValue = globalTxAgg[0]?.totalValue ?? 0;
         const txValueShare = globalTxValue > 0 ? countryTxValue / globalTxValue : 0;
 
-        // Dollarization index
-        const usdCoins = await StablecoinModel.find({ referenceAsset: 'USD' }).lean();
-        const usdCoinIds = usdCoins.map((s) => s.stablecoinId);
+        // Dollarization index — from Allium corridor snapshots for the period:
+        // usdStablecoinVolume / totalUsdVolume across all outbound corridors.
+        const periodMatch = month
+            ? { period: `${year}-${String(month).padStart(2, '0')}` }
+            : { period: { $gte: `${year}-01`, $lte: `${year}-12` } };
 
-        const [usdTxAgg] = await TransactionModel.aggregate<TxAgg>([
+        interface CorridorDollarizationAgg { totalUsdVolume: number; usdStablecoinVolume: number }
+        const [dollarizationAgg] = await TransactionModel.aggregate<CorridorDollarizationAgg>([
             {
                 $match: {
+                    type: 'corridor',
+                    source: 'allium',
                     senderCountryId: countryId,
-                    stablecoinId: { $in: usdCoinIds },
-                    date: { $gte: start, $lte: end },
+                    ...periodMatch,
                 },
             },
-            { $group: { _id: null, totalValue: { $sum: '$value.amount' } } },
+            {
+                $group: {
+                    _id: null,
+                    totalUsdVolume: { $sum: '$value.amount' },
+                    usdStablecoinVolume: { $sum: '$usdStablecoinVolume' },
+                },
+            },
         ]);
-        const usdTxValue = usdTxAgg?.totalValue ?? 0;
-        const dollarizationIndex = countryTxValue > 0 ? usdTxValue / countryTxValue : 0;
+        const dollarizationIndex =
+            dollarizationAgg && dollarizationAgg.totalUsdVolume > 0
+                ? dollarizationAgg.usdStablecoinVolume / dollarizationAgg.totalUsdVolume
+                : 0;
 
         const adoptionRate =
             countryDoc.population && countryDoc.population > 0
@@ -476,6 +494,29 @@ export class MongoAnalyticsRepository implements IAnalyticsRepository {
                 : Promise.resolve<CorridorFlow[]>([]),
         ]);
 
-        return { countryId, inflows, outflows };
+        // Enrich flows with partner country names
+        const partnerIds = [
+            ...new Set([
+                ...inflows.map((f) => f.from),
+                ...outflows.map((f) => f.to),
+            ]),
+        ].filter((id) => id !== countryId);
+
+        const partnerDocs = await CountryModel.find(
+            { countryId: { $in: partnerIds } },
+            { countryId: 1, name: 1 },
+        ).lean();
+        const nameMap = new Map(partnerDocs.map((d) => [d.countryId, d.name]));
+
+        const selfDoc = await CountryModel.findOne({ countryId }, { name: 1 }).lean();
+        const selfName = selfDoc?.name ?? countryId;
+
+        const enrich = (f: CorridorFlow): CorridorFlow => ({
+            ...f,
+            fromName: nameMap.get(f.from) ?? (f.from === countryId ? selfName : f.from),
+            toName: nameMap.get(f.to) ?? (f.to === countryId ? selfName : f.to),
+        });
+
+        return { countryId, inflows: inflows.map(enrich), outflows: outflows.map(enrich) };
     }
 }

@@ -5,12 +5,14 @@ import type { MoneyDto } from './TransactionDto';
 
 export interface CountryAdoptionMetricDto {
     countryId: string;
+    isoAlpha2: string;
     name: string;
     region: string;
     adoptionRate: number;
     activeWallets: number;
     txValueShare: number;
     unit: 'ratio' | 'percent';
+    remittancesSent?: number;
 }
 
 export interface StablecoinShareDto {
