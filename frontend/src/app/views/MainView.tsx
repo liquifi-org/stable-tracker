@@ -127,15 +127,15 @@ export function MainView() {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-semibold text-slate-800 dark:text-slate-100">Global Overview</h2>
+      <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Global Overview</h2>
 
       <div className="flex gap-3">
         <button
           onClick={() => setSelectedMap('adoption')}
-          className={`px-6 py-3 rounded-lg font-semibold transition-all shadow-md ${
+          className={`px-6 py-3 rounded-lg font-semibold transition-all duration-300 shadow-sm ${
             selectedMap === 'adoption'
-              ? 'text-white'
-              : 'bg-white dark:bg-neutral-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-neutral-700 border-2 border-slate-300 dark:border-neutral-700'
+              ? 'text-white shadow-md'
+              : 'bg-white dark:bg-neutral-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-neutral-700 border border-slate-200/50 dark:border-neutral-700'
           }`}
           style={selectedMap === 'adoption' ? { backgroundColor: 'var(--brand)' } : {}}
         >
@@ -143,10 +143,10 @@ export function MainView() {
         </button>
         <button
           onClick={() => setSelectedMap('corridors')}
-          className={`px-6 py-3 rounded-lg font-semibold transition-all shadow-md ${
+          className={`px-6 py-3 rounded-lg font-semibold transition-all duration-300 shadow-sm ${
             selectedMap === 'corridors'
-              ? 'text-white'
-              : 'bg-white dark:bg-neutral-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-neutral-700 border-2 border-slate-300 dark:border-neutral-700'
+              ? 'text-white shadow-md'
+              : 'bg-white dark:bg-neutral-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-neutral-700 border border-slate-200/50 dark:border-neutral-700'
           }`}
           style={selectedMap === 'corridors' ? { backgroundColor: 'var(--brand)' } : {}}
         >
@@ -174,12 +174,12 @@ export function MainView() {
             </div>
           </div>
           {selectedMap === 'adoption' && filteredCountries.length === 0 && (
-            <div className="bg-white dark:bg-neutral-800 border-2 border-slate-300 dark:border-neutral-700 rounded-lg p-8 text-center text-slate-500 dark:text-slate-400">
+            <div className="bg-white dark:bg-neutral-800 border border-slate-200/50 dark:border-neutral-700 rounded-lg p-8 text-center text-slate-500 dark:text-slate-400">
               No countries match the current filters
             </div>
           )}
           {selectedMap === 'corridors' && filteredCorridors.length === 0 && (
-            <div className="bg-white dark:bg-neutral-800 border-2 border-slate-300 dark:border-neutral-700 rounded-lg p-8 text-center text-slate-500 dark:text-slate-400">
+            <div className="bg-white dark:bg-neutral-800 border border-slate-200/50 dark:border-neutral-700 rounded-lg p-8 text-center text-slate-500 dark:text-slate-400">
               No corridors match the current filters
             </div>
           )}

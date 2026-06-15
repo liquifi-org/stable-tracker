@@ -4,6 +4,9 @@
 @import 'tw-animate-css';
 
 @theme {
+  /* Font family — maps Tailwind's font-sans utility to the IBM Plex Sans variable */
+  --font-family-sans: var(--font-sans);
+
   /* Tailwind blue-* palette → brand variables (theme.css is the single source) */
   --color-blue-50:  var(--brand-50);
   --color-blue-100: var(--brand-100);

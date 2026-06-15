@@ -1,6 +1,9 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
+  /* ── Typography ── */
+  --font-sans: 'IBM Plex Sans', sans-serif;
+
   /* ── Brand color ── change only --brand to retheme the whole app ── */
   --brand: #5d5d9b;
   --brand-50:  oklch(from var(--brand) 0.97 calc(c * 0.15) h);
@@ -139,6 +142,7 @@
 
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-sans);
   }
 
   /**

@@ -46,21 +46,21 @@ export function DataTable({ data, columns, pageSize = 10 }: DataTableProps) {
   const paginatedData = sortedData.slice(startIndex, startIndex + pageSize);
 
   return (
-    <div className="bg-white dark:bg-neutral-800 rounded-lg border-2 border-slate-300 dark:border-neutral-700 overflow-hidden shadow-lg transition-colors">
+    <div className="bg-white dark:bg-neutral-800 rounded-lg border border-slate-200/50 dark:border-neutral-700 overflow-hidden shadow-md transition-all duration-300">
       <div className="overflow-x-auto">
         <table className="w-full">
-          <thead className="border-b-2 border-slate-300 dark:border-neutral-700" style={{ backgroundColor: 'var(--brand)' }}>
+          <thead className="border-b border-slate-200/50 dark:border-neutral-700 transition-all" style={{ backgroundColor: 'var(--brand)' }}>
             <tr>
               {columns.map((column) => (
                 <th
                   key={column.key}
                   onClick={() => handleSort(column.key)}
-                  className="px-4 py-3 text-left text-sm font-semibold text-white cursor-pointer hover:bg-[var(--brand-700)] transition-colors"
+                  className="px-4 py-3 text-left text-sm font-semibold text-white cursor-pointer hover:bg-[var(--brand-700)] transition-all duration-300"
                 >
                   <div className="flex items-center gap-2">
                     {column.header}
                     {sortKey === column.key && (
-                      <span className="text-cyan-300">
+                      <span className="text-white/80">
                         {sortDirection === 'asc' ? '↑' : '↓'}
                       </span>
                     )}
@@ -83,7 +83,7 @@ export function DataTable({ data, columns, pageSize = 10 }: DataTableProps) {
         </table>
       </div>
 
-      <div className="flex items-center justify-between px-4 py-3 border-t-2 border-slate-200 dark:border-neutral-700 bg-slate-50 dark:bg-neutral-900">
+      <div className="flex items-center justify-between px-4 py-3 border-t border-slate-200/50 dark:border-neutral-700 bg-slate-50/50 dark:bg-neutral-900/50 transition-all">
         <div className="text-sm text-slate-600 dark:text-slate-400">
           Showing {startIndex + 1} to {Math.min(startIndex + pageSize, sortedData.length)} of {sortedData.length} entries
         </div>
@@ -91,14 +91,14 @@ export function DataTable({ data, columns, pageSize = 10 }: DataTableProps) {
           <button
             onClick={() => setCurrentPage(0)}
             disabled={currentPage === 0}
-            className="px-2 py-1 rounded hover:bg-slate-200 dark:hover:bg-neutral-700 disabled:opacity-30 disabled:cursor-not-allowed text-slate-600 dark:text-slate-300 transition-colors"
+            className="px-2 py-1 rounded hover:bg-slate-200/50 dark:hover:bg-neutral-700/50 disabled:opacity-30 disabled:cursor-not-allowed text-slate-600 dark:text-slate-300 transition-all duration-300"
           >
             <ChevronsLeft className="w-4 h-4" />
           </button>
           <button
             onClick={() => setCurrentPage(currentPage - 1)}
             disabled={currentPage === 0}
-            className="px-2 py-1 rounded hover:bg-slate-200 dark:hover:bg-neutral-700 disabled:opacity-30 disabled:cursor-not-allowed text-slate-600 dark:text-slate-300 transition-colors"
+            className="px-2 py-1 rounded hover:bg-slate-200/50 dark:hover:bg-neutral-700/50 disabled:opacity-30 disabled:cursor-not-allowed text-slate-600 dark:text-slate-300 transition-all duration-300"
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
@@ -119,10 +119,10 @@ export function DataTable({ data, columns, pageSize = 10 }: DataTableProps) {
               <button
                 key={pageNum}
                 onClick={() => setCurrentPage(pageNum)}
-                className={`min-w-[32px] px-2 py-1 rounded text-sm font-medium transition-colors ${
+                className={`min-w-[32px] px-2 py-1 rounded text-sm font-medium transition-all duration-300 ${
                   currentPage === pageNum
-                    ? 'text-white'
-                    : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-neutral-700'
+                    ? 'text-white shadow-sm'
+                    : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200/50 dark:hover:bg-neutral-700/50'
                 }`}
                 style={currentPage === pageNum ? { backgroundColor: 'var(--brand)' } : {}}
               >
@@ -138,14 +138,14 @@ export function DataTable({ data, columns, pageSize = 10 }: DataTableProps) {
           <button
             onClick={() => setCurrentPage(currentPage + 1)}
             disabled={currentPage >= totalPages - 1}
-            className="px-2 py-1 rounded hover:bg-slate-200 dark:hover:bg-neutral-700 disabled:opacity-30 disabled:cursor-not-allowed text-slate-600 dark:text-slate-300 transition-colors"
+            className="px-2 py-1 rounded hover:bg-slate-200/50 dark:hover:bg-neutral-700/50 disabled:opacity-30 disabled:cursor-not-allowed text-slate-600 dark:text-slate-300 transition-all duration-300"
           >
             <ChevronRight className="w-4 h-4" />
           </button>
           <button
             onClick={() => setCurrentPage(totalPages - 1)}
             disabled={currentPage >= totalPages - 1}
-            className="px-2 py-1 rounded hover:bg-slate-200 dark:hover:bg-neutral-700 disabled:opacity-30 disabled:cursor-not-allowed text-slate-600 dark:text-slate-300 transition-colors"
+            className="px-2 py-1 rounded hover:bg-slate-200/50 dark:hover:bg-neutral-700/50 disabled:opacity-30 disabled:cursor-not-allowed text-slate-600 dark:text-slate-300 transition-all duration-300"
           >
             <ChevronsRight className="w-4 h-4" />
           </button>

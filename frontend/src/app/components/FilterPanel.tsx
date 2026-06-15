@@ -24,7 +24,7 @@ export function FilterPanel() {
   } = useFilters();
 
   return (
-    <aside className="w-80 border-l border-slate-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 p-6 space-y-6 shadow-lg transition-colors">
+    <aside className="w-80 border-l border-slate-200/50 dark:border-neutral-700 bg-white dark:bg-neutral-800 p-6 space-y-6 shadow-md transition-all duration-300">
       <div>
         <h2 className="font-semibold text-lg mb-4 text-slate-800 dark:text-slate-100">Filters</h2>
 

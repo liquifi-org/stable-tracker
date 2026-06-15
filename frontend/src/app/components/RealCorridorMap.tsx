@@ -142,8 +142,8 @@ export function RealCorridorMap({ corridors, getCountryName }: RealCorridorMapPr
 
   return (
     <div className="relative">
-      <div className="bg-white dark:bg-neutral-800 rounded-xl border-2 border-slate-300 dark:border-neutral-700 overflow-hidden shadow-lg transition-colors">
-        <div className="p-4 border-b-2 border-slate-300 dark:border-neutral-700 flex justify-between items-center" style={{ backgroundColor: '#214A9A' }}>
+      <div className="bg-white dark:bg-neutral-800 rounded-xl border border-slate-200/50 dark:border-neutral-700 overflow-hidden shadow-md transition-all">
+        <div className="p-6 border-b border-slate-200/50 dark:border-neutral-700 flex justify-between items-center" style={{ backgroundColor: 'var(--brand)' }}>
           <div className="flex items-center gap-6">
             <span className="text-sm text-white font-medium">Transfer volume (line thickness)</span>
             <div className="flex items-center gap-4">
@@ -237,7 +237,7 @@ export function RealCorridorMap({ corridors, getCountryName }: RealCorridorMapPr
                   onMouseEnter={(e) => handleMouseMove(e, index)}
                   onMouseLeave={() => setHoveredCorridor(null)}
                   onClick={() => setSelectedCorridor(index)}
-                  className="cursor-pointer transition-all"
+                  className="cursor-pointer transition-all duration-300"
                   filter={isHovered || isSelected ? 'url(#corridor-glow)' : undefined}
                   strokeLinecap="round"
                 />
@@ -278,11 +278,11 @@ export function RealCorridorMap({ corridors, getCountryName }: RealCorridorMapPr
 
       {hoveredData && (
         <div
-          className="fixed z-50 bg-slate-900/98 backdrop-blur-md border-2 border-cyan-500/50 rounded-lg shadow-2xl pointer-events-none"
+          className="fixed z-50 bg-slate-900/98 backdrop-blur-md border border-[var(--brand)]/50 rounded-lg shadow-lg pointer-events-none transition-all"
           style={{ left: tooltipPos.x + 15, top: tooltipPos.y - 100, minWidth: '500px' }}
         >
-          <div className="bg-gradient-to-r from-blue-900/40 to-cyan-900/40 px-4 py-2 border-b border-slate-700">
-            <h3 className="font-bold text-cyan-400 text-lg text-center">
+          <div className="bg-gradient-to-r from-[var(--brand)]/30 to-[var(--brand-700)]/20 px-4 py-2 border-b border-slate-700">
+            <h3 className="font-bold text-[var(--brand-300)] text-lg text-center">
               {getCountryName(hoveredData.country1)} &lt;-&gt; {getCountryName(hoveredData.country2)}
             </h3>
           </div>
@@ -292,10 +292,10 @@ export function RealCorridorMap({ corridors, getCountryName }: RealCorridorMapPr
               <thead>
                 <tr className="border-b border-slate-700">
                   <th className="bg-slate-800/50 p-2 text-left"></th>
-                  <th className="bg-slate-800/50 p-2 text-center text-cyan-400 italic font-semibold border-l border-slate-700">
+                  <th className="bg-slate-800/50 p-2 text-center text-[var(--brand-300)] italic font-semibold border-l border-slate-700">
                     {getCountryName(hoveredData.country1)} -&gt; {getCountryName(hoveredData.country2)}
                   </th>
-                  <th className="bg-slate-800/50 p-2 text-center text-cyan-400 italic font-semibold border-l border-slate-700">
+                  <th className="bg-slate-800/50 p-2 text-center text-[var(--brand-300)] italic font-semibold border-l border-slate-700">
                     {getCountryName(hoveredData.country2)} -&gt; {getCountryName(hoveredData.country1)}
                   </th>
                 </tr>
@@ -377,37 +377,37 @@ export function RealCorridorMap({ corridors, getCountryName }: RealCorridorMapPr
 
       {selectedData && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 backdrop-blur-sm" onClick={() => setSelectedCorridor(null)}>
-          <div className="bg-slate-900 border-2 border-slate-700 rounded-xl p-8 max-w-lg w-full mx-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-2xl font-bold text-white mb-6">Corridor Details</h3>
+          <div className="bg-white dark:bg-neutral-800 border border-[var(--brand)]/30 rounded-xl p-8 max-w-lg w-full mx-4 shadow-lg transition-all" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Corridor Details</h3>
             <div className="space-y-4">
-              <div className="flex justify-between items-center p-4 bg-slate-800 rounded-lg">
-                <span className="text-slate-300">Route</span>
-                <span className="text-white font-bold">{getCountryName(selectedData.country1)} ⟷ {getCountryName(selectedData.country2)}</span>
+              <div className="flex justify-between items-center p-4 bg-[var(--brand-50)] dark:bg-slate-800 rounded-lg">
+                <span className="text-gray-600 dark:text-slate-300">Route</span>
+                <span className="text-gray-900 dark:text-white font-bold">{getCountryName(selectedData.country1)} ⟷ {getCountryName(selectedData.country2)}</span>
               </div>
-              <div className="border-t border-slate-700 pt-4 space-y-3">
-                <div className="flex justify-between items-center p-3 bg-slate-800/50 rounded-lg">
-                  <span className="text-slate-300">Total corridor value (bidirectional)</span>
-                  <span className="text-cyan-400 font-bold text-xl">{formatValue(selectedData.totalValue)}</span>
+              <div className="border-t border-[var(--brand)]/20 pt-4 space-y-3">
+                <div className="flex justify-between items-center p-3 bg-[var(--brand-50)] dark:bg-slate-800/50 rounded-lg">
+                  <span className="text-gray-600 dark:text-slate-300">Total corridor value (bidirectional)</span>
+                  <span className="text-[var(--brand)] dark:text-[var(--brand-300)] font-bold text-xl">{formatValue(selectedData.totalValue)}</span>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="flex flex-col p-3 bg-slate-800/30 rounded">
-                    <span className="text-xs text-slate-400">{getCountryName(selectedData.country1)} → {getCountryName(selectedData.country2)}</span>
-                    <span className="text-white font-semibold mt-1">{formatValue(selectedData.valueFromCountry1)}</span>
+                  <div className="flex flex-col p-3 bg-gray-50 dark:bg-slate-800/30 rounded">
+                    <span className="text-xs text-gray-500 dark:text-slate-400">{getCountryName(selectedData.country1)} → {getCountryName(selectedData.country2)}</span>
+                    <span className="text-gray-900 dark:text-white font-semibold mt-1">{formatValue(selectedData.valueFromCountry1)}</span>
                   </div>
-                  <div className="flex flex-col p-3 bg-slate-800/30 rounded">
-                    <span className="text-xs text-slate-400">{getCountryName(selectedData.country2)} → {getCountryName(selectedData.country1)}</span>
-                    <span className="text-white font-semibold mt-1">{formatValue(selectedData.valueFromCountry2)}</span>
+                  <div className="flex flex-col p-3 bg-gray-50 dark:bg-slate-800/30 rounded">
+                    <span className="text-xs text-gray-500 dark:text-slate-400">{getCountryName(selectedData.country2)} → {getCountryName(selectedData.country1)}</span>
+                    <span className="text-gray-900 dark:text-white font-semibold mt-1">{formatValue(selectedData.valueFromCountry2)}</span>
                   </div>
                 </div>
-                <div className="flex justify-between text-slate-300">
+                <div className="flex justify-between text-gray-600 dark:text-slate-300">
                   <span>Dollarization index</span>
-                  <span className="font-semibold text-white">{(selectedData.dollarization * 100).toFixed(0)}%</span>
+                  <span className="font-semibold text-gray-900 dark:text-white">{(selectedData.dollarization * 100).toFixed(0)}%</span>
                 </div>
               </div>
             </div>
             <button
               onClick={() => setSelectedCorridor(null)}
-              className="w-full mt-8 bg-slate-800 hover:bg-slate-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
+              className="w-full mt-8 bg-[var(--brand)] hover:bg-[var(--brand-700)] text-white px-6 py-3 rounded-lg font-semibold transition-colors"
             >
               Close
             </button>
