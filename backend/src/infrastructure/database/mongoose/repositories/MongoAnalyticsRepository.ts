@@ -139,59 +139,57 @@ export class MongoAnalyticsRepository implements IAnalyticsRepository {
     }
 
     // ------------------------------------------------------------------
-    // Corridor flows
+    // Corridor flows  (source: Allium corridor snapshots in TransactionModel)
     // ------------------------------------------------------------------
     async getCorridorFlows(
         params: CorridorParams,
     ): Promise<CorridorFlow[] | BidirectionalCorridorFlow[]> {
-        const { year, month, referenceAsset, stablecoinId, bidirectional, regionFrom, regionTo } =
-            params;
-        const { start, end } = periodBoundaries(year, month);
+        const { year, month, stablecoinId, bidirectional, regionFrom, regionTo } = params;
 
-        let stablecoinIds: string[] | null = null;
-        if (stablecoinId && stablecoinId !== 'All') {
-            stablecoinIds = [stablecoinId];
-        } else if (referenceAsset) {
-            const coins = await StablecoinModel.find({ referenceAsset }).lean();
-            stablecoinIds = coins.map((c) => c.stablecoinId);
-        }
+        const periodFilter = month
+            ? { period: `${year}-${String(month).padStart(2, '0')}` }
+            : { period: { $gte: `${year}-01`, $lte: `${year}-12` } };
 
-        const txFilter: Record<string, unknown> = {
-            date: { $gte: start, $lte: end },
+        const matchFilter: Record<string, unknown> = {
+            type: 'corridor',
+            source: 'allium',
+            ...periodFilter,
         };
-        if (stablecoinIds) txFilter['stablecoinId'] = { $in: stablecoinIds };
+
+        if (stablecoinId && stablecoinId !== 'All') {
+            matchFilter['tokenSymbol'] = stablecoinId.toUpperCase();
+        }
         if (params.countryId && params.countryId !== 'All') {
-            txFilter['$or'] = [
+            matchFilter['$or'] = [
                 { senderCountryId: params.countryId },
                 { receiverCountryId: params.countryId },
             ];
         }
 
-        interface AggRow {
+        interface AlliumAggRow {
             _id: { from: string; to: string };
-            totalValue: number;
-            stablecoins: { stablecoinId: string; value: number }[];
+            totalUsdVolume: number;
+            usdStablecoinVolume: number;
+            tokens: { symbol: string; volume: number }[];
         }
 
-        const rows = await TransactionModel.aggregate<AggRow>([
-            { $match: txFilter },
+        const rows = await TransactionModel.aggregate<AlliumAggRow>([
+            { $match: matchFilter },
             {
                 $group: {
                     _id: { from: '$senderCountryId', to: '$receiverCountryId' },
-                    totalValue: { $sum: '$value.amount' },
-                    stablecoins: {
-                        $push: { stablecoinId: '$stablecoinId', value: '$value.amount' },
-                    },
+                    totalUsdVolume: { $sum: '$value.amount' },
+                    usdStablecoinVolume: { $sum: '$usdStablecoinVolume' },
+                    tokens: { $push: { symbol: '$tokenSymbol', volume: '$value.amount' } },
                 },
             },
         ]);
 
-        // Apply region filters (need country data)
         let filteredRows = rows;
         if (regionFrom || regionTo) {
-            const countriesWithRegion = await CountryModel.find({}).lean();
+            const allCountries = await CountryModel.find({}).lean();
             const regionMap = new Map<string, string>(
-                countriesWithRegion.map((c) => [c.countryId, c.region]),
+                allCountries.map((c) => [c.countryId, c.region]),
             );
             filteredRows = rows.filter((r) => {
                 if (regionFrom && regionMap.get(r._id.from) !== regionFrom) return false;
@@ -200,67 +198,45 @@ export class MongoAnalyticsRepository implements IAnalyticsRepository {
             });
         }
 
-        // Build stablecoin name map for top stablecoins
-        const allStablecoinIds = [
-            ...new Set(filteredRows.flatMap((r) => r.stablecoins.map((s) => s.stablecoinId))),
-        ];
-        const stablecoinDocs = await StablecoinModel.find({
-            stablecoinId: { $in: allStablecoinIds },
-        }).lean();
-        const scNameMap = new Map<string, string>(
-            stablecoinDocs.map((s) => [s.stablecoinId, s.name]),
-        );
-
-        // Check which stablecoins are USD-referenced (for dollarization)
-        const usdCoins = new Set<string>(
-            stablecoinDocs
-                .filter((s) => s.referenceAsset === 'USD')
-                .map((s) => s.stablecoinId),
-        );
+        const buildTopTokens = (
+            tokens: { symbol: string; volume: number }[],
+            totalVol: number,
+        ): StablecoinShare[] => {
+            const tokenMap = tokens.reduce<Map<string, number>>((acc, t) => {
+                acc.set(t.symbol, (acc.get(t.symbol) ?? 0) + t.volume);
+                return acc;
+            }, new Map());
+            return Array.from(tokenMap.entries())
+                .sort(([, a], [, b]) => b - a)
+                .slice(0, 3)
+                .map(([symbol, vol]) => ({
+                    stablecoinId: symbol,
+                    name: symbol,
+                    share: totalVol > 0 ? vol / totalVol : 0,
+                }));
+        };
 
         if (!bidirectional) {
-            return filteredRows.map((r): CorridorFlow => {
-                const scValueMap = r.stablecoins.reduce<Map<string, number>>((acc, s) => {
-                    acc.set(s.stablecoinId, (acc.get(s.stablecoinId) ?? 0) + s.value);
-                    return acc;
-                }, new Map());
-
-                const usdValue = Array.from(scValueMap.entries())
-                    .filter(([id]) => usdCoins.has(id))
-                    .reduce((sum, [, v]) => sum + v, 0);
-
-                const topStablecoins: StablecoinShare[] = Array.from(scValueMap.entries())
-                    .sort(([, a], [, b]) => b - a)
-                    .slice(0, 3)
-                    .map(([id, val]) => ({
-                        stablecoinId: id,
-                        name: scNameMap.get(id) ?? id,
-                        share: r.totalValue > 0 ? val / r.totalValue : 0,
-                    }));
-
-                return {
-                    from: r._id.from,
-                    to: r._id.to,
-                    value: { amount: parseFloat(r.totalValue.toFixed(2)), currency: 'USD' },
-                    dollarizationIndex: r.totalValue > 0 ? usdValue / r.totalValue : 0,
-                    topStablecoins,
-                };
-            });
+            return filteredRows.map((r): CorridorFlow => ({
+                from: r._id.from,
+                to: r._id.to,
+                value: { amount: parseFloat(r.totalUsdVolume.toFixed(2)), currency: 'USD' },
+                dollarizationIndex:
+                    r.totalUsdVolume > 0 ? r.usdStablecoinVolume / r.totalUsdVolume : 0,
+                topStablecoins: buildTopTokens(r.tokens, r.totalUsdVolume),
+            }));
         }
 
         // Bidirectional: merge A→B and B→A
-        const pairMap = new Map<string, { a: AggRow; b?: AggRow }>();
+        const pairMap = new Map<string, { a: AlliumAggRow; b?: AlliumAggRow }>();
         for (const r of filteredRows) {
             const key =
                 r._id.from < r._id.to
                     ? `${r._id.from}:${r._id.to}`
                     : `${r._id.to}:${r._id.from}`;
             const existing = pairMap.get(key);
-            if (!existing) {
-                pairMap.set(key, { a: r });
-            } else {
-                existing.b = r;
-            }
+            if (!existing) pairMap.set(key, { a: r });
+            else existing.b = r;
         }
 
         return Array.from(pairMap.values()).map(({ a, b }): BidirectionalCorridorFlow => {
@@ -269,17 +245,11 @@ export class MongoAnalyticsRepository implements IAnalyticsRepository {
             const forward = a._id.from === country1 ? a : b;
             const backward = a._id.from === country2 ? a : b;
 
-            const v1 = forward?.totalValue ?? 0;
-            const v2 = backward?.totalValue ?? 0;
+            const v1 = forward?.totalUsdVolume ?? 0;
+            const v2 = backward?.totalUsdVolume ?? 0;
             const total = v1 + v2;
-
-            const allCoins = [
-                ...(forward?.stablecoins ?? []),
-                ...(backward?.stablecoins ?? []),
-            ];
-            const usdValue = allCoins
-                .filter((s) => usdCoins.has(s.stablecoinId))
-                .reduce((sum, s) => sum + s.value, 0);
+            const usdValue =
+                (forward?.usdStablecoinVolume ?? 0) + (backward?.usdStablecoinVolume ?? 0);
 
             return {
                 country1,
