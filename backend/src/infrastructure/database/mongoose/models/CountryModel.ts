@@ -8,6 +8,9 @@ export interface ICountryDoc extends Document {
     population?: number;
     populationYear?: number;
     populationSyncedAt?: Date;
+    remittancesSent?: number;
+    remittancesYear?: number;
+    remittancesSyncedAt?: Date;
     regulatedIssuerIds: string[];
     regulatedReserveTypes: string[];
     // Stride API fields
@@ -36,6 +39,9 @@ const CountrySchema = new Schema<ICountryDoc>(
         population: { type: Number },
         populationYear: { type: Number },
         populationSyncedAt: { type: Date },
+        remittancesSent: { type: Number },
+        remittancesYear: { type: Number },
+        remittancesSyncedAt: { type: Date },
         regulatedIssuerIds:    { type: [String], default: [] },
         regulatedReserveTypes: { type: [String], default: [] },
         // Stride API fields
