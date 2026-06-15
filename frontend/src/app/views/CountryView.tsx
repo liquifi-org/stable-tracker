@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ComponentType } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import { DataTable } from '../components/DataTable';
-import { ArrowLeft, CheckCircle2, Loader2 } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Loader2, XCircle, MinusCircle, Banknote, Coins, Gem, Cpu } from 'lucide-react';
 import { api, resolveToNumericId, type ApiCountry, type ApiIssuer, type ApiLicense, type ApiReserveType, type CountryOverview, type CountryCorridorBreakdown } from '../services/api';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
+import { Tooltip, TooltipTrigger, TooltipContent } from '../components/ui/tooltip';
 
 /** Map of known stablecoin issuer name keywords → Clearbit logo domain */
 const ISSUER_DOMAINS: Record<string, string> = {
@@ -74,6 +75,18 @@ function IssuerLogo({ name }: { name: string }) {
     </div>
   );
 }
+
+const RESERVE_TYPE_DEFS: {
+  key: 'fiatBacked' | 'cryptoBacked' | 'commodityBacked' | 'algorithmBacked';
+  alertKey: 'fiatAlert' | 'cryptoAlert' | 'commodityAlert' | 'algorithmAlert';
+  label: string;
+  Icon: ComponentType<{ className?: string }>;
+}[] = [
+  { key: 'fiatBacked',      alertKey: 'fiatAlert',       label: 'Fiat-backed',      Icon: Banknote },
+  { key: 'cryptoBacked',    alertKey: 'cryptoAlert',     label: 'Crypto-backed',    Icon: Coins },
+  { key: 'commodityBacked', alertKey: 'commodityAlert',  label: 'Commodity-backed', Icon: Gem },
+  { key: 'algorithmBacked', alertKey: 'algorithmAlert',  label: 'Algorithm-backed', Icon: Cpu },
+];
 
 const CURRENT_YEAR = new Date().getFullYear();
 
@@ -220,13 +233,33 @@ export function CountryView() {
             })()}
           </div>
         </div>
-        {apiRegulatory?.countryDetail?.regulatorName && (
-          <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
-            Regulator:{' '}
-            <span className="font-medium text-slate-700 dark:text-slate-300">
-              {apiRegulatory.countryDetail.regulatorName}
-            </span>
-          </p>
+        {apiRegulatory?.countryDetail && (
+          <div className="space-y-1 mb-4 text-sm text-slate-500 dark:text-slate-400">
+            {apiRegulatory.countryDetail.regulatorName && (
+              <p>
+                Regulator:{' '}
+                <span className="font-medium text-slate-700 dark:text-slate-300">
+                  {apiRegulatory.countryDetail.regulatorName}
+                </span>
+              </p>
+            )}
+            {apiRegulatory.countryDetail.regulatorDescription && (
+              <p>
+                Regulatory Overview:{' '}
+                <span className="font-medium text-slate-700 dark:text-slate-300">
+                  {apiRegulatory.countryDetail.regulatorDescription}
+                </span>
+              </p>
+            )}
+            {apiRegulatory.countryDetail.currency && (
+              <p>
+                Currency:{' '}
+                <span className="font-medium text-slate-700 dark:text-slate-300">
+                  {apiRegulatory.countryDetail.currency}
+                </span>
+              </p>
+            )}
+          </div>
         )}
         <div className="grid grid-cols-2 gap-6">
           {/* Authorized Issuers */}
@@ -310,66 +343,49 @@ export function CountryView() {
 
           {/* Reserve Types */}
           <div>
-            <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">Permitted Reserve Types</h4>
-            <div className="space-y-2">
-              {regulatoryLoading ? (
-                <div className="text-sm text-slate-400 dark:text-slate-500">Loading...</div>
-              ) : apiRegulatory?.reserveTypes && apiRegulatory.reserveTypes.length > 0 ? (
-                apiRegulatory.reserveTypes.map((rt) => (
-                  <div key={rt.id} className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-                    <CheckCircle2 className="w-4 h-4 text-purple-500 shrink-0" />
-                    {rt.name}
-                  </div>
-                ))
-              ) : apiRegulatory?.countryDetail ? (
-                // Fallback: derive from collateral flags on country detail
-                <>
-                  {apiRegulatory.countryDetail.fiatBacked === 1 && (
-                    <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-                      <CheckCircle2 className="w-4 h-4 text-purple-500 shrink-0" />Fiat-backed
-                      {apiRegulatory.countryDetail.fiatAlert && <span className="text-xs text-slate-400">({apiRegulatory.countryDetail.fiatAlert})</span>}
+            <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">Reserve Types</h4>
+            {regulatoryLoading ? (
+              <div className="text-sm text-slate-400 dark:text-slate-500">Loading...</div>
+            ) : apiRegulatory?.countryDetail ? (
+              <div className="space-y-2">
+                {RESERVE_TYPE_DEFS.map(({ key, alertKey, label, Icon }) => {
+                  const cd = apiRegulatory.countryDetail!;
+                  const value = cd[key];
+                  const alert = cd[alertKey];
+                  const allowed = value === 1;
+                  const prohibited = value === 0;
+                  const StatusIcon = allowed ? CheckCircle2 : prohibited ? XCircle : MinusCircle;
+                  const statusCls = allowed
+                    ? 'text-green-500'
+                    : prohibited
+                    ? 'text-red-500'
+                    : 'text-slate-300 dark:text-slate-600';
+
+                  return (
+                    <div key={key} className="flex items-center gap-2 text-sm">
+                      <Icon className="w-4 h-4 text-purple-500 shrink-0" />
+                      <span className="flex-1 text-slate-600 dark:text-slate-300">{label}</span>
+                      {alert ? (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="inline-flex shrink-0 cursor-help">
+                              <StatusIcon className={`w-4 h-4 ${statusCls}`} />
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">{alert}</TooltipContent>
+                        </Tooltip>
+                      ) : (
+                        <StatusIcon className={`w-4 h-4 ${statusCls} shrink-0`} />
+                      )}
                     </div>
-                  )}
-                  {apiRegulatory.countryDetail.cryptoBacked === 1 && (
-                    <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-                      <CheckCircle2 className="w-4 h-4 text-purple-500 shrink-0" />Crypto-backed
-                      {apiRegulatory.countryDetail.cryptoAlert && <span className="text-xs text-slate-400">({apiRegulatory.countryDetail.cryptoAlert})</span>}
-                    </div>
-                  )}
-                  {apiRegulatory.countryDetail.commodityBacked === 1 && (
-                    <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-                      <CheckCircle2 className="w-4 h-4 text-purple-500 shrink-0" />Commodity-backed
-                      {apiRegulatory.countryDetail.commodityAlert && <span className="text-xs text-slate-400">({apiRegulatory.countryDetail.commodityAlert})</span>}
-                    </div>
-                  )}
-                  {apiRegulatory.countryDetail.algorithmBacked === 1 && (
-                    <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-                      <CheckCircle2 className="w-4 h-4 text-purple-500 shrink-0" />Algorithm-backed
-                      {apiRegulatory.countryDetail.algorithmAlert && <span className="text-xs text-slate-400">({apiRegulatory.countryDetail.algorithmAlert})</span>}
-                    </div>
-                  )}
-                </>
-              ) : (
-                <div className="text-sm text-slate-400 dark:text-slate-500">No reserve type data</div>
-              )}
-            </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-sm text-slate-400 dark:text-slate-500">No reserve type data</div>
+            )}
           </div>
 
-          {/* Regulatory context */}
-          <div className="space-y-3">
-            {apiRegulatory?.countryDetail?.regulatorDescription && (
-              <div>
-                <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Regulatory Overview</h4>
-                <p className="text-sm text-slate-600 dark:text-slate-400">{apiRegulatory.countryDetail.regulatorDescription}</p>
-              </div>
-            )}
-            {apiRegulatory?.countryDetail?.currency && (
-              <div>
-                <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Currency</h4>
-                <p className="text-sm text-slate-600 dark:text-slate-400">{apiRegulatory.countryDetail.currency}</p>
-              </div>
-            )}
-          </div>
         </div>
       </div>
 

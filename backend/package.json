@@ -38,7 +38,7 @@
     "db:seed:full": "npm run db:seed && npm run stride:sync && npm run remittances:sync",
     "db:seed:full:local": "npm run db:seed:local && npm run stride:sync:local && npm run remittances:sync:local"
   },
-  "author": "Pedro Frias",
+  "author": "EY",
   "license": "ISC",
   "description": "",
   "devDependencies": {

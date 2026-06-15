@@ -7,6 +7,20 @@ export class CountryMapper {
             countryId: country.countryId,
             name: country.name,
             region: country.region,
+            stage: country.stage,
+            regulatorName: country.regulatorName,
+            regulatorDescription: country.regulatorDescription,
+            description: country.description,
+            currency: country.currency,
+            fiatBacked: country.fiatBacked,
+            fiatAlert: country.fiatAlert,
+            cryptoBacked: country.cryptoBacked,
+            cryptoAlert: country.cryptoAlert,
+            commodityBacked: country.commodityBacked,
+            commodityAlert: country.commodityAlert,
+            algorithmBacked: country.algorithmBacked,
+            algorithmAlert: country.algorithmAlert,
+            isStablecoinSpecific: country.isStablecoinSpecific,
         };
     }
 }

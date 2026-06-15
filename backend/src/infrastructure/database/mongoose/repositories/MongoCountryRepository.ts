@@ -56,6 +56,22 @@ export class MongoCountryRepository implements ICountryRepository {
             population: doc.population,
             regulatedIssuerIds: doc.regulatedIssuerIds ?? [],
             regulatedReserveTypes: doc.regulatedReserveTypes ?? [],
+            stage: doc.stage,
+            regulatorName: doc.regulatorName,
+            regulatorDescription: doc.regulatorDescription,
+            description: doc.description,
+            currency: doc.currency,
+            fiatBacked: doc.fiatBacked,
+            fiatAlert: doc.fiatAlert,
+            cryptoBacked: doc.cryptoBacked,
+            cryptoAlert: doc.cryptoAlert,
+            commodityBacked: doc.commodityBacked,
+            commodityAlert: doc.commodityAlert,
+            algorithmBacked: doc.algorithmBacked,
+            algorithmAlert: doc.algorithmAlert,
+            isStablecoinSpecific: doc.isStablecoinSpecific !== undefined
+                ? Number(doc.isStablecoinSpecific)
+                : undefined,
         });
     }
 
