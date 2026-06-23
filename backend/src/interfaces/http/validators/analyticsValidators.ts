@@ -28,6 +28,10 @@ export const CountryOverviewQuerySchema = YearMonthSchema.extend({
     referenceAsset: ReferenceAssetFilterSchema,
 });
 
+export const GlobalInsightsQuerySchema = YearMonthSchema;
+
+export const CorridorStablecoinsQuerySchema = YearMonthSchema;
+
 export const CountryIdPathSchema = z.object({
     countryId: CountryIdValue,
 });
@@ -42,3 +46,5 @@ export type AdoptionQuery = z.infer<typeof AdoptionQuerySchema>;
 export type CorridorQuery = z.infer<typeof CorridorQuerySchema>;
 export type CountryOverviewQuery = z.infer<typeof CountryOverviewQuerySchema>;
 export type CountryCorridorsQuery = z.infer<typeof CountryCorridorsQuerySchema>;
+export type GlobalInsightsQuery = z.infer<typeof GlobalInsightsQuerySchema>;
+export type CorridorStablecoinsQuery = z.infer<typeof CorridorStablecoinsQuerySchema>;

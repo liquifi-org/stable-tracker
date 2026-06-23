@@ -5,6 +5,7 @@ export class CountryMapper {
     static toDto(country: Country): CountryDto {
         return {
             countryId: country.countryId,
+            isoAlpha2: country.isoAlpha2,
             name: country.name,
             region: country.region,
             stage: country.stage,

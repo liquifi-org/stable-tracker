@@ -1,12 +1,17 @@
 /**
  * Sync stablecoin-holding wallet counts per country from Allium.
  *
- * Stores one snapshot per country for the current month without overwriting
- * older periods. Re-running within the same month is idempotent.
+ * Stores one snapshot per country per month in WalletCountSnapshotModel.
+ * Re-running the same month is idempotent via upsert on (countryId, period).
+ *
+ * Defaults to the previous calendar month (passed to Allium as start_date /
+ * end_date). Pass --year=YYYY --month=M to target a specific month (useful
+ * for backfills).
  *
  * Usage:
  *   npm run allium:sync:wallets
  *   npm run allium:sync:wallets:local
+ *   npm run allium:sync:wallets -- --year=2026 --month=3
  */
 
 import mongoose from 'mongoose';
@@ -35,6 +40,7 @@ const COUNTRY_KEYS = [
     'country_iso',
 ];
 const WALLET_COUNT_KEYS = [
+    'wallets_using_stablecoins',
     'wallets_holding_stablecoins',
     'wallet_count',
     'wallets',
@@ -68,15 +74,60 @@ function toNumber(value: unknown): number | null {
     return null;
 }
 
-/** "YYYY-MM" period key for a given date. */
-function periodKey(date: Date): string {
-    return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
+/** Parse optional --year=YYYY and --month=M from argv; defaults to previous month. */
+function parseArgs(): { year: number; month: number } {
+    const args = process.argv.slice(2);
+    let year: number | undefined;
+    let month: number | undefined;
+
+    for (const arg of args) {
+        const yearMatch = arg.match(/^--year=(\d{4})$/);
+        const monthMatch = arg.match(/^--month=(\d{1,2})$/);
+        if (yearMatch) year = Number(yearMatch[1]);
+        if (monthMatch) month = Number(monthMatch[1]);
+    }
+
+    if (year === undefined || month === undefined) {
+        const prev = new Date();
+        prev.setUTCDate(1);
+        prev.setUTCMonth(prev.getUTCMonth() - 1);
+        year = year ?? prev.getUTCFullYear();
+        month = month ?? prev.getUTCMonth() + 1;
+    }
+
+    return { year, month };
 }
 
-export async function run(): Promise<void> {
+/** "YYYY-MM-DD" for the first day of the given year/month. */
+function startOfMonth(year: number, month: number): string {
+    return `${year}-${String(month).padStart(2, '0')}-01`;
+}
+
+/** "YYYY-MM-DD" for the last day of the given year/month. */
+function endOfMonth(year: number, month: number): string {
+    const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+    return `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+}
+
+export async function run(year?: number, month?: number): Promise<void> {
     const startTime = Date.now();
 
-    const rows = await runAndWait(WALLETS_QUERY_ID);
+    const args = parseArgs();
+    const targetYear = year ?? args.year;
+    const targetMonth = month ?? args.month;
+    const period = `${targetYear}-${String(targetMonth).padStart(2, '0')}`;
+    const periodDate = new Date(`${period}-01T00:00:00.000Z`);
+    const startDate = startOfMonth(targetYear, targetMonth);
+    const endDate = endOfMonth(targetYear, targetMonth);
+
+    console.log(`Fetching wallet counts from Allium for ${startDate} → ${endDate}...`);
+
+    // Allium interpolates these raw into SQL, so the parameter value itself
+    // must carry the surrounding quotes (e.g. "'2026-04-01'").
+    const rows = await runAndWait(WALLETS_QUERY_ID, {
+        start_date: `'${startDate}'`,
+        end_date: `'${endDate}'`,
+    });
     console.log(`Received ${rows.length} row(s) from Allium.`);
 
     if (rows.length === 0) {
@@ -101,8 +152,6 @@ export async function run(): Promise<void> {
     console.log(`Using columns -> country: "${countryKey}", wallets: "${walletKey}"`);
 
     const now = new Date();
-    const period = periodKey(now);
-
     let matched = 0;
     let unresolved = 0;
     const ops: Parameters<typeof WalletCountSnapshotModel.bulkWrite>[0] = [];
@@ -130,7 +179,7 @@ export async function run(): Promise<void> {
                         walletCount,
                         ...(totalWallets !== null ? { totalWallets } : {}),
                         ...(pctHoldingStablecoins !== null ? { pctHoldingStablecoins } : {}),
-                        snapshotDate: now,
+                        snapshotDate: periodDate,
                         source: 'allium',
                         syncedAt: now,
                     },
@@ -165,6 +214,3 @@ if (process.argv[1]?.endsWith('sync-wallets.js')) {
             process.exit(1);
         });
 }
-
-
-

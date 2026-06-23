@@ -1,5 +1,6 @@
 export interface CountryProps {
     countryId: string;
+    isoAlpha2?: string;
     name: string;
     region: string;
     population?: number;
@@ -24,6 +25,7 @@ export interface CountryProps {
 
 export class Country {
     readonly countryId: string;
+    readonly isoAlpha2: string | undefined;
     readonly name: string;
     readonly region: string;
     readonly population: number | undefined;
@@ -46,6 +48,7 @@ export class Country {
 
     constructor(props: CountryProps) {
         this.countryId = props.countryId;
+        this.isoAlpha2 = props.isoAlpha2;
         this.name = props.name;
         this.region = props.region;
         this.population = props.population;

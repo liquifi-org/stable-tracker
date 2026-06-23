@@ -1,5 +1,6 @@
 export interface CountryDto {
     countryId: string;
+    isoAlpha2?: string;
     name: string;
     region: string;
     // Stride API fields

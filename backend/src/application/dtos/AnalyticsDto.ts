@@ -8,11 +8,25 @@ export interface CountryAdoptionMetricDto {
     isoAlpha2: string;
     name: string;
     region: string;
+    macroRegion: string | null;
     adoptionRate: number;
     activeWallets: number;
     txValueShare: number;
     unit: 'ratio' | 'percent';
     remittancesSent?: number;
+    adoptionRank: number | null;
+    eligibleCountries: number;
+    relativeAdoptionIndex: number | null;
+}
+
+export interface RegionalAdoptionMetricDto {
+    region: string;
+    countryCount: number;
+    activeWallets: number;
+    population: number;
+    adoptionRate: number;
+    txValueShare: number;
+    unit: 'ratio' | 'percent';
 }
 
 export interface StablecoinShareDto {
@@ -40,12 +54,15 @@ export interface BidirectionalCorridorFlowDto {
 
 export interface CountryOverviewDto {
     countryId: string;
+    isoAlpha2: string;
     name: string;
     region: string;
     adoptionRate: number;
     activeWallets: number;
     txValueShare: number;
     dollarizationIndex: number;
+    adoptionRank: number | null;
+    eligibleCountries: number;
     compliantIssuers: IssuerDto[];
     licenses: LicenseDto[];
     reserveTypes: ReserveTypeDto[];
@@ -57,4 +74,11 @@ export interface CountryCorridorBreakdownDto {
     countryId: string;
     inflows: CorridorFlowDto[];
     outflows: CorridorFlowDto[];
+}
+
+export interface GlobalInsightsMetricDto {
+    totalActiveWallets: number;
+    liveRegulationCountries: number;
+    totalTxValueUsd: number;
+    totalRemittancesUsd: number;
 }

@@ -12,7 +12,7 @@ export const API_KEY = process.env.ALLIUM_API_KEY;
 export const DB_URL = process.env.DB_URL ?? 'mongodb://localhost:27017/sc-tracker';
 
 export const WALLETS_QUERY_ID =
-    process.env.ALLIUM_WALLETS_QUERY_ID ?? 'o0VH4UGyeKr55L34qxPG';
+    process.env.ALLIUM_WALLETS_QUERY_ID ?? 'uxxPD1ol2JLBPnvGoGHZ';
 
 export const CORRIDORS_QUERY_ID =
     process.env.ALLIUM_CORRIDORS_QUERY_ID ?? 'MxaKAhHTsM0QohPMPqne';

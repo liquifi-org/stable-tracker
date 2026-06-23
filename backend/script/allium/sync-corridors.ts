@@ -49,6 +49,17 @@ function parseArgs(): { year: number; month: number } {
     return { year, month };
 }
 
+/** "YYYY-MM-DD" for the first day of the given year/month. */
+function startOfMonth(year: number, month: number): string {
+    return `${year}-${String(month).padStart(2, '0')}-01`;
+}
+
+/** "YYYY-MM-DD" for the last day of the given year/month. */
+function endOfMonth(year: number, month: number): string {
+    const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+    return `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+}
+
 function toNumber(value: unknown): number | null {
     if (typeof value === 'number') return Number.isFinite(value) ? value : null;
     if (typeof value === 'string') {
@@ -115,13 +126,19 @@ export async function run(year?: number, month?: number): Promise<void> {
     const targetMonth = month ?? args.month;
     const period = `${targetYear}-${String(targetMonth).padStart(2, '0')}`;
     const periodDate = new Date(`${period}-01T00:00:00.000Z`);
+    const startDate = startOfMonth(targetYear, targetMonth);
+    const endDate = endOfMonth(targetYear, targetMonth);
 
-    console.log(`Fetching corridor data from Allium for period ${period}...`);
+    console.log(`Fetching corridor data from Allium for ${startDate} → ${endDate}...`);
 
-    // Allium requires year and month as strings
+    // Allium interpolates these raw into SQL, so the parameter value itself
+    // must carry the surrounding quotes (e.g. "'2026-04-01'") — same convention
+    // as sync-wallets.ts. The previous year/month params weren't bound to this
+    // query's date filter, so every backfilled month silently returned the same
+    // default snapshot instead of period-specific data.
     const rows = await runAndWait(CORRIDORS_QUERY_ID, {
-        year: String(targetYear),
-        month: String(targetMonth),
+        start_date: `'${startDate}'`,
+        end_date: `'${endDate}'`,
     });
     console.log(`Received ${rows.length} row(s) from Allium.`);
 

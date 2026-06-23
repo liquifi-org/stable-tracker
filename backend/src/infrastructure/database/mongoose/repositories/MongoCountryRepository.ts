@@ -1,3 +1,4 @@
+import { ISO_COUNTRIES } from '../../../../../script/shared/iso3166';
 import { CountryModel } from '../models/CountryModel';
 import { IssuerModel } from '../models/IssuerModel';
 import { LicenseModel } from '../models/LicenseModel';
@@ -14,6 +15,8 @@ import { ReserveType } from '../../../../domain/entities/ReserveType';
 import { buildPaginatedResult } from '../../../../shared/types/Pagination';
 import { parseSortParam } from '../utils/queryUtils';
 import type { ReserveTypeCodeValue } from '../../../../domain/value-objects/ReserveTypeCode';
+
+const NUMERIC_TO_ALPHA2 = new Map<string, string>(ISO_COUNTRIES.map((c) => [c.numeric, c.alpha2]));
 
 export class MongoCountryRepository implements ICountryRepository {
     async findAll(params: FindCountriesParams): Promise<PaginatedResult<Country>> {
@@ -35,11 +38,28 @@ export class MongoCountryRepository implements ICountryRepository {
             (d) =>
                 new Country({
                     countryId: d.countryId,
+                    isoAlpha2: NUMERIC_TO_ALPHA2.get(d.countryId),
                     name: d.name,
                     region: d.region,
                     population: d.population,
                     regulatedIssuerIds: d.regulatedIssuerIds ?? [],
                     regulatedReserveTypes: d.regulatedReserveTypes ?? [],
+                    stage: d.stage,
+                    regulatorName: d.regulatorName,
+                    regulatorDescription: d.regulatorDescription,
+                    description: d.description,
+                    currency: d.currency,
+                    fiatBacked: d.fiatBacked,
+                    fiatAlert: d.fiatAlert,
+                    cryptoBacked: d.cryptoBacked,
+                    cryptoAlert: d.cryptoAlert,
+                    commodityBacked: d.commodityBacked,
+                    commodityAlert: d.commodityAlert,
+                    algorithmBacked: d.algorithmBacked,
+                    algorithmAlert: d.algorithmAlert,
+                    isStablecoinSpecific: d.isStablecoinSpecific !== undefined
+                        ? Number(d.isStablecoinSpecific)
+                        : undefined,
                 }),
         );
 
@@ -51,6 +71,7 @@ export class MongoCountryRepository implements ICountryRepository {
         if (!doc) return null;
         return new Country({
             countryId: doc.countryId,
+            isoAlpha2: NUMERIC_TO_ALPHA2.get(doc.countryId),
             name: doc.name,
             region: doc.region,
             population: doc.population,

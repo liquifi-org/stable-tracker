@@ -16,14 +16,19 @@ import type {
     CountryOverviewParams,
     CountryCorridorsParams,
     CountryAdoptionMetric,
+    RegionalAdoptionMetric,
     CorridorFlow,
     BidirectionalCorridorFlow,
     CountryOverview,
     CountryCorridorBreakdown,
     StablecoinShare,
+    GlobalInsightsParams,
+    GlobalInsightsMetric,
+    CorridorStablecoinsParams,
 } from '../../../../domain/repositories/IAnalyticsRepository';
 import { periodBoundaries } from '../utils/queryUtils';
 import type { ReserveTypeCodeValue } from '../../../../domain/value-objects/ReserveTypeCode';
+import { toMacroRegion } from '../../../../domain/value-objects/MacroRegion';
 
 export class MongoAnalyticsRepository implements IAnalyticsRepository {
     // ------------------------------------------------------------------
@@ -63,7 +68,19 @@ export class MongoAnalyticsRepository implements IAnalyticsRepository {
     // ------------------------------------------------------------------
     // Adoption heatmap
     // ------------------------------------------------------------------
-    async getAdoptionMetrics(params: AdoptionParams): Promise<CountryAdoptionMetric[]> {
+
+    /** Per-country adoption inputs shared by the country-level and regional roll-up endpoints. */
+    private async buildCountryAdoptionRows(params: AdoptionParams): Promise<{
+        countryId: string;
+        isoAlpha2: string;
+        name: string;
+        region: string;
+        population: number;
+        adoptionRate: number;
+        activeWallets: number;
+        txValueShare: number;
+        remittancesSent?: number;
+    }[]> {
         const { year, month, referenceAsset, stablecoinId, countryId, region } = params;
         const { start, end } = periodBoundaries(year, month);
 
@@ -122,25 +139,128 @@ export class MongoAnalyticsRepository implements IAnalyticsRepository {
         const txMap = new Map<string, number>(txAgg.map((r) => [r._id, r.totalValue]));
         const globalTotal = Array.from(txMap.values()).reduce((sum, v) => sum + v, 0);
 
+        // World Bank remittances are annual; tx value / active wallets above are scoped to the
+        // requested period (one month, or the full year when no month is given). Pro-rate the
+        // annual figure down to that same period so ratios against it are apples-to-apples.
+        const periodMonths = month !== undefined ? 1 : 12;
+
         return countries.map((c) => {
             const activeWallets = snapshotMap.get(c.countryId) ?? walletMap.get(c.countryId) ?? 0;
             const txValue = txMap.get(c.countryId) ?? 0;
             const adoptionRate =
                 c.population && c.population > 0 ? activeWallets / c.population : 0;
             const txValueShare = globalTotal > 0 ? txValue / globalTotal : 0;
+            const remittancesSent =
+                c.remittancesSent !== undefined ? (c.remittancesSent * periodMonths) / 12 : undefined;
 
             return {
                 countryId: c.countryId,
                 isoAlpha2: NUMERIC_TO_ALPHA2.get(c.countryId) ?? '',
                 name: c.name,
                 region: c.region,
-                adoptionRate: parseFloat(adoptionRate.toFixed(6)),
+                population: c.population ?? 0,
+                adoptionRate,
                 activeWallets,
-                txValueShare: parseFloat(txValueShare.toFixed(6)),
-                unit: 'ratio' as const,
-                remittancesSent: c.remittancesSent,
+                txValueShare,
+                remittancesSent,
             };
         });
+    }
+
+    /** Rank-normalized adoption: wallets holding stablecoins / population, ranked across
+     *  the eligible geography set (> 10k wallets holding stablecoins). Shared by the country-level
+     *  adoption table and the single-country overview, so "#X of N" means the same thing in both. */
+    private rankAdoptionRows(
+        rows: { countryId: string; activeWallets: number; adoptionRate: number }[],
+    ): { rankMap: Map<string, number>; eligibleCountries: number } {
+        const ELIGIBILITY_THRESHOLD = 10_000;
+        const eligible = rows
+            .filter((r) => r.activeWallets > ELIGIBILITY_THRESHOLD)
+            .sort((a, b) => b.adoptionRate - a.adoptionRate);
+        const rankMap = new Map<string, number>(eligible.map((r, i) => [r.countryId, i + 1]));
+        return { rankMap, eligibleCountries: eligible.length };
+    }
+
+    async getAdoptionMetrics(params: AdoptionParams): Promise<CountryAdoptionMetric[]> {
+        const baseRows = await this.buildCountryAdoptionRows(params);
+        const { rankMap, eligibleCountries } = this.rankAdoptionRows(baseRows);
+
+        return baseRows.map((r) => {
+            const adoptionRank = rankMap.get(r.countryId) ?? null;
+            const relativeAdoptionIndex =
+                adoptionRank === null
+                    ? null
+                    : eligibleCountries > 1
+                    ? (eligibleCountries - adoptionRank) / (eligibleCountries - 1)
+                    : 1;
+
+            return {
+                countryId: r.countryId,
+                isoAlpha2: r.isoAlpha2,
+                name: r.name,
+                region: r.region,
+                macroRegion: toMacroRegion(r.region),
+                adoptionRate: parseFloat(r.adoptionRate.toFixed(6)),
+                activeWallets: r.activeWallets,
+                txValueShare: parseFloat(r.txValueShare.toFixed(6)),
+                unit: 'ratio' as const,
+                remittancesSent: r.remittancesSent,
+                adoptionRank,
+                eligibleCountries,
+                relativeAdoptionIndex:
+                    relativeAdoptionIndex !== null
+                        ? parseFloat(relativeAdoptionIndex.toFixed(4))
+                        : null,
+            };
+        });
+    }
+
+    // ------------------------------------------------------------------
+    // Adoption heatmap — regional roll-up (APAC / Americas / EMEIA)
+    // ------------------------------------------------------------------
+    async getRegionalAdoptionMetrics(params: AdoptionParams): Promise<RegionalAdoptionMetric[]> {
+        const baseRows = await this.buildCountryAdoptionRows(params);
+
+        // Each row's txValueShare is already that country's share of the
+        // filtered set's total tx value, so per-region shares simply sum.
+        interface Acc {
+            countryCount: number;
+            activeWallets: number;
+            population: number;
+            txValueShare: number;
+        }
+
+        const byMacroRegion = new Map<string, Acc>();
+        for (const row of baseRows) {
+            const macroRegion = toMacroRegion(row.region);
+            if (macroRegion === null) continue;
+
+            const acc = byMacroRegion.get(macroRegion) ?? {
+                countryCount: 0,
+                activeWallets: 0,
+                population: 0,
+                txValueShare: 0,
+            };
+            acc.countryCount += 1;
+            acc.activeWallets += row.activeWallets;
+            acc.population += row.population;
+            acc.txValueShare += row.txValueShare;
+            byMacroRegion.set(macroRegion, acc);
+        }
+
+        return Array.from(byMacroRegion.entries())
+            .map(([region, acc]): RegionalAdoptionMetric => ({
+                region,
+                countryCount: acc.countryCount,
+                activeWallets: acc.activeWallets,
+                population: acc.population,
+                adoptionRate: acc.population > 0
+                    ? parseFloat((acc.activeWallets / acc.population).toFixed(6))
+                    : 0,
+                txValueShare: parseFloat(acc.txValueShare.toFixed(6)),
+                unit: 'ratio' as const,
+            }))
+            .sort((a, b) => b.adoptionRate - a.adoptionRate);
     }
 
     // ------------------------------------------------------------------
@@ -149,7 +269,7 @@ export class MongoAnalyticsRepository implements IAnalyticsRepository {
     async getCorridorFlows(
         params: CorridorParams,
     ): Promise<CorridorFlow[] | BidirectionalCorridorFlow[]> {
-        const { year, month, stablecoinId, bidirectional, regionFrom, regionTo } = params;
+        const { year, month, stablecoinId, referenceAsset, bidirectional, regionFrom, regionTo } = params;
 
         const periodFilter = month
             ? { period: `${year}-${String(month).padStart(2, '0')}` }
@@ -161,8 +281,21 @@ export class MongoAnalyticsRepository implements IAnalyticsRepository {
             ...periodFilter,
         };
 
+        // Corridor transactions only carry a raw ticker (tokenSymbol), not a StablecoinModel
+        // foreign key, so there's no reliable join to filter by referenceAsset through the
+        // stablecoins collection. USD/EUR-pegged tickers conventionally embed the currency in
+        // their symbol (USDT, USDC, EURC, ...), so match on that instead.
+        const tokenConditions: Record<string, unknown>[] = [];
         if (stablecoinId && stablecoinId !== 'All') {
-            matchFilter['tokenSymbol'] = stablecoinId.toUpperCase();
+            tokenConditions.push({ tokenSymbol: stablecoinId.toUpperCase() });
+        }
+        if (referenceAsset && referenceAsset !== 'All') {
+            tokenConditions.push({ tokenSymbol: { $regex: referenceAsset, $options: 'i' } });
+        }
+        if (tokenConditions.length === 1) {
+            Object.assign(matchFilter, tokenConditions[0]);
+        } else if (tokenConditions.length > 1) {
+            matchFilter['$and'] = tokenConditions;
         }
         if (params.countryId && params.countryId !== 'All') {
             matchFilter['$or'] = [
@@ -354,6 +487,11 @@ export class MongoAnalyticsRepository implements IAnalyticsRepository {
                 ? activeWallets / countryDoc.population
                 : 0;
 
+        // Same rank used by the country-level adoption table, so "#X of N" matches everywhere.
+        const allAdoptionRows = await this.buildCountryAdoptionRows({ year, month, referenceAsset });
+        const { rankMap, eligibleCountries } = this.rankAdoptionRows(allAdoptionRows);
+        const adoptionRank = rankMap.get(countryId) ?? null;
+
         // Compliant issuers
         const regulatedIssuerIds = countryDoc.regulatedIssuerIds ?? [];
         const issuerDocs =
@@ -377,12 +515,15 @@ export class MongoAnalyticsRepository implements IAnalyticsRepository {
 
         return {
             countryId: countryDoc.countryId,
+            isoAlpha2: NUMERIC_TO_ALPHA2.get(countryDoc.countryId) ?? '',
             name: countryDoc.name,
             region: countryDoc.region,
             adoptionRate: parseFloat(adoptionRate.toFixed(6)),
             activeWallets,
             txValueShare: parseFloat(txValueShare.toFixed(6)),
             dollarizationIndex: parseFloat(dollarizationIndex.toFixed(6)),
+            adoptionRank,
+            eligibleCountries,
             compliantIssuers: issuerDocs.map((d) => ({
                 issuerId: d.issuerId,
                 name: d.name,
@@ -518,5 +659,74 @@ export class MongoAnalyticsRepository implements IAnalyticsRepository {
         });
 
         return { countryId, inflows: inflows.map(enrich), outflows: outflows.map(enrich) };
+    }
+
+    // ------------------------------------------------------------------
+    // Global insights — summary KPIs shown across all analytics views
+    // ------------------------------------------------------------------
+    async getGlobalInsights(params: GlobalInsightsParams): Promise<GlobalInsightsMetric> {
+        const { year, month } = params;
+        const { start, end } = periodBoundaries(year, month);
+        const periodKey = this.periodKey(year, month);
+
+        const countries = await CountryModel.find().lean();
+        const countryIds = countries.map((c) => c.countryId);
+
+        const snapshotMap = await this.getWalletSnapshotMap(countryIds, periodKey);
+        const walletAgg = await WalletModel.aggregate<{ _id: string; count: number }>([
+            {
+                $match: {
+                    countryId: { $in: countryIds },
+                    dateOpened: { $lte: end },
+                    $or: [{ dateClosed: null }, { dateClosed: { $gt: end } }],
+                },
+            },
+            { $group: { _id: '$countryId', count: { $sum: 1 } } },
+        ]);
+        const walletMap = new Map<string, number>(walletAgg.map((r) => [r._id, r.count]));
+
+        const totalActiveWallets = countries.reduce(
+            (sum, c) => sum + (snapshotMap.get(c.countryId) ?? walletMap.get(c.countryId) ?? 0),
+            0,
+        );
+
+        const liveRegulationCountries = countries.filter((c) => c.stage === 3).length;
+
+        const txAgg = await TransactionModel.aggregate<{ totalValue: number }>([
+            { $match: { date: { $gte: start, $lte: end } } },
+            { $group: { _id: null, totalValue: { $sum: '$value.amount' } } },
+        ]);
+        const totalTxValueUsd = txAgg[0]?.totalValue ?? 0;
+
+        // Pro-rate annual World Bank remittances down to the queried period, same as
+        // buildCountryAdoptionRows, so this stays comparable to totalTxValueUsd above.
+        const periodMonths = month !== undefined ? 1 : 12;
+        const totalRemittancesUsd =
+            (countries.reduce((sum, c) => sum + (c.remittancesSent ?? 0), 0) * periodMonths) / 12;
+
+        return {
+            totalActiveWallets,
+            liveRegulationCountries,
+            totalTxValueUsd: parseFloat(totalTxValueUsd.toFixed(2)),
+            totalRemittancesUsd: parseFloat(totalRemittancesUsd.toFixed(2)),
+        };
+    }
+
+    // ------------------------------------------------------------------
+    // Corridor stablecoin filter options
+    // ------------------------------------------------------------------
+    async getCorridorStablecoins(params: CorridorStablecoinsParams): Promise<string[]> {
+        const { year, month } = params;
+        const periodFilter = month
+            ? { period: `${year}-${String(month).padStart(2, '0')}` }
+            : { period: { $gte: `${year}-01`, $lte: `${year}-12` } };
+
+        const symbols = await TransactionModel.distinct('tokenSymbol', {
+            type: 'corridor',
+            source: 'allium',
+            ...periodFilter,
+        });
+
+        return symbols.filter((s): s is string => typeof s === 'string' && s.length > 0).sort();
     }
 }

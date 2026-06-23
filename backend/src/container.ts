@@ -27,9 +27,12 @@ import { ListExchangeRatesUseCase } from './application/use-cases/exchange-rates
 import { ListWalletsUseCase } from './application/use-cases/wallets/ListWalletsUseCase';
 import { ListTransactionsUseCase } from './application/use-cases/transactions/ListTransactionsUseCase';
 import { GetAdoptionAnalyticsUseCase } from './application/use-cases/analytics/GetAdoptionAnalyticsUseCase';
+import { GetRegionalAdoptionAnalyticsUseCase } from './application/use-cases/analytics/GetRegionalAdoptionAnalyticsUseCase';
 import { GetCorridorAnalyticsUseCase } from './application/use-cases/analytics/GetCorridorAnalyticsUseCase';
 import { GetCountryOverviewUseCase } from './application/use-cases/analytics/GetCountryOverviewUseCase';
 import { GetCountryCorridorsUseCase } from './application/use-cases/analytics/GetCountryCorridorsUseCase';
+import { GetGlobalInsightsUseCase } from './application/use-cases/analytics/GetGlobalInsightsUseCase';
+import { GetCorridorStablecoinsUseCase } from './application/use-cases/analytics/GetCorridorStablecoinsUseCase';
 
 // ---- Controllers ----
 import { CountryController } from './interfaces/http/controllers/CountryController';
@@ -93,9 +96,12 @@ export function buildV1Router(): Router {
     const listTransactions = new ListTransactionsUseCase(transactionRepo);
 
     const getAdoptionAnalytics = new GetAdoptionAnalyticsUseCase(analyticsRepo);
+    const getRegionalAdoptionAnalytics = new GetRegionalAdoptionAnalyticsUseCase(analyticsRepo);
     const getCorridorAnalytics = new GetCorridorAnalyticsUseCase(analyticsRepo);
     const getCountryOverview = new GetCountryOverviewUseCase(analyticsRepo);
     const getCountryCorridors = new GetCountryCorridorsUseCase(analyticsRepo);
+    const getGlobalInsights = new GetGlobalInsightsUseCase(analyticsRepo);
+    const getCorridorStablecoins = new GetCorridorStablecoinsUseCase(analyticsRepo);
 
     // Controllers
     const countryController = new CountryController(
@@ -115,9 +121,12 @@ export function buildV1Router(): Router {
     const transactionController = new TransactionController(listTransactions);
     const analyticsController = new AnalyticsController(
         getAdoptionAnalytics,
+        getRegionalAdoptionAnalytics,
         getCorridorAnalytics,
         getCountryOverview,
         getCountryCorridors,
+        getGlobalInsights,
+        getCorridorStablecoins,
     );
     const adminController = new AdminController();
 
