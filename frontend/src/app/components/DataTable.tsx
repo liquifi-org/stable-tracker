@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-r
 
 interface Column {
   key: string;
-  header: string;
+  header: React.ReactNode;
   render?: (value: any, row: any) => React.ReactNode;
 }
 
@@ -11,12 +11,14 @@ interface DataTableProps {
   data: any[];
   columns: Column[];
   pageSize?: number;
+  defaultSortKey?: string;
+  defaultSortDirection?: 'asc' | 'desc';
 }
 
-export function DataTable({ data, columns, pageSize = 10 }: DataTableProps) {
+export function DataTable({ data, columns, pageSize = 10, defaultSortKey, defaultSortDirection = 'asc' }: DataTableProps) {
   const [currentPage, setCurrentPage] = useState(0);
-  const [sortKey, setSortKey] = useState<string | null>(null);
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [sortKey, setSortKey] = useState<string | null>(defaultSortKey ?? null);
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>(defaultSortDirection);
 
   const handleSort = (key: string) => {
     if (sortKey === key) {

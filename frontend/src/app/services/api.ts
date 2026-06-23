@@ -3,6 +3,7 @@ const BASE_URL = 'http://localhost:3003/v1';
 export interface ApiCountry {
   id: number;
   name: string;
+  region?: string;
   stage: number;
   isStablecoinSpecific?: number;
   fiatBacked?: number;
@@ -20,9 +21,9 @@ export interface ApiCountry {
 }
 
 export interface ApiIssuer {
-  id: number;
+  issuerId: string;
   name: string;
-  officialName?: string;
+  originCountry: string;
 }
 
 export interface ApiLicense {
@@ -43,11 +44,25 @@ export interface CountryAdoptionMetric {
   isoAlpha2: string;
   name: string;
   region: string;
+  macroRegion: string | null;
   adoptionRate: number;
   activeWallets: number;
   txValueShare: number;
   unit?: string;
   remittancesSent?: number;
+  adoptionRank: number | null;
+  eligibleCountries: number;
+  relativeAdoptionIndex: number | null;
+}
+
+export interface RegionalAdoptionMetric {
+  region: string;
+  countryCount: number;
+  activeWallets: number;
+  population: number;
+  adoptionRate: number;
+  txValueShare: number;
+  unit?: string;
 }
 
 export interface StablecoinShare {
@@ -81,12 +96,51 @@ export interface CountryCorridorBreakdown {
 
 export interface CountryOverview {
   countryId: string;
+  isoAlpha2: string;
   name: string;
   region: string;
   adoptionRate: number;
   activeWallets: number;
   txValueShare: number;
   dollarizationIndex: number;
+  adoptionRank: number | null;
+  eligibleCountries: number;
+}
+
+export interface CountryRegulationInfo {
+  countryId: string;
+  isoAlpha2?: string;
+  name: string;
+  region: string;
+  stage?: number;
+  regulatorName?: string;
+  regulatorDescription?: string;
+  description?: string;
+  currency?: string;
+  fiatBacked?: number;
+  fiatAlert?: string;
+  cryptoBacked?: number;
+  cryptoAlert?: string;
+  commodityBacked?: number;
+  commodityAlert?: string;
+  algorithmBacked?: number;
+  algorithmAlert?: string;
+  isStablecoinSpecific?: number;
+}
+
+export interface GlobalInsights {
+  totalActiveWallets: number;
+  liveRegulationCountries: number;
+  totalTxValueUsd: number;
+  totalRemittancesUsd: number;
+}
+
+export interface CountryPage<T> {
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  items: T[];
 }
 
 /** Resolve a country URL param (numeric string or alpha-2) to an integer numeric ID. */
@@ -127,12 +181,30 @@ export const api = {
     return fetchJson<CountryAdoptionMetric[]>(`/analytics/adoption?${params}`);
   },
 
-  getCorridors: (year: number, month?: number, regionFrom?: string, regionTo?: string) => {
+  getRegionalAdoptionAnalytics: (year: number, month?: number) => {
     const params = new URLSearchParams({ year: String(year) });
     if (month !== undefined) params.set('month', String(month));
-    if (regionFrom && regionFrom !== 'All') params.set('regionFrom', regionFrom);
-    if (regionTo && regionTo !== 'All') params.set('regionTo', regionTo);
+    return fetchJson<RegionalAdoptionMetric[]>(`/analytics/adoption/regions?${params}`);
+  },
+
+  getCorridors: (
+    year: number,
+    month?: number,
+    opts?: { regionFrom?: string; regionTo?: string; stablecoinId?: string; referenceAsset?: string }
+  ) => {
+    const params = new URLSearchParams({ year: String(year) });
+    if (month !== undefined) params.set('month', String(month));
+    if (opts?.regionFrom && opts.regionFrom !== 'All') params.set('regionFrom', opts.regionFrom);
+    if (opts?.regionTo && opts.regionTo !== 'All') params.set('regionTo', opts.regionTo);
+    if (opts?.stablecoinId && opts.stablecoinId !== 'All') params.set('stablecoinId', opts.stablecoinId);
+    if (opts?.referenceAsset && opts.referenceAsset !== 'All') params.set('referenceAsset', opts.referenceAsset);
     return fetchJson<CorridorFlow[]>(`/analytics/corridors?${params}`);
+  },
+
+  getCorridorStablecoins: (year: number, month?: number) => {
+    const params = new URLSearchParams({ year: String(year) });
+    if (month !== undefined) params.set('month', String(month));
+    return fetchJson<string[]>(`/analytics/corridors/stablecoins?${params}`);
   },
 
   getCountryOverview: (numericId: number, year: number, month?: number) => {
@@ -145,5 +217,14 @@ export const api = {
     const params = new URLSearchParams({ year: String(year) });
     if (month !== undefined) params.set('month', String(month));
     return fetchJson<CountryCorridorBreakdown>(`/analytics/countries/${numericId}/corridors?${params}`);
+  },
+
+  getCountriesRegulation: () =>
+    fetchJson<CountryPage<CountryRegulationInfo>>('/countries?pageSize=200'),
+
+  getGlobalInsights: (year: number, month?: number) => {
+    const params = new URLSearchParams({ year: String(year) });
+    if (month !== undefined) params.set('month', String(month));
+    return fetchJson<GlobalInsights>(`/analytics/global-insights?${params}`);
   },
 };

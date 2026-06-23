@@ -1,8 +1,14 @@
-import { useEffect, useState, type ComponentType } from 'react';
+import { useEffect, useMemo, useState, type ComponentType } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import { DataTable } from '../components/DataTable';
-import { ArrowLeft, CheckCircle2, Loader2, XCircle, MinusCircle, Banknote, Coins, Gem, Cpu } from 'lucide-react';
+import { CountryFlag } from '../components/CountryFlag';
+import {
+  ArrowLeft, CheckCircle2, Loader2, XCircle, MinusCircle, Banknote, Coins, Gem, Cpu,
+  Trophy, Wallet, ArrowLeftRight, Percent, ArrowDownToLine, ArrowUpFromLine,
+} from 'lucide-react';
 import { api, resolveToNumericId, type ApiCountry, type ApiIssuer, type ApiLicense, type ApiReserveType, type CountryOverview, type CountryCorridorBreakdown } from '../services/api';
+import { useFilters, getPreviousPeriod } from '../context/FilterContext';
+import { TrendBadge } from '../components/TrendBadge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { Tooltip, TooltipTrigger, TooltipContent } from '../components/ui/tooltip';
 
@@ -88,7 +94,15 @@ const RESERVE_TYPE_DEFS: {
   { key: 'algorithmBacked', alertKey: 'algorithmAlert',  label: 'Algorithm-backed', Icon: Cpu },
 ];
 
-const CURRENT_YEAR = new Date().getFullYear();
+/** Stride's country id for "European Union (EU)" — covers MiCA-passported issuers/licenses
+ *  that apply across member states regardless of which national regulator granted them. */
+const EU_COUNTRY_ID = 999;
+
+/** Country's own entries first, then any EU-level ones not already present (by key). */
+function mergeUnique<T>(own: T[], extra: T[], keyFn: (item: T) => string | number): T[] {
+  const seen = new Set(own.map(keyFn));
+  return [...own, ...extra.filter((item) => !seen.has(keyFn(item)))];
+}
 
 function fmtPct(ratio: number) {
   const pct = ratio * 100;
@@ -106,6 +120,7 @@ function fmtValue(amount: number) {
 export function CountryView() {
   const { countryCode } = useParams<{ countryCode: string }>();
   const navigate = useNavigate();
+  const filters = useFilters();
 
   const numericId = countryCode ? resolveToNumericId(countryCode) : null;
 
@@ -114,6 +129,10 @@ export function CountryView() {
 
   const [corridors, setCorridors] = useState<CountryCorridorBreakdown | null>(null);
   const [corridorsLoading, setCorridorsLoading] = useState(false);
+
+  const [previousOverview, setPreviousOverview] = useState<CountryOverview | null>(null);
+  const [previousCorridors, setPreviousCorridors] = useState<CountryCorridorBreakdown | null>(null);
+  const previousPeriod = getPreviousPeriod(filters.year, filters.month);
 
   const [regulatoryLoading, setRegulatoryLoading] = useState(false);
   const [licensesDialogOpen, setLicensesDialogOpen] = useState(false);
@@ -129,16 +148,32 @@ export function CountryView() {
     if (!numericId) return;
 
     setOverviewLoading(true);
-    api.getCountryOverview(numericId, CURRENT_YEAR)
+    api.getCountryOverview(numericId, filters.year, filters.month)
       .then(setOverview)
       .catch(() => setOverview(null))
       .finally(() => setOverviewLoading(false));
 
     setCorridorsLoading(true);
-    api.getCountryCorridors(numericId, CURRENT_YEAR)
+    api.getCountryCorridors(numericId, filters.year, filters.month)
       .then(setCorridors)
       .catch(() => setCorridors(null))
       .finally(() => setCorridorsLoading(false));
+  }, [numericId, filters.year, filters.month]);
+
+  useEffect(() => {
+    if (!numericId) return;
+
+    api.getCountryOverview(numericId, previousPeriod.year, previousPeriod.month)
+      .then(setPreviousOverview)
+      .catch(() => setPreviousOverview(null));
+
+    api.getCountryCorridors(numericId, previousPeriod.year, previousPeriod.month)
+      .then(setPreviousCorridors)
+      .catch(() => setPreviousCorridors(null));
+  }, [numericId, previousPeriod.year, previousPeriod.month]);
+
+  useEffect(() => {
+    if (!numericId) return;
 
     setRegulatoryLoading(true);
     setApiRegulatory(null);
@@ -148,12 +183,53 @@ export function CountryView() {
       api.getCountryLicenses(numericId),
       api.getCountryReserveTypes(numericId),
     ])
-      .then(([countryDetail, issuers, licenses, reserveTypes]) => {
+      .then(async ([countryDetail, issuers, licenses, reserveTypes]) => {
+        // EU member states are also covered by MiCA-passported EU-level issuers/licenses
+        // (Stride country 999), in addition to whatever the country has nationally.
+        if (countryDetail.region === 'EU' && numericId !== EU_COUNTRY_ID) {
+          const [euIssuers, euLicenses] = await Promise.all([
+            api.getCountryIssuers(EU_COUNTRY_ID).catch(() => []),
+            api.getCountryLicenses(EU_COUNTRY_ID).catch(() => []),
+          ]);
+          issuers = mergeUnique(issuers, euIssuers, (i) => i.issuerId);
+          licenses = mergeUnique(licenses, euLicenses, (l) => l.licenseId);
+        }
         setApiRegulatory({ countryDetail, issuers, licenses, reserveTypes });
       })
       .catch(() => setApiRegulatory(null))
       .finally(() => setRegulatoryLoading(false));
   }, [numericId]);
+
+  const totalInbound = useMemo(
+    () => (corridors?.inflows ?? []).reduce((sum, f) => sum + f.value.amount, 0),
+    [corridors]
+  );
+  const totalOutbound = useMemo(
+    () => (corridors?.outflows ?? []).reduce((sum, f) => sum + f.value.amount, 0),
+    [corridors]
+  );
+  const previousTotalInbound = useMemo(
+    () => (previousCorridors?.inflows ?? []).reduce((sum, f) => sum + f.value.amount, 0),
+    [previousCorridors]
+  );
+  const previousTotalOutbound = useMemo(
+    () => (previousCorridors?.outflows ?? []).reduce((sum, f) => sum + f.value.amount, 0),
+    [previousCorridors]
+  );
+
+  const pctChange = (current: number, previous: number): number | null =>
+    previous > 0 ? ((current - previous) / previous) * 100 : null;
+
+  const rankDelta =
+    overview?.adoptionRank != null && previousOverview?.adoptionRank != null
+      ? previousOverview.adoptionRank - overview.adoptionRank
+      : null;
+  const walletsChangePct =
+    overview && previousOverview ? pctChange(overview.activeWallets, previousOverview.activeWallets) : null;
+  const dollarizationChangePp =
+    overview && previousOverview ? (overview.dollarizationIndex - previousOverview.dollarizationIndex) * 100 : null;
+  const inboundChangePct = pctChange(totalInbound, previousTotalInbound);
+  const outboundChangePct = pctChange(totalOutbound, previousTotalOutbound);
 
   if (!numericId) {
     return <div>Country not found</div>;
@@ -187,30 +263,87 @@ export function CountryView() {
           <ArrowLeft className="w-5 h-5" />
         </button>
         <div>
-          <h2 className="text-2xl font-semibold text-slate-800 dark:text-slate-100">
+          <h2 className="text-2xl font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-2.5">
+            {overview?.isoAlpha2 && <CountryFlag isoAlpha2={overview.isoAlpha2} className="w-7 h-7" />}
             {overview?.name ?? apiRegulatory?.countryDetail?.name ?? `Country ${numericId}`}
           </h2>
           <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">Country deep dive analysis</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
-        <div className="bg-white dark:bg-neutral-800 border border-slate-200/50 dark:border-neutral-700 rounded-lg p-6 shadow-md">
-          <div className="text-sm text-slate-600 dark:text-slate-400 mb-2">Population Using Stablecoins</div>
-          <div className="text-3xl font-semibold text-slate-800 dark:text-slate-100">
-            {overviewLoading ? <Loader2 className="w-6 h-6 animate-spin text-slate-400" /> : overview ? fmtPct(overview.adoptionRate) : '—'}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-white dark:bg-neutral-800 border border-slate-200/50 dark:border-neutral-700 rounded-lg p-6 shadow-md flex items-center gap-4">
+          <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 bg-[var(--brand-100)] dark:bg-[var(--brand-900)]/40 text-[var(--brand)] dark:text-[var(--brand-300)]">
+            <Trophy className="w-5 h-5" />
+          </div>
+          <div className="min-w-0">
+            <div className="text-sm text-slate-600 dark:text-slate-400 mb-1">Adoption Index (Rank)</div>
+            <div className="flex items-center gap-2 text-2xl font-semibold text-slate-800 dark:text-slate-100">
+              {overviewLoading ? (
+                <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
+              ) : overview?.adoptionRank != null ? (
+                <>#{overview.adoptionRank}<span className="text-sm text-slate-400 font-normal"> of {overview.eligibleCountries}</span></>
+              ) : (
+                '—'
+              )}
+              <TrendBadge value={rankDelta} format={(v) => String(v)} />
+            </div>
           </div>
         </div>
-        <div className="bg-white dark:bg-neutral-800 border border-slate-200/50 dark:border-neutral-700 rounded-lg p-6 shadow-md">
-          <div className="text-sm text-slate-600 dark:text-slate-400 mb-2">Stablecoin TX Value (% of total)</div>
-          <div className="text-3xl font-semibold text-slate-800 dark:text-slate-100">
-            {overviewLoading ? <Loader2 className="w-6 h-6 animate-spin text-slate-400" /> : overview ? fmtPct(overview.txValueShare) : '—'}
+        <div className="bg-white dark:bg-neutral-800 border border-slate-200/50 dark:border-neutral-700 rounded-lg p-6 shadow-md flex items-center gap-4">
+          <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 bg-[var(--brand-100)] dark:bg-[var(--brand-900)]/40 text-[var(--brand)] dark:text-[var(--brand-300)]">
+            <Wallet className="w-5 h-5" />
+          </div>
+          <div className="min-w-0">
+            <div className="text-sm text-slate-600 dark:text-slate-400 mb-1">Wallets Holding Stablecoins</div>
+            <div className="flex items-center gap-2 text-2xl font-semibold text-slate-800 dark:text-slate-100">
+              {overviewLoading ? <Loader2 className="w-6 h-6 animate-spin text-slate-400" /> : overview && overview.activeWallets > 0 ? overview.activeWallets.toLocaleString() : '—'}
+              <TrendBadge value={walletsChangePct} format={(v) => `${v.toFixed(2)}%`} />
+            </div>
           </div>
         </div>
-        <div className="bg-white dark:bg-neutral-800 border border-slate-200/50 dark:border-neutral-700 rounded-lg p-6 shadow-md">
-          <div className="text-sm text-slate-600 dark:text-slate-400 mb-2">Dollarization Index</div>
-          <div className="text-3xl font-semibold text-slate-800 dark:text-slate-100">
-            {overviewLoading ? <Loader2 className="w-6 h-6 animate-spin text-slate-400" /> : overview ? fmtPct(overview.dollarizationIndex) : '—'}
+        <div className="bg-white dark:bg-neutral-800 border border-slate-200/50 dark:border-neutral-700 rounded-lg p-6 shadow-md flex items-center gap-4">
+          <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 bg-[var(--brand-100)] dark:bg-[var(--brand-900)]/40 text-[var(--brand)] dark:text-[var(--brand-300)]">
+            <ArrowLeftRight className="w-5 h-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="text-sm text-slate-600 dark:text-slate-400 mb-1">Total Corridor Volume</div>
+            {corridorsLoading ? (
+              <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
+            ) : (
+              <div className="space-y-1">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="inline-flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
+                    <ArrowDownToLine className="w-3.5 h-3.5" /> In
+                  </span>
+                  <span className="flex items-center gap-2 text-lg font-semibold text-slate-800 dark:text-slate-100">
+                    {totalInbound > 0 ? fmtValue(totalInbound) : '—'}
+                    <TrendBadge value={inboundChangePct} format={(v) => `${v.toFixed(2)}%`} />
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="inline-flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
+                    <ArrowUpFromLine className="w-3.5 h-3.5" /> Out
+                  </span>
+                  <span className="flex items-center gap-2 text-lg font-semibold text-slate-800 dark:text-slate-100">
+                    {totalOutbound > 0 ? fmtValue(totalOutbound) : '—'}
+                    <TrendBadge value={outboundChangePct} format={(v) => `${v.toFixed(2)}%`} />
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+        <div className="bg-white dark:bg-neutral-800 border border-slate-200/50 dark:border-neutral-700 rounded-lg p-6 shadow-md flex items-center gap-4">
+          <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 bg-[var(--brand-100)] dark:bg-[var(--brand-900)]/40 text-[var(--brand)] dark:text-[var(--brand-300)]">
+            <Percent className="w-5 h-5" />
+          </div>
+          <div className="min-w-0">
+            <div className="text-sm text-slate-600 dark:text-slate-400 mb-1">Dollarization Index</div>
+            <div className="flex items-center gap-2 text-2xl font-semibold text-slate-800 dark:text-slate-100">
+              {overviewLoading ? <Loader2 className="w-6 h-6 animate-spin text-slate-400" /> : overview && overview.dollarizationIndex > 0 ? fmtPct(overview.dollarizationIndex) : '—'}
+              <TrendBadge value={dollarizationChangePp} format={(v) => `${v.toFixed(2)}pp`} />
+            </div>
           </div>
         </div>
       </div>
@@ -226,7 +359,7 @@ export function CountryView() {
                 s === 3 ? { label: 'Live', cls: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' } :
                 s === 2 ? { label: 'Proposed', cls: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' } :
                 s === 1 ? { label: 'Draft', cls: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' } :
-                           { label: 'No Framework', cls: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' };
+                           { label: 'No Framework/Banned', cls: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' };
               return (
                 <span className={`text-xs font-medium px-2 py-1 rounded-full ${cfg.cls}`}>{cfg.label}</span>
               );
@@ -270,14 +403,9 @@ export function CountryView() {
                 <div className="text-sm text-slate-400 dark:text-slate-500">Loading...</div>
               ) : apiRegulatory?.issuers && apiRegulatory.issuers.length > 0 ? (
                 apiRegulatory.issuers.map((issuer) => (
-                  <div key={issuer.id} className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+                  <div key={issuer.issuerId} className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
                     <IssuerLogo name={issuer.name} />
-                    <div>
-                      <span>{issuer.name}</span>
-                      {issuer.officialName && issuer.officialName !== issuer.name && (
-                        <p className="text-xs text-slate-400">{issuer.officialName}</p>
-                      )}
-                    </div>
+                    <span>{issuer.name}</span>
                   </div>
                 ))
               ) : (
@@ -391,7 +519,10 @@ export function CountryView() {
 
       <div className="space-y-6">
         <div>
-          <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4">Outflow Corridors</h3>
+          <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 flex items-center gap-2">
+            <ArrowUpFromLine className="w-5 h-5 text-[var(--brand)]" />
+            Outflow Corridors
+          </h3>
           {corridorsLoading ? (
             <div className="flex items-center gap-2 text-slate-400 text-sm p-4"><Loader2 className="w-4 h-4 animate-spin" /> Loading…</div>
           ) : corridors && corridors.outflows.length > 0 ? (
@@ -404,7 +535,10 @@ export function CountryView() {
         </div>
 
         <div>
-          <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4">Inflow Corridors</h3>
+          <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 flex items-center gap-2">
+            <ArrowDownToLine className="w-5 h-5 text-[var(--brand)]" />
+            Inflow Corridors
+          </h3>
           {corridorsLoading ? (
             <div className="flex items-center gap-2 text-slate-400 text-sm p-4"><Loader2 className="w-4 h-4 animate-spin" /> Loading…</div>
           ) : corridors && corridors.inflows.length > 0 ? (

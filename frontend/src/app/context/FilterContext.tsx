@@ -1,5 +1,24 @@
 import { createContext, useContext, useState, ReactNode } from 'react';
 
+export type MapType = 'adoption' | 'corridors' | 'regulation';
+
+const NOW = new Date();
+const CURRENT_YEAR = NOW.getFullYear();
+const CURRENT_MONTH = NOW.getMonth() + 1;
+
+/** Latest selectable period is the previous calendar month — never the current month or the future. */
+export const MAX_YEAR = CURRENT_MONTH === 1 ? CURRENT_YEAR - 1 : CURRENT_YEAR;
+
+export function maxMonthForYear(year: number): number {
+  if (year < MAX_YEAR) return 12;
+  return CURRENT_MONTH === 1 ? 12 : CURRENT_MONTH - 1;
+}
+
+/** Previous calendar month relative to the given period, for month-over-month comparisons. */
+export function getPreviousPeriod(year: number, month: number): { year: number; month: number } {
+  return month === 1 ? { year: year - 1, month: 12 } : { year, month: month - 1 };
+}
+
 interface FilterContextType {
   year: number;
   month: number;
@@ -8,6 +27,7 @@ interface FilterContextType {
   country: string;
   regionFrom: string;
   regionTo: string;
+  mapType: MapType;
   setYear: (year: number) => void;
   setMonth: (month: number) => void;
   setReferenceAsset: (asset: string) => void;
@@ -15,18 +35,30 @@ interface FilterContextType {
   setCountry: (country: string) => void;
   setRegionFrom: (region: string) => void;
   setRegionTo: (region: string) => void;
+  setMapType: (mapType: MapType) => void;
 }
 
 const FilterContext = createContext<FilterContextType | undefined>(undefined);
 
 export function FilterProvider({ children }: { children: ReactNode }) {
-  const [year, setYear] = useState(2026);
-  const [month, setMonth] = useState(4);
-  const [referenceAsset, setReferenceAsset] = useState('USD');
+  const [year, setYearState] = useState(MAX_YEAR);
+  const [month, setMonthState] = useState(maxMonthForYear(MAX_YEAR));
+  const [referenceAsset, setReferenceAsset] = useState('All');
   const [stablecoin, setStablecoin] = useState('All');
   const [country, setCountry] = useState('All');
   const [regionFrom, setRegionFrom] = useState('All');
   const [regionTo, setRegionTo] = useState('All');
+  const [mapType, setMapType] = useState<MapType>('adoption');
+
+  const setYear = (newYear: number) => {
+    const clampedYear = Math.min(newYear, MAX_YEAR);
+    setYearState(clampedYear);
+    setMonthState((m) => Math.min(m, maxMonthForYear(clampedYear)));
+  };
+
+  const setMonth = (newMonth: number) => {
+    setMonthState(Math.min(newMonth, maxMonthForYear(year)));
+  };
 
   return (
     <FilterContext.Provider
@@ -38,6 +70,7 @@ export function FilterProvider({ children }: { children: ReactNode }) {
         country,
         regionFrom,
         regionTo,
+        mapType,
         setYear,
         setMonth,
         setReferenceAsset,
@@ -45,6 +78,7 @@ export function FilterProvider({ children }: { children: ReactNode }) {
         setCountry,
         setRegionFrom,
         setRegionTo,
+        setMapType,
       }}
     >
       {children}
