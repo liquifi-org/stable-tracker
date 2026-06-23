@@ -5,7 +5,7 @@
   --font-sans: 'IBM Plex Sans', sans-serif;
 
   /* ── Brand color ── change only --brand to retheme the whole app ── */
-  --brand: #5d5d9b;
+  --brand: #2f5ec2;
   --brand-50:  oklch(from var(--brand) 0.97 calc(c * 0.15) h);
   --brand-100: oklch(from var(--brand) 0.93 calc(c * 0.25) h);
   --brand-200: oklch(from var(--brand) 0.87 calc(c * 0.45) h);
@@ -58,24 +58,24 @@
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
+  --background: oklch(0.08 0.025 250);
   --foreground: oklch(0.985 0 0);
-  --card: oklch(0.145 0 0);
+  --card: oklch(0.13 0.025 250);
   --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.145 0 0);
+  --popover: oklch(0.13 0.025 250);
   --popover-foreground: oklch(0.985 0 0);
   --primary: oklch(0.985 0 0);
   --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
+  --secondary: oklch(0.24 0.025 250);
   --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
+  --muted: oklch(0.24 0.025 250);
   --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
+  --accent: oklch(0.24 0.025 250);
   --accent-foreground: oklch(0.985 0 0);
   --destructive: oklch(0.396 0.141 25.723);
   --destructive-foreground: oklch(0.637 0.237 25.331);
-  --border: oklch(0.269 0 0);
-  --input: oklch(0.269 0 0);
+  --border: oklch(0.24 0.025 250);
+  --input: oklch(0.24 0.025 250);
   --ring: oklch(0.439 0 0);
   --font-weight-medium: 500;
   --font-weight-normal: 400;
@@ -92,6 +92,17 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(0.269 0 0);
   --sidebar-ring: oklch(0.439 0 0);
+}
+
+/* Dashboard dark mode is built with the default "neutral" Tailwind palette
+   (dark:bg-neutral-800/900/950, dark:border-neutral-700, etc.) — overriding
+   the shades used there retints every dark-mode surface to navy at once. */
+@theme {
+  --color-neutral-600: oklch(0.32 0.025 250);
+  --color-neutral-700: oklch(0.24 0.025 250);
+  --color-neutral-800: oklch(0.18 0.03 250);
+  --color-neutral-900: oklch(0.13 0.03 250);
+  --color-neutral-950: oklch(0.08 0.03 250);
 }
 
 @theme inline {
