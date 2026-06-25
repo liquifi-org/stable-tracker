@@ -17,6 +17,7 @@ export function FilterPanel() {
     regionFrom,
     regionTo,
     mapType,
+    displayCurrency,
     setYear,
     setMonth,
     setReferenceAsset,
@@ -24,6 +25,7 @@ export function FilterPanel() {
     setCountry,
     setRegionFrom,
     setRegionTo,
+    setDisplayCurrency,
   } = useFilters();
 
   const showCorridorFilters = mapType === 'corridors';
@@ -56,7 +58,8 @@ export function FilterPanel() {
     stablecoin !== 'All' ||
     country !== 'All' ||
     regionFrom !== 'All' ||
-    regionTo !== 'All';
+    regionTo !== 'All' ||
+    displayCurrency !== 'USD';
 
   const handleResetFilters = () => {
     setYear(MAX_YEAR);
@@ -66,6 +69,7 @@ export function FilterPanel() {
     setCountry('All');
     setRegionFrom('All');
     setRegionTo('All');
+    setDisplayCurrency('USD');
   };
 
   return (
@@ -118,6 +122,26 @@ export function FilterPanel() {
                   <div className="absolute h-4 w-4 rounded-full shadow-md cursor-pointer border border-white" style={{ left: `${((draftMonthClamped - 1) / Math.max(1, draftMaxMonth - 1)) * 100}%`, transform: 'translateX(-50%)', backgroundColor: 'var(--brand)' }} />
                 </Slider>
               </div>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm text-slate-700 dark:text-slate-300 mb-2 font-medium">Display Currency</label>
+            <div className="flex gap-1 bg-slate-100 dark:bg-neutral-900 rounded-lg p-1">
+              {(['USD', 'EUR'] as const).map((currency) => (
+                <button
+                  key={currency}
+                  onClick={() => setDisplayCurrency(currency)}
+                  className={`flex-1 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                    displayCurrency === currency
+                      ? 'text-white shadow'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                  }`}
+                  style={displayCurrency === currency ? { backgroundColor: 'var(--brand)' } : {}}
+                >
+                  {currency}
+                </button>
+              ))}
             </div>
           </div>
 
@@ -218,6 +242,7 @@ export function FilterPanel() {
           <div className="mb-2 font-semibold text-slate-800 dark:text-slate-100">Active filters:</div>
           <div className="space-y-1">
             <div>Period: <span className="text-slate-800 dark:text-slate-200 font-medium">{MONTHS[month - 1]} {year}</span></div>
+            <div>Currency: <span className="text-slate-800 dark:text-slate-200 font-medium">{displayCurrency}</span></div>
             {showCorridorFilters && <div>Asset: <span className="text-slate-800 dark:text-slate-200 font-medium">{referenceAsset}</span></div>}
             {showCorridorFilters && stablecoin !== 'All' && <div>Coin: <span className="text-slate-800 dark:text-slate-200 font-medium">{stablecoin}</span></div>}
             {showCorridorFilters && country !== 'All' && <div>Country: <span className="text-slate-800 dark:text-slate-200 font-medium">{country}</span></div>}

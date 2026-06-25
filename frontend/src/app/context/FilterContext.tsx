@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, ReactNode } from 'react';
 
 export type MapType = 'adoption' | 'corridors' | 'regulation';
+export type DisplayCurrency = 'USD' | 'EUR';
 
 const NOW = new Date();
 const CURRENT_YEAR = NOW.getFullYear();
@@ -28,6 +29,7 @@ interface FilterContextType {
   regionFrom: string;
   regionTo: string;
   mapType: MapType;
+  displayCurrency: DisplayCurrency;
   setYear: (year: number) => void;
   setMonth: (month: number) => void;
   setReferenceAsset: (asset: string) => void;
@@ -36,6 +38,7 @@ interface FilterContextType {
   setRegionFrom: (region: string) => void;
   setRegionTo: (region: string) => void;
   setMapType: (mapType: MapType) => void;
+  setDisplayCurrency: (currency: DisplayCurrency) => void;
 }
 
 const FilterContext = createContext<FilterContextType | undefined>(undefined);
@@ -49,6 +52,7 @@ export function FilterProvider({ children }: { children: ReactNode }) {
   const [regionFrom, setRegionFrom] = useState('All');
   const [regionTo, setRegionTo] = useState('All');
   const [mapType, setMapType] = useState<MapType>('adoption');
+  const [displayCurrency, setDisplayCurrency] = useState<DisplayCurrency>('USD');
 
   const setYear = (newYear: number) => {
     const clampedYear = Math.min(newYear, MAX_YEAR);
@@ -71,6 +75,7 @@ export function FilterProvider({ children }: { children: ReactNode }) {
         regionFrom,
         regionTo,
         mapType,
+        displayCurrency,
         setYear,
         setMonth,
         setReferenceAsset,
@@ -79,6 +84,7 @@ export function FilterProvider({ children }: { children: ReactNode }) {
         setRegionFrom,
         setRegionTo,
         setMapType,
+        setDisplayCurrency,
       }}
     >
       {children}

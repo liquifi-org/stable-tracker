@@ -4,6 +4,7 @@ import { feature } from 'topojson-client';
 import { Plus, Minus, RotateCcw } from 'lucide-react';
 import { useMapZoomPan } from '../hooks/useMapZoomPan';
 import { useFilters } from '../context/FilterContext';
+import { useCurrencyFormat } from '../hooks/useCurrencyFormat';
 import { SourceBadge } from './SourceBadge';
 
 type MapViewMode = 'country' | 'region';
@@ -76,13 +77,8 @@ const regionCentroids: Record<string, [number, number]> = {
   APAC: [110, 8],
 };
 
-function formatValue(value: number): string {
-  if (value >= 1000000000) return `$${(value / 1000000000).toFixed(1)}B`;
-  if (value >= 1000000) return `$${(value / 1000000).toFixed(0)}M`;
-  return `$${value}`;
-}
-
 export function RealCorridorMap({ corridors, getCountryName, limit, mode = 'country', regionalCorridors = [] }: RealCorridorMapProps) {
+  const { formatCurrency: formatValue } = useCurrencyFormat();
   const [worldData, setWorldData] = useState<any>(null);
   const [hoveredCorridor, setHoveredCorridor] = useState<number | null>(null);
   const [selectedCorridor, setSelectedCorridor] = useState<number | null>(null);

@@ -8,23 +8,11 @@ import { GlobalInsightsBar } from '../components/GlobalInsightsBar';
 import { TrendBadge } from '../components/TrendBadge';
 import { SourceBadge, type DataSource } from '../components/SourceBadge';
 import { useFilters, getPreviousPeriod } from '../context/FilterContext';
+import { useCurrencyFormat } from '../hooks/useCurrencyFormat';
 import { api, type CountryAdoptionMetric, type CorridorFlow, type RegionalAdoptionMetric, type GlobalInsights } from '../services/api';
 
 type AdoptionViewMode = 'country' | 'region';
 type CorridorViewMode = 'country' | 'region';
-
-function formatRemittances(v: number): string {
-  if (v >= 1e9) return `$${(v / 1e9).toFixed(1)}B`;
-  if (v >= 1e6) return `$${(v / 1e6).toFixed(0)}M`;
-  if (v >= 1e3) return `$${(v / 1e3).toFixed(0)}K`;
-  return `$${v.toLocaleString()}`;
-}
-
-function formatValue(v: number): string {
-  if (v >= 1e9) return `$${(v / 1e9).toFixed(1)}B`;
-  if (v >= 1e6) return `$${(v / 1e6).toFixed(0)}M`;
-  return `$${v.toLocaleString()}`;
-}
 
 function headerWithSource(text: string, source: DataSource) {
   return (
@@ -49,6 +37,7 @@ export function MainView() {
   const [previousGlobalInsights, setPreviousGlobalInsights] = useState<GlobalInsights | null>(null);
   const [previousAdoptionData, setPreviousAdoptionData] = useState<CountryAdoptionMetric[]>([]);
   const filters = useFilters();
+  const { formatCurrency } = useCurrencyFormat();
   const previousPeriod = getPreviousPeriod(filters.year, filters.month);
 
   useEffect(() => {
@@ -348,12 +337,12 @@ export function MainView() {
     {
       key: 'outboundVolume',
       header: headerWithSource('Outbound stablecoin volume', 'allium'),
-      render: (value: number) => formatValue(value)
+      render: (value: number) => formatCurrency(value)
     },
     {
       key: 'remittancesSent',
       header: 'Remittances sent (World Bank, monthly est.)',
-      render: (value: number | null) => value != null ? formatRemittances(value) : '—'
+      render: (value: number | null) => value != null ? formatCurrency(value) : '—'
     },
     {
       key: 'stablecoinPctOfRemittances',

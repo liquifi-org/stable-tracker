@@ -135,6 +135,13 @@ export interface GlobalInsights {
   totalRemittancesUsd: number;
 }
 
+export interface ExchangeRate {
+  referenceAsset: string;
+  currencyOriginal: string;
+  usdExchangeRate: number;
+  date: string;
+}
+
 export interface CountryPage<T> {
   page: number;
   pageSize: number;
@@ -226,5 +233,19 @@ export const api = {
     const params = new URLSearchParams({ year: String(year) });
     if (month !== undefined) params.set('month', String(month));
     return fetchJson<GlobalInsights>(`/analytics/global-insights?${params}`);
+  },
+
+  /** Average EUR/USD rate stored for the given month (see backend/script/general/sync-exchange-rates.ts). */
+  getExchangeRate: async (year: number, month: number): Promise<number | null> => {
+    const date = `${year}-${String(month).padStart(2, '0')}-01`;
+    const params = new URLSearchParams({
+      dateFrom: date,
+      dateTo: date,
+      currencyOriginal: 'EUR',
+      referenceAsset: 'USD',
+      pageSize: '1',
+    });
+    const page = await fetchJson<CountryPage<ExchangeRate>>(`/exchange-rates?${params}`);
+    return page.items[0]?.usdExchangeRate ?? null;
   },
 };

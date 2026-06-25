@@ -1,14 +1,8 @@
 import { Wallet, ShieldCheck, ArrowLeftRight, Percent } from 'lucide-react';
 import { TrendBadge } from './TrendBadge';
 import { SourceBadge, type DataSource } from './SourceBadge';
+import { useCurrencyFormat } from '../hooks/useCurrencyFormat';
 import type { GlobalInsights } from '../services/api';
-
-function formatCompactUsd(v: number): string {
-  if (v >= 1e9) return `$${(v / 1e9).toFixed(1)}B`;
-  if (v >= 1e6) return `$${(v / 1e6).toFixed(0)}M`;
-  if (v >= 1e3) return `$${(v / 1e3).toFixed(0)}K`;
-  return `$${v.toLocaleString()}`;
-}
 
 function pctChange(current: number, previous: number): number | null {
   return previous > 0 ? ((current - previous) / previous) * 100 : null;
@@ -21,6 +15,7 @@ interface GlobalInsightsBarProps {
 }
 
 export function GlobalInsightsBar({ data, previousData, loading }: GlobalInsightsBarProps) {
+  const { formatCurrency } = useCurrencyFormat();
   const stablecoinVsRemittancesPct =
     data && data.totalRemittancesUsd > 0
       ? (data.totalTxValueUsd / data.totalRemittancesUsd) * 100
@@ -49,7 +44,7 @@ export function GlobalInsightsBar({ data, previousData, loading }: GlobalInsight
     },
     {
       label: 'Stablecoin transaction volume',
-      value: data ? formatCompactUsd(data.totalTxValueUsd) : '—',
+      value: data ? formatCurrency(data.totalTxValueUsd) : '—',
       Icon: ArrowLeftRight,
       trend: data && previousData ? pctChange(data.totalTxValueUsd, previousData.totalTxValueUsd) : null,
       trendFormat: (v) => `${v.toFixed(2)}%`,

@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { api, resolveToNumericId, type ApiCountry, type ApiIssuer, type ApiLicense, type ApiReserveType, type CountryOverview, type CountryCorridorBreakdown } from '../services/api';
 import { useFilters, getPreviousPeriod } from '../context/FilterContext';
+import { useCurrencyFormat } from '../hooks/useCurrencyFormat';
 import { TrendBadge } from '../components/TrendBadge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { Tooltip, TooltipTrigger, TooltipContent } from '../components/ui/tooltip';
@@ -111,16 +112,11 @@ function fmtPct(ratio: number) {
   return pct.toFixed(1) + '%';
 }
 
-function fmtValue(amount: number) {
-  if (amount >= 1e9) return `$${(amount / 1e9).toFixed(1)}B`;
-  if (amount >= 1e6) return `$${(amount / 1e6).toFixed(0)}M`;
-  return `$${amount.toLocaleString()}`;
-}
-
 export function CountryView() {
   const { countryCode } = useParams<{ countryCode: string }>();
   const navigate = useNavigate();
   const filters = useFilters();
+  const { formatCurrency } = useCurrencyFormat();
 
   const numericId = countryCode ? resolveToNumericId(countryCode) : null;
 
@@ -240,7 +236,7 @@ export function CountryView() {
     {
       key: 'value',
       header: 'Stablecoin volume',
-      render: (v: { amount: number }) => fmtValue(v.amount),
+      render: (v: { amount: number }) => formatCurrency(v.amount),
     },
   ];
 
@@ -249,7 +245,7 @@ export function CountryView() {
     {
       key: 'value',
       header: 'Stablecoin volume',
-      render: (v: { amount: number }) => fmtValue(v.amount),
+      render: (v: { amount: number }) => formatCurrency(v.amount),
     },
   ];
 
@@ -317,7 +313,7 @@ export function CountryView() {
                     <ArrowDownToLine className="w-3.5 h-3.5" /> In
                   </span>
                   <span className="flex items-center gap-2 text-lg font-semibold text-slate-800 dark:text-slate-100">
-                    {totalInbound > 0 ? fmtValue(totalInbound) : '—'}
+                    {totalInbound > 0 ? formatCurrency(totalInbound) : '—'}
                     <TrendBadge value={inboundChangePct} format={(v) => `${v.toFixed(2)}%`} />
                   </span>
                 </div>
@@ -326,7 +322,7 @@ export function CountryView() {
                     <ArrowUpFromLine className="w-3.5 h-3.5" /> Out
                   </span>
                   <span className="flex items-center gap-2 text-lg font-semibold text-slate-800 dark:text-slate-100">
-                    {totalOutbound > 0 ? fmtValue(totalOutbound) : '—'}
+                    {totalOutbound > 0 ? formatCurrency(totalOutbound) : '—'}
                     <TrendBadge value={outboundChangePct} format={(v) => `${v.toFixed(2)}%`} />
                   </span>
                 </div>
