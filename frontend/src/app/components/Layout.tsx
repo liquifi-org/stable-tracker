@@ -45,21 +45,21 @@ function LayoutBody({ isDark, toggle }: { isDark: boolean; toggle: () => void })
         className="border-b border-slate-200/50 dark:border-neutral-700 backdrop-blur-sm transition-all duration-300"
         style={{ backgroundColor: isDark ? 'var(--brand-900)' : 'var(--brand)' }}
       >
-        <div className="px-6 py-4 flex items-center justify-between">
+        <div className="px-4 sm:px-6 py-4 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <img src={logo} alt="Stablecoin Tracker" className="h-10 w-auto" />
+            <img src={logo} alt="Stablecoin Tracker" className="h-8 sm:h-10 w-auto" />
             <div>
-              <h1 className="text-2xl text-white"><b>Stablecoin</b> Tracker</h1>
-              <p className="text-sm text-white/70 mt-1">Global adoption and flows analysis</p>
+              <h1 className="text-lg sm:text-2xl text-white"><b>Stablecoin</b> Tracker</h1>
+              <p className="text-xs sm:text-sm text-white/70 mt-1">Global adoption and flows analysis</p>
             </div>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
             <Link
               to="/"
               className="inline-flex items-center gap-1.5 text-sm font-medium text-white/90 hover:text-white transition-all duration-300"
             >
               <Home className="h-4 w-4" />
-              Overview
+              <span className="hidden sm:inline">Overview</span>
             </Link>
             {/* TODO: link to the whitepaper once published */}
             <a
@@ -67,7 +67,7 @@ function LayoutBody({ isDark, toggle }: { isDark: boolean; toggle: () => void })
               className="inline-flex items-center gap-1.5 text-sm font-medium text-white/90 hover:text-white transition-all duration-300"
             >
               <FileText className="h-4 w-4" />
-              Whitepaper
+              <span className="hidden sm:inline">Whitepaper</span>
             </a>
             <a
               href={GITHUB_URL}
@@ -76,29 +76,29 @@ function LayoutBody({ isDark, toggle }: { isDark: boolean; toggle: () => void })
               className="inline-flex items-center gap-1.5 text-sm font-medium text-white/90 hover:text-white transition-all duration-300"
             >
               <Github className="h-4 w-4" />
-              Source Code
+              <span className="hidden sm:inline">Source Code</span>
             </a>
             <Link
               to="/contact"
               className="inline-flex items-center gap-1.5 text-sm font-medium text-white/90 hover:text-white transition-all duration-300"
             >
               <Mail className="h-4 w-4" />
-              Contact
+              <span className="hidden sm:inline">Contact</span>
             </Link>
             <button
               type="button"
               onClick={toggle}
               aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
               title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-              className="inline-flex items-center justify-center h-10 w-10 rounded-lg border border-white/20 bg-white/10 text-white hover:bg-white/20 transition-all duration-300 hover:scale-105"
+              className="inline-flex items-center justify-center h-9 w-9 sm:h-10 sm:w-10 rounded-lg border border-white/20 bg-white/10 text-white hover:bg-white/20 transition-all duration-300 hover:scale-105 shrink-0"
             >
               {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
             </button>
           </div>
         </div>
       </header>
-      <div className="flex flex-1">
-        <main className="flex-1 p-6">
+      <div className="flex flex-col lg:flex-row flex-1">
+        <main className="flex-1 p-4 sm:p-6 min-w-0">
           <Outlet />
         </main>
         {showFilters && <FilterPanel />}

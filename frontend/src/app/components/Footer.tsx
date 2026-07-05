@@ -18,7 +18,6 @@ interface Collaborator {
 
 const GITHUB_URL = 'https://github.com/liquifi-org/stable-tracker';
 
-// TODO: confirm FirmShift's website URL — placeholder until provided.
 const COLLABORATORS: Collaborator[] = [
   { name: 'Allium', logo: alliumLogo, url: 'https://www.allium.so' },
   { name: 'Stride', logo: strideLogo, url: 'https://tracker.stride.sc' },
@@ -31,7 +30,7 @@ const CURRENT_YEAR = new Date().getFullYear();
 export function Footer() {
   return (
     <footer>
-      <div className="border-t border-slate-200/50 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-6 py-6">
+      <div className="border-t border-slate-200/50 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-4 sm:px-6 py-6">
         <h3 className="text-sm font-bold mb-5" style={{ color: 'var(--brand)' }}>Contributing Organizations</h3>
         <div className="flex items-center justify-around gap-8 flex-wrap">
           {COLLABORATORS.map((c) => (
@@ -55,7 +54,7 @@ export function Footer() {
           ))}
         </div>
       </div>
-      <div className="px-6 py-4 flex items-center justify-between flex-wrap gap-3" style={{ backgroundColor: 'var(--brand)' }}>
+      <div className="px-4 sm:px-6 py-4 flex items-center justify-between flex-wrap gap-3" style={{ backgroundColor: 'var(--brand)' }}>
         <p className="text-xs font-medium text-white/90">Stablecoin Tracker © {CURRENT_YEAR}</p>
         <div className="flex items-center gap-4 flex-wrap">
           <a

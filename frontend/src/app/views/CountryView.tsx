@@ -267,14 +267,14 @@ export function CountryView() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
         <div className="bg-white dark:bg-neutral-800 border border-slate-200/50 dark:border-neutral-700 rounded-lg p-6 shadow-md flex items-center gap-4">
           <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 bg-[var(--brand-100)] dark:bg-[var(--brand-900)]/40 text-[var(--brand)] dark:text-[var(--brand-300)]">
             <Trophy className="w-5 h-5" />
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <div className="text-sm text-slate-600 dark:text-slate-400 mb-1">Adoption Index (Rank)</div>
-            <div className="flex items-center gap-2 text-2xl font-semibold text-slate-800 dark:text-slate-100">
+            <div className="flex items-center gap-2 flex-wrap text-2xl font-semibold text-slate-800 dark:text-slate-100">
               {overviewLoading ? (
                 <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
               ) : overview?.adoptionRank != null ? (
@@ -290,9 +290,9 @@ export function CountryView() {
           <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 bg-[var(--brand-100)] dark:bg-[var(--brand-900)]/40 text-[var(--brand)] dark:text-[var(--brand-300)]">
             <Wallet className="w-5 h-5" />
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <div className="text-sm text-slate-600 dark:text-slate-400 mb-1">Wallets Holding Stablecoins</div>
-            <div className="flex items-center gap-2 text-2xl font-semibold text-slate-800 dark:text-slate-100">
+            <div className="flex items-center gap-2 flex-wrap text-2xl font-semibold text-slate-800 dark:text-slate-100">
               {overviewLoading ? <Loader2 className="w-6 h-6 animate-spin text-slate-400" /> : overview && overview.activeWallets > 0 ? overview.activeWallets.toLocaleString() : '—'}
               <TrendBadge value={walletsChangePct} format={(v) => `${v.toFixed(2)}%`} />
             </div>
@@ -308,20 +308,20 @@ export function CountryView() {
               <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
             ) : (
               <div className="space-y-1">
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
                   <span className="inline-flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
                     <ArrowDownToLine className="w-3.5 h-3.5" /> In
                   </span>
-                  <span className="flex items-center gap-2 text-lg font-semibold text-slate-800 dark:text-slate-100">
+                  <span className="flex items-center gap-2 flex-wrap text-lg font-semibold text-slate-800 dark:text-slate-100">
                     {totalInbound > 0 ? formatCurrency(totalInbound) : '—'}
                     <TrendBadge value={inboundChangePct} format={(v) => `${v.toFixed(2)}%`} />
                   </span>
                 </div>
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
                   <span className="inline-flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
                     <ArrowUpFromLine className="w-3.5 h-3.5" /> Out
                   </span>
-                  <span className="flex items-center gap-2 text-lg font-semibold text-slate-800 dark:text-slate-100">
+                  <span className="flex items-center gap-2 flex-wrap text-lg font-semibold text-slate-800 dark:text-slate-100">
                     {totalOutbound > 0 ? formatCurrency(totalOutbound) : '—'}
                     <TrendBadge value={outboundChangePct} format={(v) => `${v.toFixed(2)}%`} />
                   </span>
@@ -334,9 +334,9 @@ export function CountryView() {
           <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 bg-[var(--brand-100)] dark:bg-[var(--brand-900)]/40 text-[var(--brand)] dark:text-[var(--brand-300)]">
             <Percent className="w-5 h-5" />
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <div className="text-sm text-slate-600 dark:text-slate-400 mb-1">Dollarization Index</div>
-            <div className="flex items-center gap-2 text-2xl font-semibold text-slate-800 dark:text-slate-100">
+            <div className="flex items-center gap-2 flex-wrap text-2xl font-semibold text-slate-800 dark:text-slate-100">
               {overviewLoading ? <Loader2 className="w-6 h-6 animate-spin text-slate-400" /> : overview && overview.dollarizationIndex > 0 ? fmtPct(overview.dollarizationIndex) : '—'}
               <TrendBadge value={dollarizationChangePp} format={(v) => `${v.toFixed(2)}pp`} />
             </div>

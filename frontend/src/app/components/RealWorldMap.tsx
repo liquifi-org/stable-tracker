@@ -71,7 +71,7 @@ export function RealWorldMap({ countries, mode = 'country', regionalData = [] }:
 
   if (!worldData) {
     return (
-      <div className="bg-slate-900 rounded-xl border border-slate-700/50 p-8 flex items-center justify-center" style={{ height: '600px' }}>
+      <div className="bg-slate-900 rounded-xl border border-slate-700/50 p-8 flex items-center justify-center h-[300px] sm:h-[600px]">
         <div className="text-slate-400">Loading world map...</div>
       </div>
     );
@@ -112,6 +112,12 @@ export function RealWorldMap({ countries, mode = 'country', regionalData = [] }:
 
   const hoveredRegion =
     mode === 'region' && hoveredCountry?.macroRegion ? regionDataMap.get(hoveredCountry.macroRegion) : null;
+
+  // Tooltip tracks the cursor, so on narrow viewports it must shrink and stay clamped
+  // to the screen edge instead of overflowing horizontally off a 650px desktop width.
+  const tooltipWidth = Math.min(window.innerWidth * 0.94, 650);
+  const tooltipLeft = Math.min(tooltipPos.x + 15, window.innerWidth - tooltipWidth - 10);
+  const tooltipTop = Math.max(8, tooltipPos.y - 120);
 
   return (
     <div className="relative">
@@ -181,8 +187,7 @@ export function RealWorldMap({ countries, mode = 'country', regionalData = [] }:
           <svg
             ref={svgRef}
             viewBox={viewBox}
-            className={`w-full ${zoom > minZoom ? (isDragging ? 'cursor-grabbing' : 'cursor-grab') : ''}`}
-            style={{ height: '550px' }}
+            className={`w-full aspect-[8/5] ${zoom > minZoom ? (isDragging ? 'cursor-grabbing' : 'cursor-grab') : ''}`}
             onMouseDown={handleMouseDown}
             onMouseMove={handlePanMove}
             onMouseUp={endDrag}
@@ -251,7 +256,7 @@ export function RealWorldMap({ countries, mode = 'country', regionalData = [] }:
       {hoveredId && hoveredCountry && (
         <div
           className="fixed z-50 bg-white/95 dark:bg-neutral-800/95 backdrop-blur-md border border-[var(--brand)]/30 dark:border-[var(--brand)]/40 rounded-lg shadow-lg pointer-events-none transition-all"
-          style={{ left: tooltipPos.x + 15, top: tooltipPos.y - 120, minWidth: '650px' }}
+          style={{ left: tooltipLeft, top: tooltipTop, width: tooltipWidth }}
         >
           {mode === 'region' ? (
             <>

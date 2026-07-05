@@ -25,7 +25,7 @@ export function GlobalInsightsBar({ data, previousData, loading }: GlobalInsight
       ? (previousData.totalTxValueUsd / previousData.totalRemittancesUsd) * 100
       : null;
 
-  const stats: { label: string; value: string; Icon: typeof Wallet; trend: number | null; trendFormat: (v: number) => string; source?: DataSource }[] = [
+  const stats: { label: string; value: string; Icon: typeof Wallet; trend: number | null; trendFormat: (v: number) => string; source?: DataSource; hideOnLaptop?: boolean }[] = [
     {
       label: 'Wallets holding stablecoins',
       value: data ? data.totalActiveWallets.toLocaleString() : '—',
@@ -41,6 +41,10 @@ export function GlobalInsightsBar({ data, previousData, loading }: GlobalInsight
       trend: null,
       trendFormat: (v) => `${v.toFixed(2)}%`,
       source: 'stride',
+      // Least critical of the 4 at a glance — drop it at the cramped "smaller laptop" width
+      // band (lg, ~1024-1279px) where 4 cards don't fit comfortably; the grid goes 3-wide
+      // there. Comes back once xl (1280px+) has room for all 4.
+      hideOnLaptop: true,
     },
     {
       label: 'Stablecoin transaction volume',
@@ -63,23 +67,27 @@ export function GlobalInsightsBar({ data, previousData, loading }: GlobalInsight
   ];
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-      {stats.map(({ label, value, Icon, trend, trendFormat, source }) => (
+    <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+      {stats.map(({ label, value, Icon, trend, trendFormat, source, hideOnLaptop }) => (
         <div
           key={label}
-          className="bg-white dark:bg-neutral-800 border border-slate-200/50 dark:border-neutral-700 rounded-xl p-4 shadow-md flex items-center gap-3 transition-all duration-300"
+          className={`bg-white dark:bg-neutral-800 border border-slate-200/50 dark:border-neutral-700 rounded-xl p-4 shadow-md flex items-center gap-3 transition-all duration-300 ${
+            hideOnLaptop ? 'lg:hidden xl:flex' : ''
+          }`}
         >
           <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 bg-[var(--brand-100)] dark:bg-[var(--brand-900)]/40 text-[var(--brand)] dark:text-[var(--brand-300)]">
             <Icon className="w-5 h-5" />
           </div>
           <div className="min-w-0 flex-1">
-            <div className={`flex items-center gap-2 text-xl font-bold text-slate-800 dark:text-slate-100 transition-opacity ${loading ? 'opacity-40' : ''}`}>
+            <div className={`flex items-center gap-2 flex-wrap text-xl font-bold text-slate-800 dark:text-slate-100 transition-opacity ${loading ? 'opacity-40' : ''}`}>
               {value}
               <TrendBadge value={trend} format={trendFormat} />
             </div>
             <div className="text-xs text-slate-500 dark:text-slate-400">{label}</div>
+            {/* Kept in normal flow below the label (not flex-centered against the icon) so it
+                never overlaps text when the label wraps to 2-3 lines on narrow cards. */}
+            {source && <SourceBadge source={source} label={label} size="sm" className="mt-1" />}
           </div>
-          {source && <SourceBadge source={source} label={label} size="md" className="ml-auto" />}
         </div>
       ))}
     </div>

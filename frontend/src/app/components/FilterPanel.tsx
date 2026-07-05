@@ -3,7 +3,8 @@ import { useFilters, MAX_YEAR, maxMonthForYear } from '../context/FilterContext'
 import { api } from '../services/api';
 import { Slider } from '@radix-ui/react-slider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@radix-ui/react-select';
-import { ChevronDown } from 'lucide-react';
+import * as DialogPrimitive from '@radix-ui/react-dialog';
+import { ChevronDown, Filter, X } from 'lucide-react';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -29,6 +30,10 @@ export function FilterPanel() {
   } = useFilters();
 
   const showCorridorFilters = mapType === 'corridors';
+
+  // Below lg, the sidebar is replaced by a FAB + bottom sheet (no room for a static panel
+  // without pushing all page content down).
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   // Local, uncommitted slider positions: update live for visual feedback while dragging,
   // but only call setYear/setMonth (which trigger data refetches) once the user lets go.
@@ -72,11 +77,9 @@ export function FilterPanel() {
     setDisplayCurrency('USD');
   };
 
-  return (
-    <aside className="w-80 border-l border-slate-200/50 dark:border-neutral-700 bg-white dark:bg-neutral-800 p-6 space-y-6 shadow-md transition-all duration-300">
+  const filterControls = (
+    <>
       <div>
-        <h2 className="font-semibold text-lg mb-4 text-slate-800 dark:text-slate-100">Filters</h2>
-
         <div className="space-y-5">
           <div>
             <label className="block text-sm text-slate-700 dark:text-slate-300 mb-3 font-medium">Historic State</label>
@@ -260,6 +263,55 @@ export function FilterPanel() {
           </button>
         )}
       </div>
-    </aside>
+    </>
+  );
+
+  return (
+    <>
+      {/* lg+: static sidebar, same as before */}
+      <aside className="hidden lg:block lg:w-80 lg:shrink-0 border-l border-slate-200/50 dark:border-neutral-700 bg-white dark:bg-neutral-800 p-6 space-y-6 shadow-md transition-all duration-300">
+        <h2 className="font-semibold text-lg mb-4 text-slate-800 dark:text-slate-100">Filters</h2>
+        {filterControls}
+      </aside>
+
+      {/* Below lg: floating button opens the same controls in a bottom sheet, instead of
+          pushing all page content down to make room for a static panel. Docked bottom-LEFT —
+          the right corner is already claimed by page content at various scroll positions
+          (the Country/Region view toggle, map zoom controls, table pagination). */}
+      <button
+        type="button"
+        onClick={() => setMobileOpen(true)}
+        aria-label="Open filters"
+        className="lg:hidden fixed bottom-5 left-5 z-40 h-14 w-14 rounded-full shadow-lg flex items-center justify-center text-white transition-transform duration-300 hover:scale-105"
+        style={{ backgroundColor: 'var(--brand)' }}
+      >
+        <Filter className="w-6 h-6" />
+        {hasNonDefaultFilters && (
+          <span className="absolute top-1.5 right-1.5 w-3 h-3 rounded-full bg-red-500 border-2 border-white dark:border-neutral-900" />
+        )}
+      </button>
+
+      <DialogPrimitive.Root open={mobileOpen} onOpenChange={setMobileOpen}>
+        <DialogPrimitive.Portal>
+          <DialogPrimitive.Overlay className="lg:hidden fixed inset-0 z-50 bg-black/50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
+          <DialogPrimitive.Content
+            aria-describedby={undefined}
+            className="lg:hidden fixed inset-x-0 bottom-0 z-50 max-h-[85vh] overflow-y-auto rounded-t-2xl bg-white dark:bg-neutral-800 p-6 shadow-lg space-y-6 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom duration-300"
+          >
+            <div className="mx-auto -mt-2 mb-2 h-1.5 w-12 rounded-full bg-slate-300 dark:bg-neutral-600" />
+            <div className="flex items-center justify-between">
+              <DialogPrimitive.Title className="font-semibold text-lg text-slate-800 dark:text-slate-100">Filters</DialogPrimitive.Title>
+              <DialogPrimitive.Close
+                aria-label="Close filters"
+                className="rounded-lg p-1.5 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-neutral-700"
+              >
+                <X className="w-5 h-5" />
+              </DialogPrimitive.Close>
+            </div>
+            {filterControls}
+          </DialogPrimitive.Content>
+        </DialogPrimitive.Portal>
+      </DialogPrimitive.Root>
+    </>
   );
 }

@@ -153,7 +153,7 @@ export function RegulationPanel() {
 
   if (!worldData || loading) {
     return (
-      <div className="bg-slate-50 dark:bg-neutral-900 rounded-xl border border-slate-200/50 dark:border-neutral-700 p-8 flex items-center justify-center" style={{ height: '600px' }}>
+      <div className="bg-slate-50 dark:bg-neutral-900 rounded-xl border border-slate-200/50 dark:border-neutral-700 p-8 flex items-center justify-center h-[300px] sm:h-[600px]">
         <div className="text-slate-400">Loading regulatory data…</div>
       </div>
     );
@@ -162,6 +162,12 @@ export function RegulationPanel() {
   const projection = geoMercator().scale(140).translate([800 / 2, 500 / 2]);
   const pathGenerator = geoPath().projection(projection);
   const geojson = feature(worldData, worldData.objects.countries);
+
+  // Tooltip tracks the cursor, so on narrow viewports it must shrink and stay clamped
+  // to the screen edge instead of overflowing horizontally off a 320px desktop width.
+  const tooltipWidth = Math.min(window.innerWidth * 0.94, 320);
+  const tooltipLeft = Math.min(tooltipPos.x + 15, window.innerWidth - tooltipWidth - 10);
+  const tooltipTop = Math.max(8, tooltipPos.y - 100);
 
   return (
     <div className="space-y-6">
@@ -245,8 +251,7 @@ export function RegulationPanel() {
             <svg
               ref={svgRef}
               viewBox={viewBox}
-              className={`w-full ${zoom > minZoom ? (isDragging ? 'cursor-grabbing' : 'cursor-grab') : ''}`}
-              style={{ height: '550px' }}
+              className={`w-full aspect-[8/5] ${zoom > minZoom ? (isDragging ? 'cursor-grabbing' : 'cursor-grab') : ''}`}
               onMouseDown={handleMouseDown}
               onMouseMove={handlePanMove}
               onMouseUp={endDrag}
@@ -320,7 +325,7 @@ export function RegulationPanel() {
         {hoveredId && hoveredCountry && (
           <div
             className="fixed z-50 bg-white/95 dark:bg-neutral-800/95 backdrop-blur-md border border-[var(--brand)]/30 dark:border-[var(--brand)]/40 rounded-lg shadow-lg pointer-events-none transition-all"
-            style={{ left: tooltipPos.x + 15, top: tooltipPos.y - 100, minWidth: '320px' }}
+            style={{ left: tooltipLeft, top: tooltipTop, width: tooltipWidth }}
           >
             <div className="bg-[var(--brand)]/10 dark:bg-[var(--brand)]/15 px-4 py-2 border-b border-slate-200 dark:border-neutral-700">
               <h3 className="font-bold text-[var(--brand-700)] dark:text-[var(--brand-300)] text-lg">{hoveredCountry.name}</h3>
