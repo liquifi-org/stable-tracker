@@ -19,6 +19,8 @@
     "stride:sync:local": "npx tsc --sourceMap && cross-env DB_URL=mongodb://localhost:27017/sc-tracker node --enable-source-maps --env-file=.env.development dist/script/stride/sync-all.js",
     "stride:sync:countries": "npx tsc --sourceMap && node --enable-source-maps --env-file=.env.development dist/script/stride/sync-countries.js",
     "stride:sync:countries:local": "npx tsc --sourceMap && cross-env DB_URL=mongodb://localhost:27017/sc-tracker node --enable-source-maps --env-file=.env.development dist/script/stride/sync-countries.js",
+    "stride:seed:country-999:local": "npx tsc --sourceMap && cross-env DB_URL=mongodb://localhost:27017/sc-tracker node --enable-source-maps --env-file=.env.development dist/script/stride/seed-country-999.js",
+    "stride:sync:laws:local": "npx tsc --sourceMap && cross-env DB_URL=mongodb://localhost:27017/sc-tracker node --enable-source-maps --env-file=.env.development dist/script/stride/run-sync-laws.js",
     "stride:sync:issuers": "npx tsc --sourceMap && node --enable-source-maps --env-file=.env.development dist/script/stride/sync-issuers.js",
     "stride:sync:issuers:local": "npx tsc --sourceMap && cross-env DB_URL=mongodb://localhost:27017/sc-tracker node --enable-source-maps --env-file=.env.development dist/script/stride/sync-issuers.js",
     "stride:sync:stablecoins": "npx tsc --sourceMap && node --enable-source-maps --env-file=.env.development dist/script/stride/sync-stablecoins.js",

@@ -59,7 +59,7 @@ async function syncCountryDetail(
     console.log(`    ✓ Country ${countryId} (${detail.name})`);
 }
 
-async function syncLaws(countryId: number): Promise<void> {
+export async function syncLaws(countryId: number): Promise<void> {
     const laws = await strideFetch<StrideLaw[]>(`/laws/${countryId}`);
     if (!laws || laws.length === 0) return;
 
