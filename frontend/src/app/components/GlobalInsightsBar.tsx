@@ -2,6 +2,7 @@ import { Wallet, ShieldCheck, ArrowLeftRight, Percent } from 'lucide-react';
 import { TrendBadge } from './TrendBadge';
 import { SourceBadge, type DataSource } from './SourceBadge';
 import { useCurrencyFormat } from '../hooks/useCurrencyFormat';
+import { MONTHS } from '../context/FilterContext';
 import type { GlobalInsights } from '../services/api';
 
 function pctChange(current: number, previous: number): number | null {
@@ -12,10 +13,14 @@ interface GlobalInsightsBarProps {
   data: GlobalInsights | null;
   previousData: GlobalInsights | null;
   loading: boolean;
+  /** Reporting period the flow-based stats (transaction volume, remittances comparison) cover. */
+  year: number;
+  month: number;
 }
 
-export function GlobalInsightsBar({ data, previousData, loading }: GlobalInsightsBarProps) {
+export function GlobalInsightsBar({ data, previousData, loading, year, month }: GlobalInsightsBarProps) {
   const { formatCurrency } = useCurrencyFormat();
+  const periodLabel = `${MONTHS[month - 1]} ${year}`;
   const stablecoinVsRemittancesPct =
     data && data.totalRemittancesUsd > 0
       ? (data.totalTxValueUsd / data.totalRemittancesUsd) * 100
@@ -25,7 +30,7 @@ export function GlobalInsightsBar({ data, previousData, loading }: GlobalInsight
       ? (previousData.totalTxValueUsd / previousData.totalRemittancesUsd) * 100
       : null;
 
-  const stats: { label: string; value: string; Icon: typeof Wallet; trend: number | null; trendFormat: (v: number) => string; source?: DataSource; hideOnLaptop?: boolean }[] = [
+  const stats: { label: string; value: string; Icon: typeof Wallet; trend: number | null; trendFormat: (v: number) => string; source?: DataSource; hideOnLaptop?: boolean; showPeriod?: boolean }[] = [
     {
       label: 'Wallets holding stablecoins',
       value: data ? data.totalActiveWallets.toLocaleString() : '—',
@@ -33,6 +38,7 @@ export function GlobalInsightsBar({ data, previousData, loading }: GlobalInsight
       trend: data && previousData ? pctChange(data.totalActiveWallets, previousData.totalActiveWallets) : null,
       trendFormat: (v) => `${v.toFixed(2)}%`,
       source: 'allium',
+      showPeriod: true,
     },
     {
       label: 'Countries with live regulation',
@@ -53,6 +59,7 @@ export function GlobalInsightsBar({ data, previousData, loading }: GlobalInsight
       trend: data && previousData ? pctChange(data.totalTxValueUsd, previousData.totalTxValueUsd) : null,
       trendFormat: (v) => `${v.toFixed(2)}%`,
       source: 'allium',
+      showPeriod: true,
     },
     {
       label: 'Stablecoin volume vs. remittances',
@@ -63,12 +70,13 @@ export function GlobalInsightsBar({ data, previousData, loading }: GlobalInsight
           ? stablecoinVsRemittancesPct - previousStablecoinVsRemittancesPct
           : null,
       trendFormat: (v) => `${v.toFixed(2)}pp`,
+      showPeriod: true,
     },
   ];
 
   return (
     <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-      {stats.map(({ label, value, Icon, trend, trendFormat, source, hideOnLaptop }) => (
+      {stats.map(({ label, value, Icon, trend, trendFormat, source, hideOnLaptop, showPeriod }) => (
         <div
           key={label}
           className={`bg-white dark:bg-neutral-800 border border-slate-200/50 dark:border-neutral-700 rounded-xl p-4 shadow-md flex items-center gap-3 transition-all duration-300 ${
@@ -83,7 +91,10 @@ export function GlobalInsightsBar({ data, previousData, loading }: GlobalInsight
               {value}
               <TrendBadge value={trend} format={trendFormat} showPeriod />
             </div>
-            <div className="text-xs text-slate-500 dark:text-slate-400">{label}</div>
+            <div className="text-xs text-slate-500 dark:text-slate-400">
+              {label}
+              {showPeriod && <span className="text-slate-400 dark:text-slate-500"> · {periodLabel}</span>}
+            </div>
             {/* Kept in normal flow below the label (not flex-centered against the icon) so it
                 never overlaps text when the label wraps to 2-3 lines on narrow cards. */}
             {source && <SourceBadge source={source} label={label} size="sm" className="mt-1" />}

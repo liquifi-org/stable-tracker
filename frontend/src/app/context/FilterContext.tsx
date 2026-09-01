@@ -3,6 +3,8 @@ import { createContext, useContext, useState, ReactNode } from 'react';
 export type MapType = 'adoption' | 'corridors' | 'regulation';
 export type DisplayCurrency = 'USD' | 'EUR';
 
+export const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
 const NOW = new Date();
 const CURRENT_YEAR = NOW.getFullYear();
 const CURRENT_MONTH = NOW.getMonth() + 1;

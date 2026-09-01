@@ -22,9 +22,9 @@ interface Collaborator {
 const GITHUB_URL = 'https://github.com/liquifi-org/stable-tracker';
 
 const COLLABORATORS: Collaborator[] = [
+  { name: 'EY', logo: eyLogo, url: 'https://www.ey.com', darkLogo: eyLogoWhite },
   { name: 'Allium', logo: alliumLogo, url: 'https://www.allium.so' },
   { name: 'Stride', logo: strideLogo, url: 'https://tracker.stride.sc', darkLogo: strideLogoWhite },
-  { name: 'EY', logo: eyLogo, url: 'https://www.ey.com', darkLogo: eyLogoWhite },
   { name: 'FirmShift', logo: firmshiftLogo, url: 'https://firmshift.com' },
 ];
 

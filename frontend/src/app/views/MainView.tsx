@@ -354,7 +354,7 @@ export function MainView() {
     <div className="space-y-6">
       <h2 className="text-2xl font-semibold text-slate-800 dark:text-slate-100">Global Overview</h2>
 
-      <GlobalInsightsBar data={globalInsights} previousData={previousGlobalInsights} loading={globalInsightsLoading} />
+      <GlobalInsightsBar data={globalInsights} previousData={previousGlobalInsights} loading={globalInsightsLoading} year={filters.year} month={filters.month} />
 
       <div className="flex gap-3 items-center flex-wrap">
         <button

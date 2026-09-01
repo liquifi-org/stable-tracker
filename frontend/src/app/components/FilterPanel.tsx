@@ -1,10 +1,8 @@
 import { useState, useEffect } from 'react';
-import { useFilters, MAX_YEAR, maxMonthForYear } from '../context/FilterContext';
+import { useFilters, MAX_YEAR, maxMonthForYear, MONTHS } from '../context/FilterContext';
 import { api } from '../services/api';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { Filter, X } from 'lucide-react';
-
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 export function FilterPanel() {
   const {
