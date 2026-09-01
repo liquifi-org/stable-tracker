@@ -46,14 +46,16 @@ export class MongoAnalyticsRepository implements IAnalyticsRepository {
      * Returns a Map of countryId -> walletCount.
      */
     private async getWalletSnapshotMap(
-        countryIds: string[],
+        countryIds: string[] | null,
         targetPeriod: string,
     ): Promise<Map<string, number>> {
+        const match: Record<string, unknown> = { period: { $lte: targetPeriod } };
+        if (countryIds) match['countryId'] = { $in: countryIds };
         const rows = await WalletCountSnapshotModel.aggregate<{
             _id: string;
             walletCount: number;
         }>([
-            { $match: { countryId: { $in: countryIds }, period: { $lte: targetPeriod } } },
+            { $match: match },
             { $sort: { period: -1 } },
             {
                 $group: {
@@ -168,30 +170,47 @@ export class MongoAnalyticsRepository implements IAnalyticsRepository {
     }
 
     /** Rank-normalized adoption: wallets holding stablecoins / population, ranked across
-     *  the eligible geography set (> 10k wallets holding stablecoins). Shared by the country-level
-     *  adoption table and the single-country overview, so "#X of N" means the same thing in both. */
+     *  the eligible geography set (> 10k wallets holding stablecoins). Countries whose adoption
+     *  rate is within RANK_TIE_THRESHOLD of the country ranked above them share the same rank
+     *  (competition-style: a tied rank is not skipped, so ranks can be denser than the country
+     *  count). Shared by the country-level adoption table and the single-country overview, so
+     *  "#X of N" means the same thing in both. */
     private rankAdoptionRows(
         rows: { countryId: string; activeWallets: number; adoptionRate: number }[],
-    ): { rankMap: Map<string, number>; eligibleCountries: number } {
+    ): { rankMap: Map<string, number>; eligibleCountries: number; maxRank: number } {
         const ELIGIBILITY_THRESHOLD = 10_000;
+        // Adoption-rate gap (as a plain ratio, e.g. 0.01 = 1 percentage point) below which two
+        // countries are considered tied rather than strictly ordered. Provisional starting value.
+        const RANK_TIE_THRESHOLD = 0.01;
         const eligible = rows
             .filter((r) => r.activeWallets > ELIGIBILITY_THRESHOLD)
             .sort((a, b) => b.adoptionRate - a.adoptionRate);
-        const rankMap = new Map<string, number>(eligible.map((r, i) => [r.countryId, i + 1]));
-        return { rankMap, eligibleCountries: eligible.length };
+
+        const rankMap = new Map<string, number>();
+        let rank = 0;
+        let bandAdoptionRate = Infinity;
+        for (const r of eligible) {
+            if (bandAdoptionRate - r.adoptionRate >= RANK_TIE_THRESHOLD) {
+                rank += 1;
+                bandAdoptionRate = r.adoptionRate;
+            }
+            rankMap.set(r.countryId, rank);
+        }
+
+        return { rankMap, eligibleCountries: eligible.length, maxRank: rank };
     }
 
     async getAdoptionMetrics(params: AdoptionParams): Promise<CountryAdoptionMetric[]> {
         const baseRows = await this.buildCountryAdoptionRows(params);
-        const { rankMap, eligibleCountries } = this.rankAdoptionRows(baseRows);
+        const { rankMap, eligibleCountries, maxRank } = this.rankAdoptionRows(baseRows);
 
         return baseRows.map((r) => {
             const adoptionRank = rankMap.get(r.countryId) ?? null;
             const relativeAdoptionIndex =
                 adoptionRank === null
                     ? null
-                    : eligibleCountries > 1
-                    ? (eligibleCountries - adoptionRank) / (eligibleCountries - 1)
+                    : maxRank > 1
+                    ? (maxRank - adoptionRank) / (maxRank - 1)
                     : 1;
 
             return {
@@ -670,13 +689,15 @@ export class MongoAnalyticsRepository implements IAnalyticsRepository {
         const periodKey = this.periodKey(year, month);
 
         const countries = await CountryModel.find().lean();
-        const countryIds = countries.map((c) => c.countryId);
 
-        const snapshotMap = await this.getWalletSnapshotMap(countryIds, periodKey);
+        // Summed across every countryId Allium reports wallet data for — not scoped to
+        // CountryModel's countryIds — so a country with wallet activity but no CountryModel
+        // entry yet (e.g. one not synced from Stride, like the EU's country 999) still counts
+        // toward the true global total instead of silently dropping out of it.
+        const snapshotMap = await this.getWalletSnapshotMap(null, periodKey);
         const walletAgg = await WalletModel.aggregate<{ _id: string; count: number }>([
             {
                 $match: {
-                    countryId: { $in: countryIds },
                     dateOpened: { $lte: end },
                     $or: [{ dateClosed: null }, { dateClosed: { $gt: end } }],
                 },
@@ -685,8 +706,9 @@ export class MongoAnalyticsRepository implements IAnalyticsRepository {
         ]);
         const walletMap = new Map<string, number>(walletAgg.map((r) => [r._id, r.count]));
 
-        const totalActiveWallets = countries.reduce(
-            (sum, c) => sum + (snapshotMap.get(c.countryId) ?? walletMap.get(c.countryId) ?? 0),
+        const allWalletCountryIds = new Set([...snapshotMap.keys(), ...walletMap.keys()]);
+        const totalActiveWallets = Array.from(allWalletCountryIds).reduce(
+            (sum, id) => sum + (snapshotMap.get(id) ?? walletMap.get(id) ?? 0),
             0,
         );
 
