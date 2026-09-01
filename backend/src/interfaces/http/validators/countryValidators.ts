@@ -10,7 +10,8 @@ export const ListCountriesSchema = PaginationSchema.extend({
 export const CountryIdParamSchema = z.object({
     countryId: z
         .string()
-        .regex(/^\d{1,3}$/, 'countryId must be an ISO 3166-1 numeric country code'),
+        .regex(/^\d{1,3}$/, 'countryId must be an ISO 3166-1 numeric country code')
+        .transform((v) => v.padStart(3, '0')),
 });
 
 export type ListCountriesQuery = z.infer<typeof ListCountriesSchema>;

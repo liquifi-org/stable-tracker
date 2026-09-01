@@ -3,7 +3,10 @@ import { YearMonthSchema } from './sharedValidators';
 
 const StablecoinFilterSchema = z.string().optional();
 const ReferenceAssetFilterSchema = z.string().optional();
-const CountryIdValue = z.string().regex(/^\d{1,3}$/, 'countryId must be an ISO 3166-1 numeric country code');
+const CountryIdValue = z
+    .string()
+    .regex(/^\d{1,3}$/, 'countryId must be an ISO 3166-1 numeric country code')
+    .transform((v) => v.padStart(3, '0'));
 
 export const AdoptionQuerySchema = YearMonthSchema.extend({
     referenceAsset: ReferenceAssetFilterSchema,
