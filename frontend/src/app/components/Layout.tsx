@@ -7,6 +7,7 @@ import { FilterProvider, useFilters } from '../context/FilterContext';
 import { FilterPanel } from './FilterPanel';
 import { Footer } from './Footer';
 import logo from '../../assets/logos/logo_white.png';
+import alliumLogo from '../../assets/logos/allium.svg';
 
 function useDarkMode() {
   const [isDark, setIsDark] = useState<boolean>(() => {
@@ -52,6 +53,17 @@ function LayoutBody({ isDark, toggle }: { isDark: boolean; toggle: () => void })
               <h1 className="text-lg sm:text-2xl text-white"><b>Stablecoin</b> Tracker</h1>
               <p className="text-xs sm:text-sm text-white/70 mt-1">Global adoption and flows analysis</p>
             </div>
+            <div className="hidden sm:block w-px h-8 bg-white/20 mx-1" />
+            <a
+              href="https://www.allium.so"
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Powered by Allium"
+              className="hidden sm:flex flex-col items-center gap-1 shrink-0"
+            >
+              <img src={alliumLogo} alt="Allium" className="h-5 w-auto object-contain brightness-0 invert" />
+              <span className="text-[10px] text-white/70 font-medium whitespace-nowrap">Powered by Allium</span>
+            </a>
           </div>
           <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
             <Link

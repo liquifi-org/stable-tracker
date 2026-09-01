@@ -43,7 +43,7 @@ export function Footer() {
               target="_blank"
               rel="noopener noreferrer"
               title={c.name}
-              className="h-10 w-[130px] flex items-center justify-center grayscale hover:grayscale-0 opacity-80 hover:opacity-100 transition-all duration-300"
+              className="h-10 w-[130px] flex items-center justify-center opacity-90 hover:opacity-100 transition-all duration-300"
             >
               <img
                 src={c.logo}
