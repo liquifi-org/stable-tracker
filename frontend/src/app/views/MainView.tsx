@@ -209,6 +209,18 @@ export function MainView() {
       outboundMap.set(pair.country2, (outboundMap.get(pair.country2) ?? 0) + pair.valueFromCountry2);
     }
 
+    // Dollarization index per country: share of outbound volume settled in USD-referenced
+    // stablecoins, volume-weighted across that country's outbound corridors — same definition
+    // used for the single-country overview, computed here from the raw per-corridor flows
+    // (each flow's own dollarizationIndex) rather than the bidirectional pairs above, since a
+    // pair only carries one direction's ratio.
+    const dollarVolMap = new Map<string, number>(); // alpha2 → USD-stablecoin portion of outbound
+    for (const flow of corridorData) {
+      const alpha2 = numericToAlpha2.get(flow.from);
+      if (!alpha2) continue;
+      dollarVolMap.set(alpha2, (dollarVolMap.get(alpha2) ?? 0) + flow.value.amount * flow.dollarizationIndex);
+    }
+
     // Build numeric → remittancesSent lookup from adoption data
     const remittancesMap = new Map<string, number | undefined>(
       adoptionData.map(c => [c.countryId, c.remittancesSent])
@@ -220,16 +232,19 @@ export function MainView() {
         const remittancesSent = remittancesMap.get(numericId);
         const stablecoinPctOfRemittances =
           remittancesSent && remittancesSent > 0 ? outboundVolume / remittancesSent : null;
+        const dollarizationIndex =
+          outboundVolume > 0 ? (dollarVolMap.get(alpha2) ?? 0) / outboundVolume : null;
         return {
           alpha2,
           name: countryNameByAlpha2.get(alpha2) ?? alpha2,
           outboundVolume,
+          dollarizationIndex,
           remittancesSent: remittancesSent ?? null,
           stablecoinPctOfRemittances,
         };
       })
       .sort((a, b) => b.outboundVolume - a.outboundVolume);
-  }, [bidirectionalCorridors, alpha2ToNumeric, countryNameByAlpha2]);
+  }, [bidirectionalCorridors, corridorData, numericToAlpha2, alpha2ToNumeric, countryNameByAlpha2]);
 
   // Adoption table rows: join adoption metrics with outbound-corridor-vs-remittances ratio,
   // excluding countries with no wallets holding stablecoins.
@@ -337,6 +352,11 @@ export function MainView() {
       key: 'outboundVolume',
       header: headerWithSource('Outbound stablecoin volume', 'allium'),
       render: (value: number) => formatCurrency(value)
+    },
+    {
+      key: 'dollarizationIndex',
+      header: 'Dollarization Index',
+      render: (value: number | null) => value != null ? (value * 100).toFixed(2) + '%' : '—'
     },
     {
       key: 'remittancesSent',
