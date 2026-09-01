@@ -1,6 +1,7 @@
 import { Link } from 'react-router';
 import alliumLogo from '../../assets/logos/allium.svg';
 import strideLogo from '../../assets/logos/stride.svg';
+import strideLogoWhite from '../../assets/logos/stride_white.svg';
 import firmshiftLogo from '../../assets/logos/firmshift.svg';
 import eyLogo from '../../assets/logos/ey.jpg';
 import eyLogoWhite from '../../assets/logos/ey_white.png';
@@ -9,10 +10,12 @@ interface Collaborator {
   name: string;
   logo: string;
   url: string;
-  /** Pre-rendered white-on-transparent version for dark mode. SVG logos (flat color on a
-   *  transparent background) flatten to white via a CSS filter instead — but EY's source is a
-   *  flattened JPEG with an opaque white background and a yellow accent that inverts to blue
-   *  rather than white, so it needs a real white asset instead of a filter. */
+  /** Pre-rendered white-on-transparent version for dark mode. Most SVG logos (flat single-color
+   *  on a transparent background) flatten to white via a CSS filter instead, but that filter
+   *  discards multi-color detail — EY's source is a flattened JPEG with an opaque white
+   *  background and a yellow accent that inverts to blue rather than white, and Stride's
+   *  wordmark has a pink-to-blue gradient underline that a flattening filter would turn solid
+   *  white — so both need a real pre-made white asset instead of a filter. */
   darkLogo?: string;
 }
 
@@ -20,7 +23,7 @@ const GITHUB_URL = 'https://github.com/liquifi-org/stable-tracker';
 
 const COLLABORATORS: Collaborator[] = [
   { name: 'Allium', logo: alliumLogo, url: 'https://www.allium.so' },
-  { name: 'Stride', logo: strideLogo, url: 'https://tracker.stride.sc' },
+  { name: 'Stride', logo: strideLogo, url: 'https://tracker.stride.sc', darkLogo: strideLogoWhite },
   { name: 'EY', logo: eyLogo, url: 'https://www.ey.com', darkLogo: eyLogoWhite },
   { name: 'FirmShift', logo: firmshiftLogo, url: 'https://firmshift.com' },
 ];
