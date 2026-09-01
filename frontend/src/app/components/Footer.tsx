@@ -17,13 +17,15 @@ interface Collaborator {
    *  wordmark has a pink-to-blue gradient underline that a flattening filter would turn solid
    *  white — so both need a real pre-made white asset instead of a filter. */
   darkLogo?: string;
+  /** Small label under the logo, e.g. Allium's "Powered by" attribution requirement. */
+  caption?: string;
 }
 
 const GITHUB_URL = 'https://github.com/liquifi-org/stable-tracker';
 
 const COLLABORATORS: Collaborator[] = [
   { name: 'EY', logo: eyLogo, url: 'https://www.ey.com', darkLogo: eyLogoWhite },
-  { name: 'Allium', logo: alliumLogo, url: 'https://www.allium.so' },
+  { name: 'Allium', logo: alliumLogo, url: 'https://www.allium.so', caption: 'Powered by Allium' },
   { name: 'Stride', logo: strideLogo, url: 'https://tracker.stride.sc', darkLogo: strideLogoWhite },
   { name: 'FirmShift', logo: firmshiftLogo, url: 'https://firmshift.com' },
 ];
@@ -43,15 +45,20 @@ export function Footer() {
               target="_blank"
               rel="noopener noreferrer"
               title={c.name}
-              className="h-10 w-[130px] flex items-center justify-center opacity-90 hover:opacity-100 transition-all duration-300"
+              className="h-14 w-[130px] flex flex-col items-center justify-center gap-1 opacity-90 hover:opacity-100 transition-all duration-300"
             >
-              <img
-                src={c.logo}
-                alt={c.name}
-                className={`max-h-full max-w-full object-contain ${c.darkLogo ? 'dark:hidden' : 'dark:brightness-0 dark:invert'}`}
-              />
-              {c.darkLogo && (
-                <img src={c.darkLogo} alt={c.name} className="hidden dark:block max-h-full max-w-full object-contain" />
+              <div className="h-10 flex items-center justify-center">
+                <img
+                  src={c.logo}
+                  alt={c.name}
+                  className={`max-h-full max-w-full object-contain ${c.darkLogo ? 'dark:hidden' : 'dark:brightness-0 dark:invert'}`}
+                />
+                {c.darkLogo && (
+                  <img src={c.darkLogo} alt={c.name} className="hidden dark:block max-h-full max-w-full object-contain" />
+                )}
+              </div>
+              {c.caption && (
+                <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">{c.caption}</span>
               )}
             </a>
           ))}
@@ -85,12 +92,6 @@ export function Footer() {
             className="text-xs font-medium text-white/80 hover:text-white underline-offset-4 hover:underline transition-all duration-300"
           >
             Legal Disclaimer
-          </Link>
-          <Link
-            to="/privacy-policy"
-            className="text-xs font-medium text-white/80 hover:text-white underline-offset-4 hover:underline transition-all duration-300"
-          >
-            Privacy Policy
           </Link>
         </div>
       </div>
