@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ComponentType } from 'react';
-import { useParams, useNavigate } from 'react-router';
+import { useParams, useNavigate, useLocation } from 'react-router';
 import { DataTable } from '../components/DataTable';
 import { CountryFlag } from '../components/CountryFlag';
 import {
@@ -115,8 +115,14 @@ function fmtPct(ratio: number) {
 export function CountryView() {
   const { countryCode } = useParams<{ countryCode: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const filters = useFilters();
   const { formatCurrency } = useCurrencyFormat();
+
+  // Navigation state passed by map/corridor click handlers — used as instant fallback
+  // for name and flag while API calls are in-flight, and as permanent fallback for countries
+  // that have Allium adoption data but no Stride regulatory entry.
+  const navState = (location.state as { name?: string; isoAlpha2?: string } | null) ?? null;
 
   const numericId = countryCode ? resolveToNumericId(countryCode) : null;
 
@@ -260,8 +266,10 @@ export function CountryView() {
         </button>
         <div>
           <h2 className="text-2xl font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-2.5">
-            {overview?.isoAlpha2 && <CountryFlag isoAlpha2={overview.isoAlpha2} className="w-7 h-7" />}
-            {overview?.name ?? apiRegulatory?.countryDetail?.name ?? `Country ${numericId}`}
+            {(overview?.isoAlpha2 ?? navState?.isoAlpha2) && (
+              <CountryFlag isoAlpha2={(overview?.isoAlpha2 ?? navState?.isoAlpha2)!} className="w-7 h-7" />
+            )}
+            {overview?.name ?? apiRegulatory?.countryDetail?.name ?? navState?.name ?? `Country ${numericId}`}
           </h2>
           <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">Country deep dive analysis</p>
         </div>
@@ -282,7 +290,7 @@ export function CountryView() {
               ) : (
                 '—'
               )}
-              <TrendBadge value={rankDelta} format={(v) => String(v)} />
+              <TrendBadge value={rankDelta} format={(v) => String(v)} showPeriod />
             </div>
           </div>
         </div>
@@ -294,7 +302,7 @@ export function CountryView() {
             <div className="text-sm text-slate-600 dark:text-slate-400 mb-1">Wallets Holding Stablecoins</div>
             <div className="flex items-center gap-2 flex-wrap text-2xl font-semibold text-slate-800 dark:text-slate-100">
               {overviewLoading ? <Loader2 className="w-6 h-6 animate-spin text-slate-400" /> : overview && overview.activeWallets > 0 ? overview.activeWallets.toLocaleString() : '—'}
-              <TrendBadge value={walletsChangePct} format={(v) => `${v.toFixed(2)}%`} />
+              <TrendBadge value={walletsChangePct} format={(v) => `${v.toFixed(2)}%`} showPeriod />
             </div>
           </div>
         </div>
@@ -314,7 +322,7 @@ export function CountryView() {
                   </span>
                   <span className="flex items-center gap-2 flex-wrap text-lg font-semibold text-slate-800 dark:text-slate-100">
                     {totalInbound > 0 ? formatCurrency(totalInbound) : '—'}
-                    <TrendBadge value={inboundChangePct} format={(v) => `${v.toFixed(2)}%`} />
+                    <TrendBadge value={inboundChangePct} format={(v) => `${v.toFixed(2)}%`} showPeriod />
                   </span>
                 </div>
                 <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -323,7 +331,7 @@ export function CountryView() {
                   </span>
                   <span className="flex items-center gap-2 flex-wrap text-lg font-semibold text-slate-800 dark:text-slate-100">
                     {totalOutbound > 0 ? formatCurrency(totalOutbound) : '—'}
-                    <TrendBadge value={outboundChangePct} format={(v) => `${v.toFixed(2)}%`} />
+                    <TrendBadge value={outboundChangePct} format={(v) => `${v.toFixed(2)}%`} showPeriod />
                   </span>
                 </div>
               </div>
@@ -338,7 +346,7 @@ export function CountryView() {
             <div className="text-sm text-slate-600 dark:text-slate-400 mb-1">Dollarization Index</div>
             <div className="flex items-center gap-2 flex-wrap text-2xl font-semibold text-slate-800 dark:text-slate-100">
               {overviewLoading ? <Loader2 className="w-6 h-6 animate-spin text-slate-400" /> : overview && overview.dollarizationIndex > 0 ? fmtPct(overview.dollarizationIndex) : '—'}
-              <TrendBadge value={dollarizationChangePp} format={(v) => `${v.toFixed(2)}pp`} />
+              <TrendBadge value={dollarizationChangePp} format={(v) => `${v.toFixed(2)}pp`} showPeriod />
             </div>
           </div>
         </div>

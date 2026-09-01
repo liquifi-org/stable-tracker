@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { useNavigate } from 'react-router';
 import { geoPath, geoMercator } from 'd3-geo';
 import { feature } from 'topojson-client';
 import { Plus, Minus, RotateCcw } from 'lucide-react';
@@ -6,6 +7,7 @@ import { useMapZoomPan } from '../hooks/useMapZoomPan';
 import { useFilters } from '../context/FilterContext';
 import { useCurrencyFormat } from '../hooks/useCurrencyFormat';
 import { SourceBadge } from './SourceBadge';
+import { CountryFlag } from './CountryFlag';
 
 type MapViewMode = 'country' | 'region';
 
@@ -88,14 +90,22 @@ export function RealCorridorMap({ corridors, getCountryName, limit, mode = 'coun
     isDragging, draggedRef, handleMouseDown, handleMouseMove: handlePanMove, endDrag,
   } = useMapZoomPan();
   const filters = useFilters();
+  const navigate = useNavigate();
+  const tooltipHoveredRef = useRef(false);
+  const dismissTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const scheduleDismiss = () => {
+    dismissTimeoutRef.current = setTimeout(() => {
+      if (!tooltipHoveredRef.current) setHoveredCorridor(null);
+    }, 80);
+  };
 
   const hasActiveFilters =
-    filters.country !== 'All' || filters.regionFrom !== 'All' ||
+    filters.regionFrom !== 'All' ||
     filters.regionTo !== 'All' || filters.stablecoin !== 'All';
 
   const handleReset = () => {
     resetView();
-    filters.setCountry('All');
     filters.setRegionFrom('All');
     filters.setRegionTo('All');
     filters.setStablecoin('All');
@@ -204,33 +214,28 @@ export function RealCorridorMap({ corridors, getCountryName, limit, mode = 'coun
 
   // Tooltip tracks the cursor, so on narrow viewports it must shrink and stay clamped
   // to the screen edge instead of overflowing horizontally off a 500px desktop width.
-  const tooltipWidth = Math.min(window.innerWidth * 0.94, 500);
+  const tooltipWidth = Math.min(window.innerWidth * 0.94, 560);
   const tooltipLeft = Math.min(tooltipPos.x + 15, window.innerWidth - tooltipWidth - 10);
   const tooltipTop = Math.max(8, tooltipPos.y - 100);
 
   return (
     <div className="relative">
       <div className="bg-white dark:bg-neutral-800 rounded-xl border border-slate-200/50 dark:border-neutral-700 overflow-hidden shadow-md transition-all">
-        <div className="px-6 py-4 border-b border-slate-200/50 dark:border-neutral-700 flex justify-between items-center" style={{ backgroundColor: 'var(--brand)' }}>
-          <span className="text-sm text-white font-medium">
-            {mode === 'region'
-              ? `${displayItems.length} region ${displayItems.length === 1 ? 'corridor' : 'corridors'}`
-              : limit !== undefined ? `Top ${displayItems.length} corridors by volume` : `${displayItems.length} corridors`} · line width = relative volume
-          </span>
-          <div className="flex items-center gap-4">
-            <span className="text-xs text-white/70">{formatValue(minVolume)}</span>
-            {legendItems.map((item, idx) => (
-              <div key={idx} className="flex items-center gap-1">
-                <svg width="28" height="12">
-                  <line x1="0" y1="6" x2="28" y2="6" stroke={item.color} strokeWidth={item.width} strokeLinecap="round" />
-                </svg>
-              </div>
-            ))}
-            <span className="text-xs text-white/70">{formatValue(maxVolume)}</span>
-          </div>
-        </div>
-
         <div className="relative p-6 bg-[#F7FAFC] dark:bg-neutral-900">
+          {/* Legend — bottom-left, opposite zoom controls */}
+          <div className="absolute bottom-4 left-4 z-10 bg-white/90 dark:bg-neutral-800/90 backdrop-blur-sm border border-slate-200/60 dark:border-neutral-700 rounded-lg p-2.5 shadow-md">
+            <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1.5 uppercase tracking-wide">Volume</div>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[10px] text-slate-500 dark:text-slate-400">{formatValue(minVolume)}</span>
+              {legendItems.map((item, idx) => (
+                <svg key={idx} width="22" height="10" className="shrink-0">
+                  <line x1="0" y1="5" x2="22" y2="5" stroke={item.color} strokeWidth={item.width} strokeLinecap="round" />
+                </svg>
+              ))}
+              <span className="text-[10px] text-slate-500 dark:text-slate-400">{formatValue(maxVolume)}</span>
+            </div>
+          </div>
+
           <div className="absolute bottom-4 right-4 flex flex-col gap-1 z-10">
             <button
               type="button"
@@ -336,7 +341,7 @@ export function RealCorridorMap({ corridors, getCountryName, limit, mode = 'coun
                   fill="none"
                   opacity={isHovered || isSelected ? 1 : 0.85}
                   onMouseEnter={(e) => handleCorridorHover(e, index)}
-                  onMouseLeave={() => setHoveredCorridor(null)}
+                  onMouseLeave={scheduleDismiss}
                   onClick={() => handleCorridorClick(index)}
                   className="cursor-pointer transition-all duration-300"
                   filter={isHovered || isSelected ? 'url(#corridor-glow)' : undefined}
@@ -406,55 +411,150 @@ export function RealCorridorMap({ corridors, getCountryName, limit, mode = 'coun
 
       {hoveredData && (
         <div
-          className="fixed z-50 bg-white/95 dark:bg-neutral-800/95 backdrop-blur-md border border-[var(--brand)]/30 dark:border-[var(--brand)]/40 rounded-lg shadow-lg pointer-events-none transition-all"
+          className="fixed z-50 bg-white/97 dark:bg-neutral-800/97 backdrop-blur-md border border-[var(--brand)]/25 dark:border-[var(--brand)]/35 rounded-xl shadow-xl transition-all overflow-hidden"
           style={{ left: tooltipLeft, top: tooltipTop, width: tooltipWidth }}
+          onMouseEnter={() => {
+            tooltipHoveredRef.current = true;
+            if (dismissTimeoutRef.current) clearTimeout(dismissTimeoutRef.current);
+          }}
+          onMouseLeave={() => {
+            tooltipHoveredRef.current = false;
+            setHoveredCorridor(null);
+          }}
         >
-          <div className="bg-[var(--brand)]/10 dark:bg-[var(--brand)]/15 px-4 py-2 border-b border-slate-200 dark:border-neutral-700">
-            <h3 className="font-bold text-[var(--brand-700)] dark:text-[var(--brand-300)] text-lg text-center">
-              {getLabel(hoveredData.id1)} &lt;-&gt; {getLabel(hoveredData.id2)}
-            </h3>
+          {/* Header */}
+          <div className="px-4 py-2.5 border-b border-slate-200 dark:border-neutral-700 bg-[var(--brand)]/8 dark:bg-[var(--brand)]/12">
+            <div className="flex items-center justify-center gap-2 text-sm font-bold text-slate-800 dark:text-slate-100">
+              {mode === 'country' && <CountryFlag isoAlpha2={hoveredData.id1} className="w-5 h-4 rounded-sm" />}
+              <span>{getLabel(hoveredData.id1)}</span>
+              <span className="text-[var(--brand)] dark:text-[var(--brand-300)] font-normal">⟷</span>
+              {mode === 'country' && <CountryFlag isoAlpha2={hoveredData.id2} className="w-5 h-4 rounded-sm" />}
+              <span>{getLabel(hoveredData.id2)}</span>
+            </div>
           </div>
 
-          <div className="overflow-hidden">
+          {/* Table */}
+          <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-                <tr className="border-b border-slate-200 dark:border-neutral-700">
-                  <th className="bg-slate-50 dark:bg-neutral-900 p-2 text-left"></th>
-                  <th className="bg-slate-50 dark:bg-neutral-900 p-2 text-center text-[var(--brand-700)] dark:text-[var(--brand-300)] italic font-semibold border-l border-slate-200 dark:border-neutral-700">
-                    {getLabel(hoveredData.id1)} -&gt; {getLabel(hoveredData.id2)}
+                <tr className="border-b border-slate-200 dark:border-neutral-700 bg-slate-50/80 dark:bg-neutral-900/60">
+                  <th className="px-3 py-2 text-left text-slate-400 dark:text-slate-500 font-medium w-24"></th>
+                  {/* Bidirectional total column */}
+                  <th className="px-3 py-2 text-center font-semibold text-slate-600 dark:text-slate-300 border-l border-slate-200 dark:border-neutral-700 bg-[var(--brand)]/5 dark:bg-[var(--brand)]/8">
+                    <span className="text-[var(--brand)] dark:text-[var(--brand-300)]">⟷</span> Total
                   </th>
-                  <th className="bg-slate-50 dark:bg-neutral-900 p-2 text-center text-[var(--brand-700)] dark:text-[var(--brand-300)] italic font-semibold border-l border-slate-200 dark:border-neutral-700">
-                    {getLabel(hoveredData.id2)} -&gt; {getLabel(hoveredData.id1)}
+                  {/* A → B column */}
+                  <th className="px-3 py-2 text-center font-semibold border-l border-slate-200 dark:border-neutral-700">
+                    {mode === 'country' ? (
+                      <button
+                        onClick={() => navigate(`/country/${hoveredData.id1}`, { state: { name: getLabel(hoveredData.id1), isoAlpha2: hoveredData.id1 } })}
+                        className="inline-flex items-center gap-1 text-[var(--brand)] dark:text-[var(--brand-300)] hover:underline cursor-pointer"
+                        title={`View ${getLabel(hoveredData.id1)} country page`}
+                      >
+                        <CountryFlag isoAlpha2={hoveredData.id1} className="w-4 h-3 rounded-sm" />
+                        {getLabel(hoveredData.id1)}
+                      </button>
+                    ) : (
+                      <span className="text-slate-600 dark:text-slate-300">{getLabel(hoveredData.id1)}</span>
+                    )}
+                    <span className="text-slate-400 dark:text-slate-500 font-normal mx-1">→</span>
+                    {mode === 'country' ? (
+                      <button
+                        onClick={() => navigate(`/country/${hoveredData.id2}`, { state: { name: getLabel(hoveredData.id2), isoAlpha2: hoveredData.id2 } })}
+                        className="inline-flex items-center gap-1 text-[var(--brand)] dark:text-[var(--brand-300)] hover:underline cursor-pointer"
+                        title={`View ${getLabel(hoveredData.id2)} country page`}
+                      >
+                        <CountryFlag isoAlpha2={hoveredData.id2} className="w-4 h-3 rounded-sm" />
+                        {getLabel(hoveredData.id2)}
+                      </button>
+                    ) : (
+                      <span className="text-slate-600 dark:text-slate-300">{getLabel(hoveredData.id2)}</span>
+                    )}
+                  </th>
+                  {/* B → A column */}
+                  <th className="px-3 py-2 text-center font-semibold border-l border-slate-200 dark:border-neutral-700">
+                    {mode === 'country' ? (
+                      <button
+                        onClick={() => navigate(`/country/${hoveredData.id2}`, { state: { name: getLabel(hoveredData.id2), isoAlpha2: hoveredData.id2 } })}
+                        className="inline-flex items-center gap-1 text-[var(--brand)] dark:text-[var(--brand-300)] hover:underline cursor-pointer"
+                        title={`View ${getLabel(hoveredData.id2)} country page`}
+                      >
+                        <CountryFlag isoAlpha2={hoveredData.id2} className="w-4 h-3 rounded-sm" />
+                        {getLabel(hoveredData.id2)}
+                      </button>
+                    ) : (
+                      <span className="text-slate-600 dark:text-slate-300">{getLabel(hoveredData.id2)}</span>
+                    )}
+                    <span className="text-slate-400 dark:text-slate-500 font-normal mx-1">→</span>
+                    {mode === 'country' ? (
+                      <button
+                        onClick={() => navigate(`/country/${hoveredData.id1}`, { state: { name: getLabel(hoveredData.id1), isoAlpha2: hoveredData.id1 } })}
+                        className="inline-flex items-center gap-1 text-[var(--brand)] dark:text-[var(--brand-300)] hover:underline cursor-pointer"
+                        title={`View ${getLabel(hoveredData.id1)} country page`}
+                      >
+                        <CountryFlag isoAlpha2={hoveredData.id1} className="w-4 h-3 rounded-sm" />
+                        {getLabel(hoveredData.id1)}
+                      </button>
+                    ) : (
+                      <span className="text-slate-600 dark:text-slate-300">{getLabel(hoveredData.id1)}</span>
+                    )}
                   </th>
                 </tr>
               </thead>
               <tbody>
-                <tr className="border-b border-slate-200 dark:border-neutral-700">
-                  <td className="p-2 text-slate-600 dark:text-slate-300 bg-slate-50/60 dark:bg-neutral-900/60">Stablecoin value</td>
-                  <td className="p-2 text-center text-slate-800 dark:text-slate-100 font-bold border-l border-slate-200 dark:border-neutral-700">
+                {/* Volume row */}
+                <tr className={mode === 'country' ? 'border-b border-slate-200 dark:border-neutral-700' : ''}>
+                  <td className="px-3 py-2.5 text-slate-500 dark:text-slate-400 font-medium">Volume</td>
+                  <td className="px-3 py-2.5 text-center font-bold text-slate-800 dark:text-slate-100 border-l border-slate-200 dark:border-neutral-700 bg-[var(--brand)]/5 dark:bg-[var(--brand)]/8">
+                    {formatValue(hoveredData.totalValue)}
+                  </td>
+                  <td className="px-3 py-2.5 text-center font-semibold text-slate-700 dark:text-slate-200 border-l border-slate-200 dark:border-neutral-700">
                     {formatValue(hoveredData.valueFrom1)}
                   </td>
-                  <td className="p-2 text-center text-slate-800 dark:text-slate-100 font-bold border-l border-slate-200 dark:border-neutral-700">
+                  <td className="px-3 py-2.5 text-center font-semibold text-slate-700 dark:text-slate-200 border-l border-slate-200 dark:border-neutral-700">
                     {formatValue(hoveredData.valueFrom2)}
                   </td>
                 </tr>
+                {/* Stablecoin mix row (country mode only) */}
                 {mode === 'country' && (
-                  <tr className="border-b border-slate-200 dark:border-neutral-700">
-                    <td className="p-2 text-slate-600 dark:text-slate-300 bg-slate-50/60 dark:bg-neutral-900/60 align-top">Stablecoin share (%)</td>
-                    <td className="p-2 border-l border-slate-200 dark:border-neutral-700 bg-slate-50/40 dark:bg-neutral-900/40">
+                  <tr>
+                    <td className="px-3 py-2.5 text-slate-500 dark:text-slate-400 font-medium align-top">Top coins</td>
+                    <td className="px-3 py-2.5 border-l border-slate-200 dark:border-neutral-700 bg-[var(--brand)]/5 dark:bg-[var(--brand)]/8 align-top">
+                      {(() => {
+                        const coins = new Map<string, number>();
+                        for (const s of hoveredData.topStablecoinsFrom1 ?? []) {
+                          coins.set(s.name, (coins.get(s.name) ?? 0) + s.share * hoveredData.valueFrom1);
+                        }
+                        for (const s of hoveredData.topStablecoinsFrom2 ?? []) {
+                          coins.set(s.name, (coins.get(s.name) ?? 0) + s.share * hoveredData.valueFrom2);
+                        }
+                        const denom = hoveredData.totalValue || 1;
+                        const sorted = [...coins.entries()]
+                          .map(([name, abs]) => ({ name, share: abs / denom }))
+                          .sort((a, b) => b.share - a.share);
+                        if (!sorted.length) return <span className="text-slate-400 dark:text-slate-500">—</span>;
+                        return sorted.map(({ name, share }) => (
+                          <div key={name} className="flex justify-between gap-3">
+                            <span className="text-slate-500 dark:text-slate-400">{name}</span>
+                            <span className="text-slate-700 dark:text-slate-200 font-semibold tabular-nums">{Math.round(share * 100)}%</span>
+                          </div>
+                        ));
+                      })()}
+                    </td>
+                    <td className="px-3 py-2.5 border-l border-slate-200 dark:border-neutral-700 align-top">
                       {(hoveredData.topStablecoinsFrom1 ?? []).map(s => (
-                        <div key={s.name} className="flex justify-between">
-                          <span className="text-slate-500 dark:text-slate-400 italic">{s.name}</span>
-                          <span className="text-slate-800 dark:text-slate-100 font-semibold">{Math.round(s.share * 100)}%</span>
+                        <div key={s.name} className="flex justify-between gap-3">
+                          <span className="text-slate-500 dark:text-slate-400">{s.name}</span>
+                          <span className="text-slate-700 dark:text-slate-200 font-semibold tabular-nums">{Math.round(s.share * 100)}%</span>
                         </div>
                       ))}
                       {!hoveredData.topStablecoinsFrom1?.length && <span className="text-slate-400 dark:text-slate-500">—</span>}
                     </td>
-                    <td className="p-2 border-l border-slate-200 dark:border-neutral-700 bg-slate-50/40 dark:bg-neutral-900/40">
+                    <td className="px-3 py-2.5 border-l border-slate-200 dark:border-neutral-700 align-top">
                       {(hoveredData.topStablecoinsFrom2 ?? []).map(s => (
-                        <div key={s.name} className="flex justify-between">
-                          <span className="text-slate-500 dark:text-slate-400 italic">{s.name}</span>
-                          <span className="text-slate-800 dark:text-slate-100 font-semibold">{Math.round(s.share * 100)}%</span>
+                        <div key={s.name} className="flex justify-between gap-3">
+                          <span className="text-slate-500 dark:text-slate-400">{s.name}</span>
+                          <span className="text-slate-700 dark:text-slate-200 font-semibold tabular-nums">{Math.round(s.share * 100)}%</span>
                         </div>
                       ))}
                       {!hoveredData.topStablecoinsFrom2?.length && <span className="text-slate-400 dark:text-slate-500">—</span>}
@@ -464,9 +564,14 @@ export function RealCorridorMap({ corridors, getCountryName, limit, mode = 'coun
               </tbody>
             </table>
           </div>
+
+          {/* Footer */}
           <div className="px-4 py-2 border-t border-slate-200 dark:border-neutral-700 flex items-center gap-1.5 text-xs text-slate-400 dark:text-slate-500">
             <span>Data provided by</span>
             <SourceBadge source="allium" label="Corridor volume data" />
+            {mode === 'country' && (
+              <span className="ml-auto italic">Click a country to view details</span>
+            )}
           </div>
         </div>
       )}

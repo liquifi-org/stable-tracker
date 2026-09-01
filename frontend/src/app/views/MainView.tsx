@@ -154,14 +154,8 @@ export function MainView() {
       pair.totalValue = pair.valueFromCountry1 + pair.valueFromCountry2;
     }
 
-    let result = Array.from(pairMap.values());
-
-    if (filters.country !== 'All') {
-      result = result.filter(c => c.country1 === filters.country || c.country2 === filters.country);
-    }
-
-    return result;
-  }, [corridorData, numericToAlpha2, filters.country]);
+    return Array.from(pairMap.values());
+  }, [corridorData, numericToAlpha2]);
 
   // Group directional flows into bidirectional macro-region pairs (cross-region only —
   // same-region pairs are dropped since there's no meaningful line to draw to itself).
@@ -288,7 +282,12 @@ export function MainView() {
     },
     {
       key: 'activeWallets',
-      header: headerWithSource('Wallets holding stablecoins', 'allium'),
+      header: (
+        <span className="flex flex-col gap-0.5">
+          {headerWithSource('Wallets holding stablecoins', 'allium')}
+          <span className="text-[10px] font-normal text-white/60">% change vs. prev. month</span>
+        </span>
+      ),
       render: (value: number, row: { walletsChangePct: number | null }) => (
         <span className="inline-flex items-center gap-2">
           {value.toLocaleString()}
@@ -443,8 +442,8 @@ export function MainView() {
               regionalCorridors={regionalCorridors}
               mode={corridorViewMode}
               getCountryName={(alpha2) => countryNameByAlpha2.get(alpha2) ?? alpha2}
-              limit={filters.country === 'All' ? 20 : undefined}
-              key={`corridors-${corridorViewMode}-${filters.country}-${filters.regionFrom}-${filters.regionTo}-${filters.year}-${filters.month}`}
+              limit={20}
+              key={`corridors-${corridorViewMode}-${filters.regionFrom}-${filters.regionTo}-${filters.year}-${filters.month}`}
             />
           )
         ) : (

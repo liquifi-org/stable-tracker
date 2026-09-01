@@ -199,25 +199,24 @@ export function RegulationPanel() {
 
       <div className="relative">
         <div className="bg-white dark:bg-neutral-800 rounded-xl border border-slate-200/50 dark:border-neutral-700 overflow-hidden shadow-md transition-all duration-300">
-          <div className="p-6 border-b border-slate-200/50 dark:border-neutral-700" style={{ backgroundColor: 'var(--brand)' }}>
-            <div className="flex items-center justify-between flex-wrap gap-2">
-              <span className="text-sm text-white font-medium">Regulatory framework stage</span>
-              <div className="flex items-center gap-3 flex-wrap justify-end">
+          <div className="relative p-6 bg-[#F7FAFC] dark:bg-neutral-900">
+            {/* Legend — bottom-left, opposite zoom controls */}
+            <div className="absolute bottom-4 left-4 z-10 bg-white/90 dark:bg-neutral-800/90 backdrop-blur-sm border border-slate-200/60 dark:border-neutral-700 rounded-lg p-2.5 shadow-md">
+              <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1.5 uppercase tracking-wide">Regulatory stage</div>
+              <div className="space-y-1">
                 {[3, 2, 1, 0].map((stage) => (
                   <div key={stage} className="flex items-center gap-1.5">
-                    <div className="w-4 h-4 rounded border border-white/30" style={{ backgroundColor: STAGE_INFO[stage].color }} />
-                    <span className="text-xs text-white font-medium">{STAGE_INFO[stage].label}</span>
+                    <div className="w-3 h-3 rounded-sm shrink-0 border border-slate-200 dark:border-neutral-600" style={{ backgroundColor: STAGE_INFO[stage].color }} />
+                    <span className="text-[11px] text-slate-700 dark:text-slate-300">{STAGE_INFO[stage].label}</span>
                   </div>
                 ))}
                 <div className="flex items-center gap-1.5">
-                  <div className="w-4 h-4 rounded border border-white/30" style={{ backgroundColor: NO_DATA_COLOR }} />
-                  <span className="text-xs text-white font-medium">No data</span>
+                  <div className="w-3 h-3 rounded-sm shrink-0 border border-slate-200 dark:border-neutral-600" style={{ backgroundColor: NO_DATA_COLOR }} />
+                  <span className="text-[11px] text-slate-700 dark:text-slate-300">No data</span>
                 </div>
               </div>
             </div>
-          </div>
 
-          <div className="relative p-6 bg-[#F7FAFC] dark:bg-neutral-900">
             <div className="absolute bottom-4 right-4 flex flex-col gap-1 z-10">
               <button
                 type="button"

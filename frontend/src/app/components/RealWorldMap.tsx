@@ -91,7 +91,10 @@ export function RealWorldMap({ countries, mode = 'country', regionalData = [] }:
 
   const handleCountryClick = (id: string) => {
     if (draggedRef.current) return;
-    navigate(`/country/${id}`);
+    const countryData = countryDataMap.get(id);
+    navigate(`/country/${id}`, {
+      state: { name: countryData?.name, isoAlpha2: countryData?.isoAlpha2 },
+    });
   };
 
   const handleCountryHover = (e: React.MouseEvent, id: string) => {
@@ -122,38 +125,37 @@ export function RealWorldMap({ countries, mode = 'country', regionalData = [] }:
   return (
     <div className="relative">
       <div className="bg-white dark:bg-neutral-800 rounded-xl border border-slate-200/50 dark:border-neutral-700 overflow-hidden shadow-md transition-all duration-300">
-        <div className="p-6 border-b border-slate-200/50 dark:border-neutral-700" style={{ backgroundColor: 'var(--brand)' }}>
-          <div className="flex items-center justify-between flex-wrap gap-2">
-            <span className="text-sm text-white font-medium">
-              {mode === 'region' ? 'Adoption rate by macro-region' : 'Adoption index — rank 1 (darkest) to rank N (lightest)'}
-            </span>
-            <div className="flex items-center gap-3 flex-wrap justify-end">
+        <div className="relative p-6 bg-[#F7FAFC] dark:bg-neutral-900">
+          {/* Legend — bottom-left, opposite zoom controls */}
+          <div className="absolute bottom-4 left-4 z-10 bg-white/90 dark:bg-neutral-800/90 backdrop-blur-sm border border-slate-200/60 dark:border-neutral-700 rounded-lg p-2.5 shadow-md">
+            <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1.5 uppercase tracking-wide">
+              {mode === 'region' ? 'Adoption by region' : 'Adoption index'}
+            </div>
+            <div className="space-y-1">
               {mode === 'region' ? (
                 rankedRegions.map((r, i) => (
                   <div key={r.region} className="flex items-center gap-1.5">
-                    <div className="w-4 h-4 rounded border border-white/30" style={{ backgroundColor: REGION_RANK_COLORS[i] ?? NO_DATA_COLOR }} />
-                    <span className="text-xs text-white font-medium">{r.region}</span>
+                    <div className="w-3 h-3 rounded-sm shrink-0 border border-slate-200 dark:border-neutral-600" style={{ backgroundColor: REGION_RANK_COLORS[i] ?? NO_DATA_COLOR }} />
+                    <span className="text-[11px] text-slate-700 dark:text-slate-300">{r.region}</span>
                   </div>
                 ))
               ) : (
                 ADOPTION_BUCKETS.map((bucket) => (
                   <div key={bucket.label} className="flex items-center gap-1.5">
-                    <div className="w-4 h-4 rounded border border-white/30" style={{ backgroundColor: bucket.color }} />
-                    <span className="text-xs text-white font-medium">{bucket.label}</span>
+                    <div className="w-3 h-3 rounded-sm shrink-0 border border-slate-200 dark:border-neutral-600" style={{ backgroundColor: bucket.color }} />
+                    <span className="text-[11px] text-slate-700 dark:text-slate-300">{bucket.label}</span>
                   </div>
                 ))
               )}
               <div className="flex items-center gap-1.5">
-                <div className="w-4 h-4 rounded border border-white/30" style={{ backgroundColor: NO_DATA_COLOR }} />
-                <span className="text-xs text-white font-medium">
-                  {mode === 'region' ? 'Unmapped region / no data' : '<10,000 wallets / no data'}
+                <div className="w-3 h-3 rounded-sm shrink-0 border border-slate-200 dark:border-neutral-600" style={{ backgroundColor: NO_DATA_COLOR }} />
+                <span className="text-[11px] text-slate-700 dark:text-slate-300">
+                  {mode === 'region' ? 'No data' : '<10k wallets'}
                 </span>
               </div>
             </div>
           </div>
-        </div>
 
-        <div className="relative p-6 bg-[#F7FAFC] dark:bg-neutral-900">
           <div className="absolute bottom-4 right-4 flex flex-col gap-1 z-10">
             <button
               type="button"

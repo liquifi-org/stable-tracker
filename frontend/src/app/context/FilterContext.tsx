@@ -25,7 +25,6 @@ interface FilterContextType {
   month: number;
   referenceAsset: string;
   stablecoin: string;
-  country: string;
   regionFrom: string;
   regionTo: string;
   mapType: MapType;
@@ -34,7 +33,6 @@ interface FilterContextType {
   setMonth: (month: number) => void;
   setReferenceAsset: (asset: string) => void;
   setStablecoin: (coin: string) => void;
-  setCountry: (country: string) => void;
   setRegionFrom: (region: string) => void;
   setRegionTo: (region: string) => void;
   setMapType: (mapType: MapType) => void;
@@ -48,7 +46,6 @@ export function FilterProvider({ children }: { children: ReactNode }) {
   const [month, setMonthState] = useState(maxMonthForYear(MAX_YEAR));
   const [referenceAsset, setReferenceAsset] = useState('All');
   const [stablecoin, setStablecoin] = useState('All');
-  const [country, setCountry] = useState('All');
   const [regionFrom, setRegionFrom] = useState('All');
   const [regionTo, setRegionTo] = useState('All');
   const [mapType, setMapType] = useState<MapType>('adoption');
@@ -71,7 +68,6 @@ export function FilterProvider({ children }: { children: ReactNode }) {
         month,
         referenceAsset,
         stablecoin,
-        country,
         regionFrom,
         regionTo,
         mapType,
@@ -80,7 +76,6 @@ export function FilterProvider({ children }: { children: ReactNode }) {
         setMonth,
         setReferenceAsset,
         setStablecoin,
-        setCountry,
         setRegionFrom,
         setRegionTo,
         setMapType,

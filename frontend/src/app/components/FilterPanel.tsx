@@ -1,10 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useFilters, MAX_YEAR, maxMonthForYear } from '../context/FilterContext';
 import { api } from '../services/api';
-import { Slider } from '@radix-ui/react-slider';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@radix-ui/react-select';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
-import { ChevronDown, Filter, X } from 'lucide-react';
+import { Filter, X } from 'lucide-react';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -14,7 +12,6 @@ export function FilterPanel() {
     month,
     referenceAsset,
     stablecoin,
-    country,
     regionFrom,
     regionTo,
     mapType,
@@ -23,7 +20,6 @@ export function FilterPanel() {
     setMonth,
     setReferenceAsset,
     setStablecoin,
-    setCountry,
     setRegionFrom,
     setRegionTo,
     setDisplayCurrency,
@@ -35,16 +31,6 @@ export function FilterPanel() {
   // without pushing all page content down).
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  // Local, uncommitted slider positions: update live for visual feedback while dragging,
-  // but only call setYear/setMonth (which trigger data refetches) once the user lets go.
-  const [draftYear, setDraftYear] = useState(year);
-  const [draftMonth, setDraftMonth] = useState(month);
-  useEffect(() => setDraftYear(year), [year]);
-  useEffect(() => setDraftMonth(month), [month]);
-
-  const draftMaxMonth = maxMonthForYear(draftYear);
-  const draftMonthClamped = Math.min(draftMonth, draftMaxMonth);
-
   // Stablecoin options come from whatever's actually present in the corridor data for this
   // period, rather than a hardcoded guess list — keeps the dropdown honest and filterable.
   const [stablecoinOptions, setStablecoinOptions] = useState<string[]>([]);
@@ -55,13 +41,12 @@ export function FilterPanel() {
       .catch(() => setStablecoinOptions([]));
   }, [showCorridorFilters, year, month]);
 
-  // Defaults: most recent selectable period (previous calendar month), no asset/coin/country/region filter.
+  // Defaults: most recent selectable period (previous calendar month), no asset/coin/region filter.
   const hasNonDefaultFilters =
     year !== MAX_YEAR ||
     month !== maxMonthForYear(MAX_YEAR) ||
     referenceAsset !== 'All' ||
     stablecoin !== 'All' ||
-    country !== 'All' ||
     regionFrom !== 'All' ||
     regionTo !== 'All' ||
     displayCurrency !== 'USD';
@@ -71,7 +56,6 @@ export function FilterPanel() {
     setMonth(maxMonthForYear(MAX_YEAR));
     setReferenceAsset('All');
     setStablecoin('All');
-    setCountry('All');
     setRegionFrom('All');
     setRegionTo('All');
     setDisplayCurrency('USD');
@@ -83,47 +67,30 @@ export function FilterPanel() {
         <div className="space-y-5">
           <div>
             <label className="block text-sm text-slate-700 dark:text-slate-300 mb-3 font-medium">Historic State</label>
-            <div className="space-y-3">
-              <div>
-                <div className="flex justify-between text-xs text-slate-600 dark:text-slate-400 mb-2">
-                  <span>Year</span>
-                  <span className="font-semibold">{draftYear}</span>
-                </div>
-                <Slider
-                  value={[draftYear]}
-                  onValueChange={([val]) => setDraftYear(val)}
-                  onValueCommit={([val]) => setYear(val)}
-                  min={2025}
-                  max={MAX_YEAR}
-                  step={1}
-                  className="relative flex items-center w-full h-5"
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">Year</label>
+                <select
+                  value={year}
+                  onChange={(e) => setYear(Number(e.target.value))}
+                  className="w-full bg-white dark:bg-neutral-900 border border-slate-200/50 dark:border-neutral-700 rounded-lg px-3 py-2 text-sm text-slate-700 dark:text-slate-200 focus:border-[var(--brand)] focus:outline-none transition-all duration-300"
                 >
-                  <div className="relative h-1 w-full bg-slate-300 dark:bg-neutral-700 rounded">
-                    <div className="absolute h-1 rounded" style={{ width: `${((draftYear - 2025) / (MAX_YEAR - 2025)) * 100}%`, backgroundColor: 'var(--brand)' }} />
-                  </div>
-                  <div className="absolute h-4 w-4 rounded-full shadow-md cursor-pointer border border-white" style={{ left: `${((draftYear - 2025) / (MAX_YEAR - 2025)) * 100}%`, transform: 'translateX(-50%)', backgroundColor: 'var(--brand)' }} />
-                </Slider>
+                  {Array.from({ length: MAX_YEAR - 2025 + 1 }, (_, i) => 2025 + i).map((y) => (
+                    <option key={y} value={y}>{y}</option>
+                  ))}
+                </select>
               </div>
-
-              <div>
-                <div className="flex justify-between text-xs text-slate-600 dark:text-slate-400 mb-2">
-                  <span>Month</span>
-                  <span className="font-semibold">{MONTHS[draftMonthClamped - 1]}</span>
-                </div>
-                <Slider
-                  value={[draftMonthClamped]}
-                  onValueChange={([val]) => setDraftMonth(val)}
-                  onValueCommit={([val]) => setMonth(val)}
-                  min={1}
-                  max={draftMaxMonth}
-                  step={1}
-                  className="relative flex items-center w-full h-5"
+              <div className="flex-1">
+                <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">Month</label>
+                <select
+                  value={month}
+                  onChange={(e) => setMonth(Number(e.target.value))}
+                  className="w-full bg-white dark:bg-neutral-900 border border-slate-200/50 dark:border-neutral-700 rounded-lg px-3 py-2 text-sm text-slate-700 dark:text-slate-200 focus:border-[var(--brand)] focus:outline-none transition-all duration-300"
                 >
-                  <div className="relative h-1 w-full bg-slate-300 dark:bg-neutral-700 rounded">
-                    <div className="absolute h-1 rounded" style={{ width: `${((draftMonthClamped - 1) / Math.max(1, draftMaxMonth - 1)) * 100}%`, backgroundColor: 'var(--brand)' }} />
-                  </div>
-                  <div className="absolute h-4 w-4 rounded-full shadow-md cursor-pointer border border-white" style={{ left: `${((draftMonthClamped - 1) / Math.max(1, draftMaxMonth - 1)) * 100}%`, transform: 'translateX(-50%)', backgroundColor: 'var(--brand)' }} />
-                </Slider>
+                  {MONTHS.slice(0, maxMonthForYear(year)).map((name, i) => (
+                    <option key={i + 1} value={i + 1}>{name}</option>
+                  ))}
+                </select>
               </div>
             </div>
           </div>
@@ -150,7 +117,7 @@ export function FilterPanel() {
 
           {showCorridorFilters && (
             <div>
-              <label className="block text-sm text-slate-700 dark:text-slate-300 mb-2 font-medium">Reference Asset</label>
+              <label className="block text-sm text-slate-700 dark:text-slate-300 mb-2 font-medium">Currency</label>
               <select
                 value={referenceAsset}
                 onChange={(e) => setReferenceAsset(e.target.value)}
@@ -175,29 +142,6 @@ export function FilterPanel() {
                 {stablecoinOptions.map((symbol) => (
                   <option key={symbol} value={symbol}>{symbol}</option>
                 ))}
-              </select>
-            </div>
-          )}
-
-          {showCorridorFilters && (
-            <div>
-              <label className="block text-sm text-slate-700 dark:text-slate-300 mb-2 font-medium">Country</label>
-              <select
-                value={country}
-                onChange={(e) => setCountry(e.target.value)}
-                className="w-full bg-white dark:bg-neutral-900 border border-slate-200/50 dark:border-neutral-700 rounded-lg px-3 py-2 text-sm text-slate-700 dark:text-slate-200 focus:border-[var(--brand)] focus:outline-none transition-all duration-300"
-              >
-                <option value="All">All</option>
-                <option value="US">United States</option>
-                <option value="BR">Brazil</option>
-                <option value="AR">Argentina</option>
-                <option value="MX">Mexico</option>
-                <option value="NG">Nigeria</option>
-                <option value="KE">Kenya</option>
-                <option value="IN">India</option>
-                <option value="CN">China</option>
-                <option value="TR">Turkey</option>
-                <option value="VE">Venezuela</option>
               </select>
             </div>
           )}
@@ -245,11 +189,10 @@ export function FilterPanel() {
           <div className="mb-2 font-semibold text-slate-800 dark:text-slate-100">Active filters:</div>
           <div className="space-y-1">
             <div>Period: <span className="text-slate-800 dark:text-slate-200 font-medium">{MONTHS[month - 1]} {year}</span></div>
-            <div>Currency: <span className="text-slate-800 dark:text-slate-200 font-medium">{displayCurrency}</span></div>
-            {showCorridorFilters && <div>Asset: <span className="text-slate-800 dark:text-slate-200 font-medium">{referenceAsset}</span></div>}
+            <div>Display Currency: <span className="text-slate-800 dark:text-slate-200 font-medium">{displayCurrency}</span></div>
+            {showCorridorFilters && <div>Currency: <span className="text-slate-800 dark:text-slate-200 font-medium">{referenceAsset}</span></div>}
             {showCorridorFilters && stablecoin !== 'All' && <div>Coin: <span className="text-slate-800 dark:text-slate-200 font-medium">{stablecoin}</span></div>}
-            {showCorridorFilters && country !== 'All' && <div>Country: <span className="text-slate-800 dark:text-slate-200 font-medium">{country}</span></div>}
-            {showCorridorFilters && regionFrom !== 'All' && <div>Region From: <span className="text-slate-800 dark:text-slate-200 font-medium">{regionFrom}</span></div>}
+{showCorridorFilters && regionFrom !== 'All' && <div>Region From: <span className="text-slate-800 dark:text-slate-200 font-medium">{regionFrom}</span></div>}
             {showCorridorFilters && regionTo !== 'All' && <div>Region To: <span className="text-slate-800 dark:text-slate-200 font-medium">{regionTo}</span></div>}
           </div>
         </div>

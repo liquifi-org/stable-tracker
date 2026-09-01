@@ -81,7 +81,7 @@ export function GlobalInsightsBar({ data, previousData, loading }: GlobalInsight
           <div className="min-w-0 flex-1">
             <div className={`flex items-center gap-2 flex-wrap text-xl font-bold text-slate-800 dark:text-slate-100 transition-opacity ${loading ? 'opacity-40' : ''}`}>
               {value}
-              <TrendBadge value={trend} format={trendFormat} />
+              <TrendBadge value={trend} format={trendFormat} showPeriod />
             </div>
             <div className="text-xs text-slate-500 dark:text-slate-400">{label}</div>
             {/* Kept in normal flow below the label (not flex-centered against the icon) so it
