@@ -1,7 +1,12 @@
 import { geoMercator, type GeoProjection } from 'd3-geo';
 
-const VIEW_W = 800;
-const VIEW_H = 500;
+/** SVG frame. Wider than 8∶5 so Mercator of the inhabited box fills the height
+ *  instead of leaving ocean bands above and below. */
+export const MAP_VIEW_W = 800;
+export const MAP_VIEW_H = 300;
+
+const VIEW_W = MAP_VIEW_W;
+const VIEW_H = MAP_VIEW_H;
 
 /** Natural Earth / world-atlas ids that draw as a polar strip in Mercator. */
 const ANTARCTICA_IDS = new Set(['010', '260']);

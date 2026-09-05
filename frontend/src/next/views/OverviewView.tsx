@@ -456,7 +456,7 @@ export function OverviewView() {
         <div className="space-y-6">
           <div className="relative">
             {usageLoading ? (
-              <Skeleton className="w-full h-[300px] sm:h-[560px] rounded-xl" />
+              <Skeleton className="w-full h-[200px] sm:h-[360px] rounded-xl" />
             ) : (
               <RealCorridorMap
                 corridors={bidirectionalCorridors}
