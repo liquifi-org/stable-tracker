@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { geoPath, geoMercator } from 'd3-geo';
+import { geoPath } from 'd3-geo';
 import { feature } from 'topojson-client';
 import { Banknote, Coins, Gem, Cpu, CheckCircle2, XCircle, MinusCircle, Plus, Minus, RotateCcw } from 'lucide-react';
 import { useMapZoomPan } from '../hooks/useMapZoomPan';
+import { filterMapFeatures, worldMapProjection } from '../lib/worldMapProjection';
 import { CountryFlag } from './CountryFlag';
 import { DataTable } from './DataTable';
-import { SourceBadge } from './SourceBadge';
+import { Skeleton } from './ui/skeleton';
 import { api, type CountryRegulationInfo } from '../services/api';
+import { countryPath } from '../lib/countryRoutes';
 
 const NO_DATA_COLOR = '#e2e8f0';
 const FILTERED_OUT_COLOR = '#f1f5f9';
@@ -36,13 +38,20 @@ function ReserveStatusIcon({ value }: { value: number | undefined }) {
   return <MinusCircle className="w-4 h-4 text-slate-300 dark:text-slate-600" />;
 }
 
-export function RegulationPanel() {
+export function RegulationPanel({
+  paginate = true,
+  hideAntarctica = false,
+}: {
+  paginate?: boolean;
+  hideAntarctica?: boolean;
+}) {
   const navigate = useNavigate();
   const [worldData, setWorldData] = useState<any>(null);
   const [countries, setCountries] = useState<CountryRegulationInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
-  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
+  const [pinnedId, setPinnedId] = useState<string | null>(null);
+  const [seenHover, setSeenHover] = useState(false);
   const [reserveTypeFilters, setReserveTypeFilters] = useState<Set<ReserveTypeKey>>(new Set());
   const {
     svgRef, viewBox, zoom, minZoom, maxZoom, zoomIn, zoomOut, resetView,
@@ -51,7 +60,6 @@ export function RegulationPanel() {
 
   const handleReset = () => {
     resetView();
-    setReserveTypeFilters(new Set());
   };
 
   useEffect(() => {
@@ -68,6 +76,18 @@ export function RegulationPanel() {
       .catch(() => setCountries([]))
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    if (!pinnedId) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setPinnedId(null);
+        setHoveredId(null);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [pinnedId]);
 
   const toggleReserveType = (key: ReserveTypeKey) => {
     setReserveTypeFilters(prev => {
@@ -110,12 +130,7 @@ export function RegulationPanel() {
     },
     {
       key: 'stage',
-      header: (
-        <span className="inline-flex items-center gap-1.5">
-          Stage
-          <SourceBadge source="stride" label="Regulatory stage" variant="white" />
-        </span>
-      ),
+      header: 'Stage',
       render: (value: number | undefined) => {
         const info = value !== undefined ? STAGE_INFO[value] : undefined;
         if (!info) return <span className="text-xs text-slate-400">No data</span>;
@@ -138,36 +153,44 @@ export function RegulationPanel() {
     })),
   ];
 
+  const closePlace = () => {
+    setPinnedId(null);
+    setHoveredId(null);
+  };
+
   const handleCountryClick = (id: string) => {
     if (draggedRef.current) return;
-    navigate(`/country/${id}`);
-  };
-
-  const handleCountryHover = (e: React.MouseEvent, id: string) => {
-    if (isDragging) return;
+    const country = countryDataMap.get(id);
+    if (!country) return;
+    if (pinnedId === id) {
+      closePlace();
+      return;
+    }
+    setPinnedId(id);
     setHoveredId(id);
-    setTooltipPos({ x: e.clientX, y: e.clientY });
   };
 
-  const hoveredCountry = hoveredId ? countryDataMap.get(hoveredId) : null;
+  const handleCountryHover = (_e: React.MouseEvent, id: string) => {
+    if (isDragging || pinnedId) return;
+    setSeenHover(true);
+    setHoveredId(id);
+  };
 
-  if (!worldData || loading) {
-    return (
-      <div className="bg-slate-50 dark:bg-neutral-900 rounded-xl border border-slate-200/50 dark:border-neutral-700 p-8 flex items-center justify-center h-[300px] sm:h-[600px]">
-        <div className="text-slate-400">Loading regulatory data…</div>
-      </div>
-    );
+  const hoveredCountry = !pinnedId && hoveredId ? countryDataMap.get(hoveredId) : null;
+  const pinnedCountry = pinnedId ? countryDataMap.get(pinnedId) : null;
+  const focusId = pinnedId ?? hoveredId;
+
+  if (!worldData || (loading && countries.length === 0)) {
+    return <Skeleton className="w-full h-[300px] sm:h-[600px] rounded-xl" />;
   }
 
-  const projection = geoMercator().scale(140).translate([800 / 2, 500 / 2]);
+  const geojson = feature(worldData, worldData.objects.countries) as GeoJSON.FeatureCollection;
+  const features = filterMapFeatures(geojson.features, hideAntarctica);
+  const projection = worldMapProjection(
+    { type: 'FeatureCollection', features },
+    { hideAntarctica },
+  );
   const pathGenerator = geoPath().projection(projection);
-  const geojson = feature(worldData, worldData.objects.countries);
-
-  // Tooltip tracks the cursor, so on narrow viewports it must shrink and stay clamped
-  // to the screen edge instead of overflowing horizontally off a 320px desktop width.
-  const tooltipWidth = Math.min(window.innerWidth * 0.94, 320);
-  const tooltipLeft = Math.min(tooltipPos.x + 15, window.innerWidth - tooltipWidth - 10);
-  const tooltipTop = Math.max(8, tooltipPos.y - 100);
 
   return (
     <div className="space-y-6">
@@ -182,7 +205,7 @@ export function RegulationPanel() {
               <button
                 key={key}
                 onClick={() => toggleReserveType(key)}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition-all duration-300 ${
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition-ui ${
                   active
                     ? 'text-white border-transparent'
                     : 'bg-white dark:bg-neutral-900 text-slate-600 dark:text-slate-300 border-slate-200/50 dark:border-neutral-700 hover:border-[var(--brand)]'
@@ -197,9 +220,30 @@ export function RegulationPanel() {
         </div>
       </div>
 
-      <div className="relative">
-        <div className="bg-white dark:bg-neutral-800 rounded-xl border border-slate-200/50 dark:border-neutral-700 overflow-hidden shadow-md transition-all duration-300">
+      <div className="relative space-y-3">
+        <div className="bg-white dark:bg-neutral-800 rounded-xl border border-slate-200/50 dark:border-neutral-700 overflow-hidden transition-ui">
           <div className="relative p-6 bg-[#F7FAFC] dark:bg-neutral-900">
+            {!seenHover && !focusId && (
+              <div className="absolute top-4 left-4 z-20 pointer-events-none text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                Hover a country — click to select
+              </div>
+            )}
+            {!pinnedId && hoveredCountry && (
+              <div className="absolute top-4 left-4 z-20 pointer-events-none max-w-[min(94%,20rem)]">
+                <div className="rounded-lg bg-neutral-950/90 dark:bg-neutral-950/92 border border-white/15 px-3 py-2 text-xs text-white">
+                  <div className="flex items-center gap-2 min-w-0">
+                    {hoveredCountry.isoAlpha2 && (
+                      <CountryFlag isoAlpha2={hoveredCountry.isoAlpha2} className="w-4 h-4 shrink-0" />
+                    )}
+                    <span className="font-semibold truncate">{hoveredCountry.name}</span>
+                  </div>
+                  <div className="mt-1 text-[11px] text-white/70">
+                    {hoveredCountry.stage !== undefined ? STAGE_INFO[hoveredCountry.stage]?.label ?? 'No data' : 'No data'}
+                    {hoveredCountry.region ? ` · ${hoveredCountry.region}` : ''}
+                  </div>
+                </div>
+              </div>
+            )}
             {/* Legend — bottom-left, opposite zoom controls */}
             <div className="absolute bottom-4 left-4 z-10 bg-white/90 dark:bg-neutral-800/90 backdrop-blur-sm border border-slate-200/60 dark:border-neutral-700 rounded-lg p-2.5 shadow-md">
               <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1.5 uppercase tracking-wide">Regulatory stage</div>
@@ -223,7 +267,7 @@ export function RegulationPanel() {
                 onClick={zoomIn}
                 disabled={zoom >= maxZoom}
                 aria-label="Zoom in"
-                className="w-8 h-8 flex items-center justify-center rounded-md bg-white dark:bg-neutral-800 border border-slate-200/50 dark:border-neutral-700 shadow-md text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-neutral-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-300"
+                className="w-8 h-8 flex items-center justify-center rounded-md bg-white dark:bg-neutral-800 border border-slate-200/50 dark:border-neutral-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-neutral-700 disabled:opacity-40 disabled:cursor-not-allowed transition-ui"
               >
                 <Plus className="w-4 h-4" />
               </button>
@@ -232,17 +276,17 @@ export function RegulationPanel() {
                 onClick={zoomOut}
                 disabled={zoom <= minZoom}
                 aria-label="Zoom out"
-                className="w-8 h-8 flex items-center justify-center rounded-md bg-white dark:bg-neutral-800 border border-slate-200/50 dark:border-neutral-700 shadow-md text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-neutral-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-300"
+                className="w-8 h-8 flex items-center justify-center rounded-md bg-white dark:bg-neutral-800 border border-slate-200/50 dark:border-neutral-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-neutral-700 disabled:opacity-40 disabled:cursor-not-allowed transition-ui"
               >
                 <Minus className="w-4 h-4" />
               </button>
               <button
                 type="button"
                 onClick={handleReset}
-                disabled={zoom <= minZoom && reserveTypeFilters.size === 0}
-                aria-label="Reset view and filters"
-                title="Reset view and filters"
-                className="w-8 h-8 flex items-center justify-center rounded-md bg-white dark:bg-neutral-800 border border-slate-200/50 dark:border-neutral-700 shadow-md text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-neutral-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-300"
+                disabled={zoom <= minZoom}
+                aria-label="Reset map view"
+                title="Reset map view"
+                className="w-8 h-8 flex items-center justify-center rounded-md bg-white dark:bg-neutral-800 border border-slate-200/50 dark:border-neutral-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-neutral-700 disabled:opacity-40 disabled:cursor-not-allowed transition-ui"
               >
                 <RotateCcw className="w-4 h-4" />
               </button>
@@ -254,7 +298,10 @@ export function RegulationPanel() {
               onMouseDown={handleMouseDown}
               onMouseMove={handlePanMove}
               onMouseUp={endDrag}
-              onMouseLeave={endDrag}
+              onMouseLeave={() => {
+                endDrag();
+                if (!pinnedId) setHoveredId(null);
+              }}
             >
               <defs>
                 <filter id="regulation-glow">
@@ -266,9 +313,17 @@ export function RegulationPanel() {
                 </filter>
               </defs>
 
-              <rect width="800" height="500" className="fill-[#F7FAFC] dark:fill-neutral-900" />
+              <rect
+                width="800"
+                height="500"
+                className="fill-[#F7FAFC] dark:fill-neutral-900"
+                onClick={() => {
+                  if (draggedRef.current) return;
+                  closePlace();
+                }}
+              />
 
-              {geojson.features.map((geo: any, i: number) => {
+              {features.map((geo: any, i: number) => {
                 const numericId = String(geo.id);
                 const countryData = countryDataMap.get(numericId);
                 const isFilteredOut = countryData ? !filteredIds.has(numericId) : false;
@@ -291,8 +346,8 @@ export function RegulationPanel() {
                   }
                 }
 
-                const isHovered = hoveredId === numericId;
-                if (isHovered) {
+                const isFocus = focusId === numericId;
+                if (isFocus) {
                   strokeColor = 'var(--brand-400)';
                   strokeWidth = 2;
                   opacity = 1;
@@ -310,10 +365,12 @@ export function RegulationPanel() {
                     strokeWidth={strokeWidth}
                     opacity={opacity}
                     onMouseEnter={(e) => handleCountryHover(e, numericId)}
-                    onMouseLeave={() => setHoveredId(null)}
+                    onMouseLeave={() => {
+                      if (!pinnedId) setHoveredId(null);
+                    }}
                     onClick={() => handleCountryClick(numericId)}
-                    className="cursor-pointer transition-all"
-                    filter={isHovered ? 'url(#regulation-glow)' : undefined}
+                    className="cursor-pointer transition-[fill,opacity,stroke-width] duration-150 ease-out"
+                    filter={isFocus ? 'url(#regulation-glow)' : undefined}
                   />
                 );
               })}
@@ -321,32 +378,54 @@ export function RegulationPanel() {
           </div>
         </div>
 
-        {hoveredId && hoveredCountry && (
-          <div
-            className="fixed z-50 bg-white/95 dark:bg-neutral-800/95 backdrop-blur-md border border-[var(--brand)]/30 dark:border-[var(--brand)]/40 rounded-lg shadow-lg pointer-events-none transition-all"
-            style={{ left: tooltipLeft, top: tooltipTop, width: tooltipWidth }}
-          >
+        {pinnedCountry && (
+          <div className="bg-white dark:bg-neutral-800 rounded-xl border border-slate-200/50 dark:border-neutral-700 overflow-hidden">
             <div className="bg-[var(--brand)]/10 dark:bg-[var(--brand)]/15 px-4 py-2 border-b border-slate-200 dark:border-neutral-700">
-              <h3 className="font-bold text-[var(--brand-700)] dark:text-[var(--brand-300)] text-lg">{hoveredCountry.name}</h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400">{hoveredCountry.region}</p>
+              <h3 className="font-bold text-[var(--brand-700)] dark:text-[var(--brand-300)] text-lg flex items-center gap-2">
+                {pinnedCountry.isoAlpha2 && (
+                  <CountryFlag isoAlpha2={pinnedCountry.isoAlpha2} className="w-5 h-5" />
+                )}
+                {pinnedCountry.name}
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400">{pinnedCountry.region}</p>
             </div>
             <div className="px-4 py-3 text-xs space-y-2">
               <div className="flex justify-between items-center">
                 <span className="text-slate-500 dark:text-slate-400">Stage</span>
                 <span className="text-slate-800 dark:text-slate-100 font-semibold">
-                  {hoveredCountry.stage !== undefined ? STAGE_INFO[hoveredCountry.stage]?.label ?? '—' : 'No data'}
+                  {pinnedCountry.stage !== undefined ? STAGE_INFO[pinnedCountry.stage]?.label ?? '—' : 'No data'}
                 </span>
               </div>
               {RESERVE_TYPE_DEFS.map(({ key, label }) => (
                 <div key={key} className="flex justify-between items-center">
                   <span className="text-slate-500 dark:text-slate-400">{label}</span>
-                  <ReserveStatusIcon value={hoveredCountry[key]} />
+                  <ReserveStatusIcon value={pinnedCountry[key]} />
                 </div>
               ))}
             </div>
-            <div className="px-4 py-2 border-t border-slate-200 dark:border-neutral-700 flex items-center gap-1.5 text-slate-400 dark:text-slate-500">
-              <span>Data provided by</span>
-              <SourceBadge source="stride" label="Regulatory data" />
+            <div className="px-4 py-2 border-t border-slate-200 dark:border-neutral-700 flex items-center gap-2 flex-wrap justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  navigate(countryPath({
+                    countryId: pinnedCountry.countryId,
+                    name: pinnedCountry.name,
+                    isoAlpha2: pinnedCountry.isoAlpha2,
+                  }), {
+                    state: { name: pinnedCountry.name, isoAlpha2: pinnedCountry.isoAlpha2 },
+                  });
+                }}
+                className="px-3 py-1.5 text-xs font-semibold rounded-md text-white bg-[var(--brand)] hover:bg-[var(--brand-700)] transition-colors"
+              >
+                Details
+              </button>
+              <button
+                type="button"
+                onClick={closePlace}
+                className="px-3 py-1.5 text-xs font-semibold rounded-md text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-neutral-700 transition-colors"
+              >
+                Close
+              </button>
             </div>
           </div>
         )}
@@ -364,7 +443,18 @@ export function RegulationPanel() {
             No countries match the current filters
           </div>
         ) : (
-          <DataTable data={filteredCountries} columns={tableColumns} pageSize={10} />
+          <DataTable
+            data={filteredCountries}
+            columns={tableColumns}
+            pageSize={10}
+            paginate={paginate}
+            resetKey={[...reserveTypeFilters].join(',')}
+            onRowClick={(row) =>
+              navigate(countryPath({ countryId: row.countryId, name: row.name, isoAlpha2: row.isoAlpha2 }), {
+                state: { name: row.name, isoAlpha2: row.isoAlpha2 },
+              })
+            }
+          />
         )}
       </div>
     </div>

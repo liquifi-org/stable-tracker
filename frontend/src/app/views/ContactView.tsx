@@ -36,7 +36,7 @@ export function ContactView() {
       <div className="flex items-center gap-4">
         <button
           onClick={() => navigate('/')}
-          className="p-2 hover:bg-slate-100 dark:hover:bg-neutral-700 rounded transition-all duration-300 text-slate-600 dark:text-slate-300 border border-slate-200/50 dark:border-neutral-700"
+          className="p-2 hover:bg-slate-100 dark:hover:bg-neutral-700 rounded transition-ui text-slate-600 dark:text-slate-300 border border-slate-200/50 dark:border-neutral-700"
         >
           <ArrowLeft className="w-5 h-5" />
         </button>
@@ -66,7 +66,7 @@ export function ContactView() {
                 name="name"
                 type="text"
                 required
-                className="w-full bg-white dark:bg-neutral-900 border border-slate-200/50 dark:border-neutral-700 rounded-lg px-3 py-2 text-sm text-slate-700 dark:text-slate-200 focus:border-[var(--brand)] focus:outline-none transition-all duration-300"
+                className="w-full bg-white dark:bg-neutral-900 border border-slate-200/50 dark:border-neutral-700 rounded-lg px-3 py-2 text-sm text-slate-700 dark:text-slate-200 focus:border-[var(--brand)] focus:outline-none transition-ui"
               />
             </div>
 
@@ -79,7 +79,7 @@ export function ContactView() {
                 name="email"
                 type="email"
                 required
-                className="w-full bg-white dark:bg-neutral-900 border border-slate-200/50 dark:border-neutral-700 rounded-lg px-3 py-2 text-sm text-slate-700 dark:text-slate-200 focus:border-[var(--brand)] focus:outline-none transition-all duration-300"
+                className="w-full bg-white dark:bg-neutral-900 border border-slate-200/50 dark:border-neutral-700 rounded-lg px-3 py-2 text-sm text-slate-700 dark:text-slate-200 focus:border-[var(--brand)] focus:outline-none transition-ui"
               />
             </div>
 
@@ -91,7 +91,7 @@ export function ContactView() {
                 id="subject"
                 name="subject"
                 type="text"
-                className="w-full bg-white dark:bg-neutral-900 border border-slate-200/50 dark:border-neutral-700 rounded-lg px-3 py-2 text-sm text-slate-700 dark:text-slate-200 focus:border-[var(--brand)] focus:outline-none transition-all duration-300"
+                className="w-full bg-white dark:bg-neutral-900 border border-slate-200/50 dark:border-neutral-700 rounded-lg px-3 py-2 text-sm text-slate-700 dark:text-slate-200 focus:border-[var(--brand)] focus:outline-none transition-ui"
               />
             </div>
 
@@ -104,7 +104,7 @@ export function ContactView() {
                 name="message"
                 rows={5}
                 required
-                className="w-full bg-white dark:bg-neutral-900 border border-slate-200/50 dark:border-neutral-700 rounded-lg px-3 py-2 text-sm text-slate-700 dark:text-slate-200 focus:border-[var(--brand)] focus:outline-none transition-all duration-300 resize-none"
+                className="w-full bg-white dark:bg-neutral-900 border border-slate-200/50 dark:border-neutral-700 rounded-lg px-3 py-2 text-sm text-slate-700 dark:text-slate-200 focus:border-[var(--brand)] focus:outline-none transition-ui resize-none"
               />
             </div>
 
@@ -118,7 +118,7 @@ export function ContactView() {
             <button
               type="submit"
               disabled={status === 'sending'}
-              className="inline-flex items-center gap-2 bg-[var(--brand)] hover:bg-[var(--brand-700)] disabled:opacity-60 text-white px-6 py-3 rounded-lg font-semibold transition-all duration-300 shadow-lg"
+              className="inline-flex items-center gap-2 bg-[var(--brand)] hover:bg-[var(--brand-700)] disabled:opacity-60 text-white px-6 py-3 rounded-lg font-semibold transition-ui shadow-lg"
             >
               <Send className="w-4 h-4" />
               {status === 'sending' ? 'Sending…' : 'Send Message'}

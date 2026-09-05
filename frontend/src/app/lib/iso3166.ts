@@ -220,6 +220,7 @@ export const ISO_COUNTRIES: IsoCountry[] = [
     { numeric: '887', alpha2: 'YE', alpha3: 'YEM', name: 'Yemen' },
     { numeric: '894', alpha2: 'ZM', alpha3: 'ZMB', name: 'Zambia' },
     { numeric: '716', alpha2: 'ZW', alpha3: 'ZWE', name: 'Zimbabwe' },
+    { numeric: '999', alpha2: 'EU', alpha3: 'EUE', name: 'European Union' },
 ];
 
 /** Common name aliases → canonical ISO numeric, to absorb naming differences. */

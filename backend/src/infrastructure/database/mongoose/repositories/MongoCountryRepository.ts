@@ -3,6 +3,7 @@ import { CountryModel } from '../models/CountryModel';
 import { IssuerModel } from '../models/IssuerModel';
 import { LicenseModel } from '../models/LicenseModel';
 import { ReserveTypeModel } from '../models/ReserveTypeModel';
+import { publicCountryName } from '../../../../util/countryName';
 import type {
     ICountryRepository,
     FindCountriesParams,
@@ -39,7 +40,7 @@ export class MongoCountryRepository implements ICountryRepository {
                 new Country({
                     countryId: d.countryId,
                     isoAlpha2: NUMERIC_TO_ALPHA2.get(d.countryId),
-                    name: d.name,
+                    name: publicCountryName(d.countryId, d.name),
                     region: d.region,
                     population: d.population,
                     regulatedIssuerIds: d.regulatedIssuerIds ?? [],
@@ -72,7 +73,7 @@ export class MongoCountryRepository implements ICountryRepository {
         return new Country({
             countryId: doc.countryId,
             isoAlpha2: NUMERIC_TO_ALPHA2.get(doc.countryId),
-            name: doc.name,
+            name: publicCountryName(doc.countryId, doc.name),
             region: doc.region,
             population: doc.population,
             regulatedIssuerIds: doc.regulatedIssuerIds ?? [],

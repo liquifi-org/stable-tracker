@@ -1,0 +1,52 @@
+name: stable-tracker
+
+services:
+  mongo:
+    image: mongo:7
+    container_name: stable-tracker-mongo
+    restart: unless-stopped
+    command: ["--wiredTigerCacheSizeGB", "0.5", "--bind_ip_all"]
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/production/Dockerfile
+    container_name: stable-tracker-api
+    restart: unless-stopped
+    env_file:
+      - .env.production
+    environment:
+      ENV: production
+      PORT: "3003"
+      SERVER_URL: https://stabletracker.org
+      ALLOWED_ORIGINS: https://stabletracker.org,https://www.stabletracker.org
+      DB_URL: mongodb://mongo:27017/sc-tracker
+      MIGRATE_MONGO_URI: mongodb://mongo:27017/sc-tracker
+    ports:
+      - "127.0.0.1:3003:3003"
+    depends_on:
+      mongo:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3003/api/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+volumes:
+  mongo-data:

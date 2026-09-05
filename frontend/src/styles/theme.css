@@ -47,6 +47,9 @@
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
   --radius: 0.625rem;
+  --duration-fast: 150ms;
+  --duration-enter: 200ms;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
   --sidebar-primary: #030213;
@@ -205,5 +208,42 @@
     font-size: var(--text-base);
     font-weight: var(--font-weight-normal);
     line-height: 1.5;
+  }
+}
+
+@keyframes map-draw {
+  to { stroke-dashoffset: 0; }
+}
+
+.animate-map-draw {
+  animation: map-draw 650ms var(--ease-out, cubic-bezier(0.22, 1, 0.36, 1)) forwards;
+}
+
+.transition-ui {
+  transition-property: color, background-color, border-color, opacity, transform, box-shadow;
+  transition-duration: var(--duration-fast, 150ms);
+  transition-timing-function: var(--ease-out, cubic-bezier(0.22, 1, 0.36, 1));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-map-draw {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+
+  .transition-ui,
+  .transition-all,
+  .transition-colors,
+  .transition-opacity,
+  .transition-transform {
+    transition-duration: 0.01ms !important;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
   }
 }
