@@ -59,6 +59,16 @@ export function RegulationPanel({
   } = useMapZoomPan();
   const inspectorRef = useRef<HTMLDivElement>(null);
 
+  const scrollToInspector = () => {
+    const el = inspectorRef.current;
+    if (!el) return;
+    const header = document.querySelector('.sticky.top-0');
+    const headerH = header instanceof HTMLElement ? header.getBoundingClientRect().height : 0;
+    const keepMap = Math.round((window.innerHeight - headerH) * 0.42);
+    const top = window.scrollY + el.getBoundingClientRect().top - headerH - keepMap;
+    window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+  };
+
   const handleReset = () => {
     resetView();
   };
@@ -379,7 +389,7 @@ export function RegulationPanel({
             {pinnedId && (
               <button
                 type="button"
-                onClick={() => inspectorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                onClick={scrollToInspector}
                 className="flex w-full flex-col items-center gap-0.5 pt-2 text-[11px] font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
               >
                 See details
