@@ -484,7 +484,7 @@ export function OverviewView() {
                     : 'Named international corridors'
                   : geoMode === 'region'
                     ? 'Regions'
-                    : 'People, not just rank'}
+                    : 'Countries'}
               </h4>
               <div className="flex items-center gap-3">
                 <span className="text-xs text-[var(--muted-ink)]">
