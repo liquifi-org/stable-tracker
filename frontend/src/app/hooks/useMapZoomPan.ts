@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react';
+import { MAP_VIEW_H, MAP_VIEW_W } from '../lib/worldMapProjection';
 
-const VIEW_W = 800;
-const VIEW_H = 500;
+const VIEW_W = MAP_VIEW_W;
+const VIEW_H = MAP_VIEW_H;
 const MIN_ZOOM = 1;
 const MAX_ZOOM = 4;
 const ZOOM_STEP = 0.5;
@@ -22,7 +23,7 @@ function clampPan(p: Pan, z: number): Pan {
   };
 }
 
-/** Shared zoom + drag-to-pan behavior for the 800x500 viewBox SVG maps. */
+/** Shared zoom + drag-to-pan behavior for the map SVG viewBox. */
 export function useMapZoomPan() {
   const [zoom, setZoom] = useState(MIN_ZOOM);
   const [pan, setPan] = useState<Pan>({ x: 0, y: 0 });

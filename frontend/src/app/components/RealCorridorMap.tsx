@@ -2,9 +2,9 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router';
 import { geoPath } from 'd3-geo';
 import { feature } from 'topojson-client';
-import { Plus, Minus, RotateCcw } from 'lucide-react';
+import { Plus, Minus, RotateCcw, ChevronDown } from 'lucide-react';
 import { useMapZoomPan } from '../hooks/useMapZoomPan';
-import { filterMapFeatures, worldMapProjection } from '../lib/worldMapProjection';
+import { filterMapFeatures, MAP_VIEW_H, MAP_VIEW_W, worldMapProjection } from '../lib/worldMapProjection';
 import { useFilters } from '../context/FilterContext';
 import { useCurrencyFormat } from '../hooks/useCurrencyFormat';
 import { CountryFlag } from './CountryFlag';
@@ -44,7 +44,7 @@ interface RealCorridorMapProps {
   limit?: number;
   mode?: MapViewMode;
   regionalCorridors?: BidirectionalRegionalCorridor[];
-  /** Mercator scale in the 800×500 viewBox. Default 140. Lower is more zoomed out. */
+  /** Mercator scale in the map viewBox. Default 140. Lower is more zoomed out. */
   projectionScale?: number;
   /** Drop Antarctica so Mercator doesn't draw a polar strip across the bottom. */
   hideAntarctica?: boolean;
@@ -181,6 +181,7 @@ export function RealCorridorMap({
   };
   const tooltipHoveredRef = useRef(false);
   const dismissTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const inspectorRef = useRef<HTMLDivElement>(null);
 
   const scheduleDismiss = () => {
     dismissTimeoutRef.current = setTimeout(() => {
@@ -396,7 +397,7 @@ export function RealCorridorMap({
 
   if (!worldData) {
     return (
-      <div className="bg-slate-900 rounded-xl border border-slate-700/50 p-8 flex items-center justify-center h-[300px] sm:h-[600px]">
+      <div className="bg-slate-900 rounded-xl border border-slate-700/50 p-8 flex items-center justify-center h-[200px] sm:h-[340px]">
         <div className="text-slate-400">Loading world map...</div>
       </div>
     );
@@ -433,7 +434,7 @@ export function RealCorridorMap({
   return (
     <div className="relative space-y-3">
       <div className="bg-white dark:bg-neutral-800 rounded-xl border border-slate-200/50 dark:border-neutral-700 overflow-hidden transition-ui">
-        <div className="relative p-6 bg-[#F7FAFC] dark:bg-neutral-900">
+        <div className="relative px-5 py-3 bg-[#F7FAFC] dark:bg-neutral-900">
           {countrySpokeHover && !seenHover && !activePlace && (
             <div className="absolute top-4 left-4 z-20 pointer-events-none text-[11px] font-medium text-slate-500 dark:text-slate-400">
               Hover a country — click to select
@@ -546,7 +547,7 @@ export function RealCorridorMap({
           <svg
             ref={svgRef}
             viewBox={viewBox}
-            className={`w-full aspect-[8/5] ${zoom > minZoom ? (isDragging ? 'cursor-grabbing' : 'cursor-grab') : ''}`}
+            className={`w-full aspect-[8/3] ${zoom > minZoom ? (isDragging ? 'cursor-grabbing' : 'cursor-grab') : ''}`}
             onMouseDown={handleMouseDown}
             onMouseMove={handlePanMove}
             onMouseUp={endDrag}
@@ -569,8 +570,8 @@ export function RealCorridorMap({
             </defs>
 
             <rect
-              width="800"
-              height="500"
+              width={MAP_VIEW_W}
+              height={MAP_VIEW_H}
               className="fill-[#F7FAFC] dark:fill-neutral-900"
               onClick={() => {
                 if (draggedRef.current) return;
@@ -816,11 +817,24 @@ export function RealCorridorMap({
               );
             })}
           </svg>
+          {countrySpokeHover && pinned && (
+            <button
+              type="button"
+              onClick={() => inspectorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+              className="flex w-full flex-col items-center gap-0.5 pt-2 text-[11px] font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+            >
+              See details
+              <ChevronDown className="w-3.5 h-3.5" aria-hidden />
+            </button>
+          )}
         </div>
       </div>
 
       {countrySpokeHover && pinned && activePlace && (
-        <div className="bg-white dark:bg-neutral-800 rounded-xl border border-slate-200/50 dark:border-neutral-700 overflow-hidden">
+        <div
+          ref={inspectorRef}
+          className="bg-white dark:bg-neutral-800 rounded-xl border border-slate-200/50 dark:border-neutral-700 overflow-hidden"
+        >
           <div className="bg-[var(--brand)]/10 dark:bg-[var(--brand)]/15 px-4 py-2 border-b border-slate-200 dark:border-neutral-700">
             <h3 className="font-bold text-[var(--brand-700)] dark:text-[var(--brand-300)] text-lg flex items-center gap-2">
               {mode === 'country' && (
