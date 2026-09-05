@@ -11,6 +11,17 @@ interface Pan {
   y: number;
 }
 
+function clampPan(p: Pan, z: number): Pan {
+  const viewW = VIEW_W / z;
+  const viewH = VIEW_H / z;
+  const maxX = (VIEW_W - viewW) / 2;
+  const maxY = (VIEW_H - viewH) / 2;
+  return {
+    x: Math.min(maxX, Math.max(-maxX, p.x)),
+    y: Math.min(maxY, Math.max(-maxY, p.y)),
+  };
+}
+
 /** Shared zoom + drag-to-pan behavior for the 800x500 viewBox SVG maps. */
 export function useMapZoomPan() {
   const [zoom, setZoom] = useState(MIN_ZOOM);
@@ -20,17 +31,6 @@ export function useMapZoomPan() {
   const dragRef = useRef<{ startX: number; startY: number; panX: number; panY: number } | null>(null);
   /** True once a drag has moved past a small threshold; consumers check this to suppress the click that follows a pan. */
   const draggedRef = useRef(false);
-
-  const clampPan = (p: Pan, z: number): Pan => {
-    const viewW = VIEW_W / z;
-    const viewH = VIEW_H / z;
-    const maxX = (VIEW_W - viewW) / 2;
-    const maxY = (VIEW_H - viewH) / 2;
-    return {
-      x: Math.min(maxX, Math.max(-maxX, p.x)),
-      y: Math.min(maxY, Math.max(-maxY, p.y)),
-    };
-  };
 
   const zoomIn = () => {
     setZoom((z) => {

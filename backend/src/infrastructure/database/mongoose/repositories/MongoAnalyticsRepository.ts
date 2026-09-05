@@ -1,8 +1,7 @@
 import { ISO_COUNTRIES } from '../../../../../script/shared/iso3166';
+import { publicCountryName } from '../../../../util/countryName';
 import { TransactionModel } from '../models/TransactionModel';
 import { WalletModel } from '../models/WalletModel';
-
-const NUMERIC_TO_ALPHA2 = new Map<string, string>(ISO_COUNTRIES.map((c) => [c.numeric, c.alpha2]));
 import { WalletCountSnapshotModel } from '../models/WalletCountSnapshotModel';
 import { CountryModel } from '../models/CountryModel';
 import { IssuerModel } from '../models/IssuerModel';
@@ -29,6 +28,8 @@ import type {
 import { periodBoundaries } from '../utils/queryUtils';
 import type { ReserveTypeCodeValue } from '../../../../domain/value-objects/ReserveTypeCode';
 import { toMacroRegion } from '../../../../domain/value-objects/MacroRegion';
+
+const NUMERIC_TO_ALPHA2 = new Map<string, string>(ISO_COUNTRIES.map((c) => [c.numeric, c.alpha2]));
 
 export class MongoAnalyticsRepository implements IAnalyticsRepository {
     // ------------------------------------------------------------------
@@ -158,7 +159,7 @@ export class MongoAnalyticsRepository implements IAnalyticsRepository {
             return {
                 countryId: c.countryId,
                 isoAlpha2: NUMERIC_TO_ALPHA2.get(c.countryId) ?? '',
-                name: c.name,
+                name: publicCountryName(c.countryId, c.name),
                 region: c.region,
                 population: c.population ?? 0,
                 adoptionRate,
@@ -170,18 +171,18 @@ export class MongoAnalyticsRepository implements IAnalyticsRepository {
     }
 
     /** Rank-normalized adoption: wallets holding stablecoins / population, ranked across
-     *  the eligible geography set (> 10k wallets holding stablecoins). Countries whose adoption
-     *  rate is within RANK_TIE_THRESHOLD of the country ranked above them share the same rank
-     *  (competition-style: a tied rank is not skipped, so ranks can be denser than the country
-     *  count). Shared by the country-level adoption table and the single-country overview, so
+     *  the eligible geography set (> 10k wallets holding stablecoins). Countries whose
+     *  wallets-per-100k would display as the same integer share a rank (dense ranking).
+     *  Shared by the country-level adoption table and the single-country overview, so
      *  "#X of N" means the same thing in both. */
     private rankAdoptionRows(
         rows: { countryId: string; activeWallets: number; adoptionRate: number }[],
     ): { rankMap: Map<string, number>; eligibleCountries: number; maxRank: number } {
         const ELIGIBILITY_THRESHOLD = 10_000;
-        // Adoption-rate gap (as a plain ratio, e.g. 0.01 = 1 percentage point) below which two
-        // countries are considered tied rather than strictly ordered. Provisional starting value.
-        const RANK_TIE_THRESHOLD = 0.01;
+        // adoptionRate is wallets / population. Typical values are 0.001–0.012
+        // (100–1200 per 100k). A 1-percentage-point band (0.01) collapses the
+        // whole list into rank 1. Tie only when the per-100k figure rounds the same.
+        const RANK_TIE_THRESHOLD = 1 / 100_000;
         const eligible = rows
             .filter((r) => r.activeWallets > ELIGIBILITY_THRESHOLD)
             .sort((a, b) => b.adoptionRate - a.adoptionRate);
@@ -535,7 +536,7 @@ export class MongoAnalyticsRepository implements IAnalyticsRepository {
         return {
             countryId: countryDoc.countryId,
             isoAlpha2: NUMERIC_TO_ALPHA2.get(countryDoc.countryId) ?? '',
-            name: countryDoc.name,
+            name: publicCountryName(countryDoc.countryId, countryDoc.name),
             region: countryDoc.region,
             adoptionRate: parseFloat(adoptionRate.toFixed(6)),
             activeWallets,
@@ -666,10 +667,12 @@ export class MongoAnalyticsRepository implements IAnalyticsRepository {
             { countryId: { $in: partnerIds } },
             { countryId: 1, name: 1 },
         ).lean();
-        const nameMap = new Map(partnerDocs.map((d) => [d.countryId, d.name]));
+        const nameMap = new Map(
+            partnerDocs.map((d) => [d.countryId, publicCountryName(d.countryId, d.name)]),
+        );
 
         const selfDoc = await CountryModel.findOne({ countryId }, { name: 1 }).lean();
-        const selfName = selfDoc?.name ?? countryId;
+        const selfName = selfDoc ? publicCountryName(countryId, selfDoc.name) : countryId;
 
         const enrich = (f: CorridorFlow): CorridorFlow => ({
             ...f,

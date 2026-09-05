@@ -9,7 +9,7 @@ export function LegalDisclaimerView() {
       <div className="flex items-center gap-4">
         <button
           onClick={() => navigate('/')}
-          className="p-2 hover:bg-slate-100 dark:hover:bg-neutral-700 rounded transition-all duration-300 text-slate-600 dark:text-slate-300 border border-slate-200/50 dark:border-neutral-700"
+          className="p-2 hover:bg-slate-100 dark:hover:bg-neutral-700 rounded transition-ui text-slate-600 dark:text-slate-300 border border-slate-200/50 dark:border-neutral-700"
         >
           <ArrowLeft className="w-5 h-5" />
         </button>

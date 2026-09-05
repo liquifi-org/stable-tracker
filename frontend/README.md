@@ -18,5 +18,5 @@ pnpm install
 pnpm dev
 ```
 
-The app expects a backend running at `http://localhost:3003/v1`. See `src/app/services/api.ts` for the endpoints consumed.
+The app expects a backend running at `http://localhost:3003/v1`. See `src/app/services/api.ts` for the endpoints consumed. Dev server: `http://127.0.0.1:5173`.
   

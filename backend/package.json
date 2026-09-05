@@ -4,7 +4,7 @@
   "main": "src/server.js",
   "scripts": {
     "build": "npx tsc",
-    "start": "node --env-file=.env.production dist/server.js --enable-source-maps",
+    "start": "node --enable-source-maps dist/server.js",
     "dev": "nodemon",
     "test": "vitest run",
     "test:watch": "vitest",

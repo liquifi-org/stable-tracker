@@ -1,13 +1,15 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router';
-import { geoPath, geoMercator } from 'd3-geo';
+import { geoPath } from 'd3-geo';
 import { feature } from 'topojson-client';
 import { Plus, Minus, RotateCcw } from 'lucide-react';
 import { useMapZoomPan } from '../hooks/useMapZoomPan';
+import { filterMapFeatures, worldMapProjection } from '../lib/worldMapProjection';
 import { useFilters } from '../context/FilterContext';
 import { useCurrencyFormat } from '../hooks/useCurrencyFormat';
-import { SourceBadge } from './SourceBadge';
 import { CountryFlag } from './CountryFlag';
+import type { CountryAdoptionMetric, RegionalAdoptionMetric } from '../services/api';
+import { countryPath } from '../lib/countryRoutes';
 
 type MapViewMode = 'country' | 'region';
 
@@ -42,6 +44,15 @@ interface RealCorridorMapProps {
   limit?: number;
   mode?: MapViewMode;
   regionalCorridors?: BidirectionalRegionalCorridor[];
+  /** Mercator scale in the 800×500 viewBox. Default 140. Lower is more zoomed out. */
+  projectionScale?: number;
+  /** Drop Antarctica so Mercator doesn't draw a polar strip across the bottom. */
+  hideAntarctica?: boolean;
+  /** Hover a country/region marker to light its spokes and show volume chips. */
+  countrySpokeHover?: boolean;
+  /** When set, land is colored by adoption and hover also shows rank / wallets. */
+  countries?: CountryAdoptionMetric[];
+  regionalAdoption?: RegionalAdoptionMetric[];
 }
 
 /** Normalized shape both country- and region-mode corridors render against. */
@@ -56,14 +67,6 @@ interface DisplayCorridor {
   topStablecoinsFrom2?: StablecoinEntry[];
 }
 
-const countryCodeToISO2: Record<string, string> = {
-  US: 'us', MX: 'mx', BR: 'br', AR: 'ar', VE: 've',
-  GB: 'gb', FR: 'fr', DE: 'de', TR: 'tr', NG: 'ng',
-  KE: 'ke', IN: 'in', CN: 'cn', JP: 'jp', PH: 'ph',
-  AU: 'au', AT: 'at', TW: 'tw', ID: 'id', KR: 'kr',
-  NL: 'nl', ZA: 'za', UA: 'ua', IR: 'ir',
-};
-
 const countryCentroids: Record<string, [number, number]> = {
   US: [-95, 38],   MX: [-102, 23],  BR: [-47, -14],  AR: [-64, -34],  VE: [-66, 8],
   GB: [-2, 54],    FR: [2, 47],     DE: [10, 51],    TR: [35, 39],    NG: [8, 9],
@@ -72,6 +75,59 @@ const countryCentroids: Record<string, [number, number]> = {
   NL: [5.3, 52.4], ZA: [25, -29],   UA: [32, 48.4],  IR: [53, 32],
 };
 
+/** world-atlas numeric ids → corridor alpha-2 used by centroids / flows. */
+const NUMERIC_TO_ALPHA2: Record<string, string> = {
+  '840': 'US', '484': 'MX', '076': 'BR', '032': 'AR', '862': 'VE',
+  '826': 'GB', '250': 'FR', '276': 'DE', '792': 'TR', '566': 'NG',
+  '404': 'KE', '356': 'IN', '156': 'CN', '392': 'JP', '608': 'PH',
+  '036': 'AU', '040': 'AT', '158': 'TW', '360': 'ID', '410': 'KR',
+  '528': 'NL', '710': 'ZA', '804': 'UA', '364': 'IR',
+};
+
+function alpha2FromFeatureId(id: unknown): string | undefined {
+  return NUMERIC_TO_ALPHA2[String(id).padStart(3, '0')];
+}
+
+const NO_DATA_COLOR = '#e2e8f0';
+const ADOPTION_BUCKETS = [
+  { min: 0.8, color: '#1a4fd6', label: 'Highest' },
+  { min: 0.6, color: '#3f74e3', label: 'High' },
+  { min: 0.4, color: '#6f9aed', label: 'Mid' },
+  { min: 0.2, color: '#a3c2f5', label: 'Low' },
+  { min: 0, color: '#d6e4fb', label: 'Lowest' },
+];
+const REGION_RANK_COLORS = ['#1a4fd6', '#6f9aed', '#d6e4fb'];
+
+function adoptionFill(index: number): string {
+  const t = Math.min(1, Math.max(0, index));
+  return ADOPTION_BUCKETS.find((b) => t >= b.min)!.color;
+}
+
+function fmtWallets(n: number): string {
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
+  if (n >= 1_000) return (n / 1_000).toFixed(1) + 'K';
+  return n.toLocaleString();
+}
+
+function fmtPer100k(rate: number): string {
+  const per100k = rate * 100_000;
+  if (per100k >= 100) return per100k.toFixed(0);
+  if (per100k >= 10) return per100k.toFixed(1);
+  return per100k.toFixed(2);
+}
+
+function fmtPct(ratio: number): string {
+  const pct = ratio * 100;
+  if (pct < 0.01) return pct.toFixed(4) + '%';
+  if (pct < 1) return pct.toFixed(2) + '%';
+  return pct.toFixed(1) + '%';
+}
+
+function coinSummary(coins?: { name: string; share: number }[]): string {
+  if (!coins?.length) return '—';
+  return coins.slice(0, 3).map((s) => `${s.name} ${Math.round(s.share * 100)}%`).join(' · ');
+}
+
 /** Representative centroid per macro region, for the region-mode map. */
 const regionCentroids: Record<string, [number, number]> = {
   Americas: [-80, 5],
@@ -79,18 +135,50 @@ const regionCentroids: Record<string, [number, number]> = {
   APAC: [110, 8],
 };
 
-export function RealCorridorMap({ corridors, getCountryName, limit, mode = 'country', regionalCorridors = [] }: RealCorridorMapProps) {
+function quadPoint(
+  p0: [number, number],
+  p1: [number, number],
+  p2: [number, number],
+  t: number,
+): [number, number] {
+  const u = 1 - t;
+  return [
+    u * u * p0[0] + 2 * u * t * p1[0] + t * t * p2[0],
+    u * u * p0[1] + 2 * u * t * p1[1] + t * t * p2[1],
+  ];
+}
+
+export function RealCorridorMap({
+  corridors,
+  getCountryName,
+  limit,
+  mode = 'country',
+  regionalCorridors = [],
+  projectionScale = 140,
+  hideAntarctica = false,
+  countrySpokeHover = false,
+  countries = [],
+  regionalAdoption = [],
+}: RealCorridorMapProps) {
   const { formatCurrency: formatValue } = useCurrencyFormat();
   const [worldData, setWorldData] = useState<any>(null);
   const [hoveredCorridor, setHoveredCorridor] = useState<number | null>(null);
   const [selectedCorridor, setSelectedCorridor] = useState<number | null>(null);
-  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
+  const [hoveredPlace, setHoveredPlace] = useState<string | null>(null);
+  const [pinnedPlace, setPinnedPlace] = useState<string | null>(null);
+  const [showCorridorDetails, setShowCorridorDetails] = useState(false);
+  const [seenHover, setSeenHover] = useState(false);
   const {
     svgRef, viewBox, zoom, minZoom, maxZoom, zoomIn, zoomOut, resetView,
     isDragging, draggedRef, handleMouseDown, handleMouseMove: handlePanMove, endDrag,
   } = useMapZoomPan();
   const filters = useFilters();
   const navigate = useNavigate();
+  const goToCountry = (ref: { name?: string; isoAlpha2?: string; countryId?: string }) => {
+    navigate(countryPath(ref), {
+      state: { name: ref.name, isoAlpha2: ref.isoAlpha2 },
+    });
+  };
   const tooltipHoveredRef = useRef(false);
   const dismissTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -100,23 +188,42 @@ export function RealCorridorMap({ corridors, getCountryName, limit, mode = 'coun
     }, 80);
   };
 
-  const hasActiveFilters =
-    filters.regionFrom !== 'All' ||
-    filters.regionTo !== 'All' || filters.stablecoin !== 'All';
+  const enterPlace = (code: string) => {
+    setSeenHover(true);
+    if (pinnedPlace) return;
+    if (dismissTimeoutRef.current) clearTimeout(dismissTimeoutRef.current);
+    setHoveredPlace(code);
+  };
+  const leavePlace = () => {
+    if (pinnedPlace) return;
+    if (dismissTimeoutRef.current) clearTimeout(dismissTimeoutRef.current);
+    dismissTimeoutRef.current = setTimeout(() => setHoveredPlace(null), 60);
+  };
+  const pinPlace = (code: string) => {
+    if (dismissTimeoutRef.current) clearTimeout(dismissTimeoutRef.current);
+    if (pinnedPlace === code) {
+      closePlace();
+      return;
+    }
+    setPinnedPlace(code);
+    setHoveredPlace(code);
+    setShowCorridorDetails(false);
+  };
+  const closePlace = () => {
+    if (dismissTimeoutRef.current) clearTimeout(dismissTimeoutRef.current);
+    setPinnedPlace(null);
+    setHoveredPlace(null);
+    setShowCorridorDetails(false);
+  };
 
   const handleReset = () => {
     resetView();
-    filters.setRegionFrom('All');
-    filters.setRegionTo('All');
-    filters.setStablecoin('All');
   };
 
   const centroids = mode === 'region' ? regionCentroids : countryCentroids;
   const getLabel = mode === 'region' ? (id: string) => id : getCountryName;
 
-  // Sort by total volume descending; apply optional limit (country mode only —
-  // region mode only ever has a handful of pairs, so showing all is fine).
-  const displayItems: DisplayCorridor[] = useMemo(() => {
+  const allItems: DisplayCorridor[] = useMemo(() => {
     if (mode === 'region') {
       return [...regionalCorridors]
         .sort((a, b) => b.totalValue - a.totalValue)
@@ -129,7 +236,7 @@ export function RealCorridorMap({ corridors, getCountryName, limit, mode = 'coun
           dollarizationIndex: r.dollarizationIndex,
         }));
     }
-    const sorted = [...corridors]
+    return [...corridors]
       .sort((a, b) => b.totalValue - a.totalValue)
       .map((c) => ({
         id1: c.country1,
@@ -141,8 +248,105 @@ export function RealCorridorMap({ corridors, getCountryName, limit, mode = 'coun
         topStablecoinsFrom1: c.topStablecoinsFrom1,
         topStablecoinsFrom2: c.topStablecoinsFrom2,
       }));
-    return limit !== undefined ? sorted.slice(0, limit) : sorted;
-  }, [mode, corridors, regionalCorridors, limit]);
+  }, [mode, corridors, regionalCorridors]);
+
+  const displayItems = limit !== undefined ? allItems.slice(0, limit) : allItems;
+
+  const spokeIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const c of allItems) {
+      ids.add(c.id1);
+      ids.add(c.id2);
+    }
+    return ids;
+  }, [allItems]);
+  const drawnEndpointIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const c of displayItems) {
+      ids.add(c.id1);
+      ids.add(c.id2);
+    }
+    return ids;
+  }, [displayItems]);
+
+  const showAdoption = countries.length > 0;
+  const adoptionById = useMemo(() => {
+    const m = new Map<string, CountryAdoptionMetric>();
+    for (const c of countries) {
+      m.set(c.countryId, c);
+      m.set(c.countryId.padStart(3, '0'), c);
+      const n = Number(c.countryId);
+      if (!Number.isNaN(n)) m.set(String(n), c);
+    }
+    return m;
+  }, [countries]);
+  const adoptionByAlpha2 = useMemo(
+    () => new Map(countries.map((c) => [c.isoAlpha2, c])),
+    [countries],
+  );
+  const rankedRegions = useMemo(
+    () => [...regionalAdoption].sort((a, b) => b.adoptionRate - a.adoptionRate).slice(0, 3),
+    [regionalAdoption],
+  );
+  const regionColorMap = useMemo(() => {
+    const m = new Map<string, string>();
+    rankedRegions.forEach((r, i) => m.set(r.region, REGION_RANK_COLORS[i] ?? NO_DATA_COLOR));
+    return m;
+  }, [rankedRegions]);
+  const regionalByName = useMemo(
+    () => new Map(regionalAdoption.map((r) => [r.region, r])),
+    [regionalAdoption],
+  );
+
+  const lookupAdoption = (id: unknown): CountryAdoptionMetric | undefined => {
+    const raw = String(id);
+    return adoptionById.get(raw)
+      ?? adoptionById.get(raw.padStart(3, '0'))
+      ?? adoptionById.get(String(Number(raw)));
+  };
+
+  const activePlace = pinnedPlace ?? hoveredPlace;
+  const pinned = pinnedPlace != null;
+  const hoveredMetric = mode === 'country' && activePlace ? adoptionByAlpha2.get(activePlace) : undefined;
+  const hoveredRegion = mode === 'region' && activePlace ? regionalByName.get(activePlace) : undefined;
+  const activeCorridors = useMemo(() => {
+    if (!activePlace) return [];
+    return allItems
+      .filter((c) => c.id1 === activePlace || c.id2 === activePlace)
+      .map((c) => {
+        const is1 = c.id1 === activePlace;
+        return {
+          partner: is1 ? c.id2 : c.id1,
+          outbound: is1 ? c.valueFrom1 : c.valueFrom2,
+          inbound: is1 ? c.valueFrom2 : c.valueFrom1,
+          totalValue: c.totalValue,
+          dollarizationIndex: c.dollarizationIndex,
+          outboundCoins: is1 ? c.topStablecoinsFrom1 : c.topStablecoinsFrom2,
+          inboundCoins: is1 ? c.topStablecoinsFrom2 : c.topStablecoinsFrom1,
+        };
+      })
+      .sort((a, b) => b.totalValue - a.totalValue);
+  }, [allItems, activePlace]);
+  const hoveredSpokeCount = activeCorridors.length;
+  const drawnSpokeCount = useMemo(() => {
+    if (!activePlace) return 0;
+    return displayItems.filter((c) => c.id1 === activePlace || c.id2 === activePlace).length;
+  }, [displayItems, activePlace]);
+  const corridorCaption = (() => {
+    if (hoveredSpokeCount === 0) return 'No international corridors';
+    const n = `${hoveredSpokeCount} international corridor${hoveredSpokeCount === 1 ? '' : 's'}`;
+    if (drawnSpokeCount === 0 && limit != null) {
+      return `${n} · not in the ${limit} largest`;
+    }
+    return n;
+  })();
+  const corridorTotals = useMemo(() => {
+    const outbound = activeCorridors.reduce((s, c) => s + c.outbound, 0);
+    const inbound = activeCorridors.reduce((s, c) => s + c.inbound, 0);
+    const total = outbound + inbound;
+    const usd = activeCorridors.reduce((s, c) => s + c.totalValue * c.dollarizationIndex, 0);
+    return { outbound, inbound, total, usdShare: total > 0 ? usd / total : null };
+  }, [activeCorridors]);
 
   const maxVolume = displayItems[0]?.totalValue ?? 1;
   const minVolume = displayItems[displayItems.length - 1]?.totalValue ?? 0;
@@ -153,14 +357,14 @@ export function RealCorridorMap({ corridors, getCountryName, limit, mode = 'coun
     return 1.5 + ((value - minVolume) / volumeRange) * 3.5;
   }
 
-  // Electric blue ramp, matching RealWorldMap's ADOPTION_BUCKETS.
+  // Warm / silver ramp so arcs read against the blue adoption fill.
   function lineColor(value: number): string {
     const ratio = (value - minVolume) / volumeRange;
-    if (ratio >= 0.8) return '#1a4fd6';
-    if (ratio >= 0.6) return '#3f74e3';
-    if (ratio >= 0.4) return '#6f9aed';
-    if (ratio >= 0.2) return '#a3c2f5';
-    return '#d6e4fb';
+    if (ratio >= 0.8) return '#f5c14a';
+    if (ratio >= 0.6) return '#e8a63a';
+    if (ratio >= 0.4) return '#d4b07a';
+    if (ratio >= 0.2) return '#c5c6c2';
+    return '#a8b3c4';
   }
 
   useEffect(() => {
@@ -176,6 +380,20 @@ export function RealCorridorMap({ corridors, getCountryName, limit, mode = 'coun
     }
   }, [displayItems, selectedCorridor]);
 
+  useEffect(() => {
+    setPinnedPlace(null);
+    setShowCorridorDetails(false);
+  }, [filters.year, filters.month, filters.stablecoin, filters.regionFrom, filters.regionTo, mode]);
+
+  useEffect(() => {
+    if (!pinnedPlace) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closePlace();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [pinnedPlace]);
+
   if (!worldData) {
     return (
       <div className="bg-slate-900 rounded-xl border border-slate-700/50 p-8 flex items-center justify-center h-[300px] sm:h-[600px]">
@@ -184,17 +402,17 @@ export function RealCorridorMap({ corridors, getCountryName, limit, mode = 'coun
     );
   }
 
-  const projection = geoMercator()
-    .scale(140)
-    .translate([800 / 2, 500 / 2]);
-
+  const geojson = feature(worldData, worldData.objects.countries) as GeoJSON.FeatureCollection;
+  const features = filterMapFeatures(geojson.features, hideAntarctica);
+  const projection = worldMapProjection(
+    { type: 'FeatureCollection', features },
+    { scale: projectionScale, hideAntarctica },
+  );
   const pathGenerator = geoPath().projection(projection);
-  const geojson = feature(worldData, worldData.objects.countries);
 
-  const handleCorridorHover = (e: React.MouseEvent, index: number) => {
+  const handleCorridorHover = (_e: React.MouseEvent, index: number) => {
     if (isDragging) return;
     setHoveredCorridor(index);
-    setTooltipPos({ x: e.clientX, y: e.clientY });
   };
 
   const handleCorridorClick = (index: number) => {
@@ -206,33 +424,92 @@ export function RealCorridorMap({ corridors, getCountryName, limit, mode = 'coun
   const selectedData = selectedCorridor !== null ? displayItems[selectedCorridor] : null;
 
   const legendItems = [
-    { label: 'Low', width: 1.5, color: '#d6e4fb' },
-    { label: 'Mid', width: 2.5, color: '#a3c2f5' },
-    { label: 'High', width: 3.5, color: '#6f9aed' },
-    { label: 'Peak', width: 5, color: '#1a4fd6' },
+    { label: 'Low', width: 1.5, color: '#a8b3c4' },
+    { label: 'Mid', width: 2.5, color: '#d4b07a' },
+    { label: 'High', width: 3.5, color: '#e8a63a' },
+    { label: 'Peak', width: 5, color: '#f5c14a' },
   ];
 
-  // Tooltip tracks the cursor, so on narrow viewports it must shrink and stay clamped
-  // to the screen edge instead of overflowing horizontally off a 500px desktop width.
-  const tooltipWidth = Math.min(window.innerWidth * 0.94, 560);
-  const tooltipLeft = Math.min(tooltipPos.x + 15, window.innerWidth - tooltipWidth - 10);
-  const tooltipTop = Math.max(8, tooltipPos.y - 100);
-
   return (
-    <div className="relative">
-      <div className="bg-white dark:bg-neutral-800 rounded-xl border border-slate-200/50 dark:border-neutral-700 overflow-hidden shadow-md transition-all">
+    <div className="relative space-y-3">
+      <div className="bg-white dark:bg-neutral-800 rounded-xl border border-slate-200/50 dark:border-neutral-700 overflow-hidden transition-ui">
         <div className="relative p-6 bg-[#F7FAFC] dark:bg-neutral-900">
+          {countrySpokeHover && !seenHover && !activePlace && (
+            <div className="absolute top-4 left-4 z-20 pointer-events-none text-[11px] font-medium text-slate-500 dark:text-slate-400">
+              Hover a country — click to select
+            </div>
+          )}
+          {countrySpokeHover && !pinned && activePlace && (
+            <div className="absolute top-4 left-4 z-20 pointer-events-none max-w-[min(94%,22rem)]">
+              <div className="rounded-lg bg-neutral-950/90 dark:bg-neutral-950/92 border border-white/15 px-3 py-2 text-xs text-white">
+                <div className="flex items-center gap-2 min-w-0">
+                  {mode === 'country' && (
+                    <CountryFlag isoAlpha2={hoveredMetric?.isoAlpha2 ?? activePlace} className="w-4 h-4 shrink-0" />
+                  )}
+                  <span className="font-semibold truncate">
+                    {mode === 'country' ? (hoveredMetric?.name ?? getLabel(activePlace)) : activePlace}
+                  </span>
+                </div>
+                <div className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[11px] text-white/70 tabular-nums">
+                  {mode === 'country' && hoveredMetric?.relativeAdoptionIndex != null && (
+                    <span>
+                      #{hoveredMetric.adoptionRank} · {fmtPer100k(hoveredMetric.adoptionRate)} / 100k
+                    </span>
+                  )}
+                  {mode === 'country' && hoveredMetric && hoveredMetric.relativeAdoptionIndex == null && hoveredMetric.activeWallets > 0 && (
+                    <span>{fmtWallets(hoveredMetric.activeWallets)} wallets · not ranked</span>
+                  )}
+                  {mode === 'region' && hoveredRegion && (
+                    <span>{fmtWallets(hoveredRegion.activeWallets)} wallets</span>
+                  )}
+                  <span>{corridorCaption}</span>
+                </div>
+              </div>
+            </div>
+          )}
           {/* Legend — bottom-left, opposite zoom controls */}
-          <div className="absolute bottom-4 left-4 z-10 bg-white/90 dark:bg-neutral-800/90 backdrop-blur-sm border border-slate-200/60 dark:border-neutral-700 rounded-lg p-2.5 shadow-md">
-            <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1.5 uppercase tracking-wide">Volume</div>
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="text-[10px] text-slate-500 dark:text-slate-400">{formatValue(minVolume)}</span>
-              {legendItems.map((item, idx) => (
-                <svg key={idx} width="22" height="10" className="shrink-0">
-                  <line x1="0" y1="5" x2="22" y2="5" stroke={item.color} strokeWidth={item.width} strokeLinecap="round" />
-                </svg>
-              ))}
-              <span className="text-[10px] text-slate-500 dark:text-slate-400">{formatValue(maxVolume)}</span>
+          <div className="absolute bottom-4 left-4 z-10 bg-white/90 dark:bg-neutral-800/90 backdrop-blur-sm border border-slate-200/60 dark:border-neutral-700 rounded-lg p-2.5 shadow-md space-y-2.5 max-w-[13.5rem]">
+            {showAdoption && (
+              <div>
+                <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1.5 uppercase tracking-wide">
+                  {mode === 'region' ? 'Adoption by region' : 'Adoption index'}
+                </div>
+                <div className="space-y-1">
+                  {mode === 'region' ? (
+                    rankedRegions.map((r, i) => (
+                      <div key={r.region} className="flex items-center gap-1.5">
+                        <div className="w-3 h-3 rounded-sm shrink-0 border border-slate-200 dark:border-neutral-600" style={{ backgroundColor: REGION_RANK_COLORS[i] ?? NO_DATA_COLOR }} />
+                        <span className="text-[11px] text-slate-700 dark:text-slate-300">{r.region}</span>
+                      </div>
+                    ))
+                  ) : (
+                    ADOPTION_BUCKETS.map((bucket) => (
+                      <div key={bucket.label} className="flex items-center gap-1.5">
+                        <div className="w-3 h-3 rounded-sm shrink-0 border border-slate-200 dark:border-neutral-600" style={{ backgroundColor: bucket.color }} />
+                        <span className="text-[11px] text-slate-700 dark:text-slate-300">{bucket.label}</span>
+                      </div>
+                    ))
+                  )}
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-3 h-3 rounded-sm shrink-0 border border-slate-200 dark:border-neutral-600" style={{ backgroundColor: NO_DATA_COLOR }} />
+                    <span className="text-[11px] text-slate-700 dark:text-slate-300">
+                      {mode === 'region' ? 'No data' : '<10k wallets'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+            <div>
+              <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1.5 uppercase tracking-wide">Volume</div>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-[10px] text-slate-500 dark:text-slate-400">{formatValue(minVolume)}</span>
+                {legendItems.map((item, idx) => (
+                  <svg key={idx} width="22" height="10" className="shrink-0">
+                    <line x1="0" y1="5" x2="22" y2="5" stroke={item.color} strokeWidth={item.width} strokeLinecap="round" />
+                  </svg>
+                ))}
+                <span className="text-[10px] text-slate-500 dark:text-slate-400">{formatValue(maxVolume)}</span>
+              </div>
             </div>
           </div>
 
@@ -242,7 +519,7 @@ export function RealCorridorMap({ corridors, getCountryName, limit, mode = 'coun
               onClick={zoomIn}
               disabled={zoom >= maxZoom}
               aria-label="Zoom in"
-              className="w-8 h-8 flex items-center justify-center rounded-md bg-white dark:bg-neutral-800 border border-slate-200/50 dark:border-neutral-700 shadow-md text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-neutral-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-300"
+              className="w-8 h-8 flex items-center justify-center rounded-md bg-white dark:bg-neutral-800 border border-slate-200/50 dark:border-neutral-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-neutral-700 disabled:opacity-40 disabled:cursor-not-allowed transition-ui"
             >
               <Plus className="w-4 h-4" />
             </button>
@@ -251,17 +528,17 @@ export function RealCorridorMap({ corridors, getCountryName, limit, mode = 'coun
               onClick={zoomOut}
               disabled={zoom <= minZoom}
               aria-label="Zoom out"
-              className="w-8 h-8 flex items-center justify-center rounded-md bg-white dark:bg-neutral-800 border border-slate-200/50 dark:border-neutral-700 shadow-md text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-neutral-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-300"
+              className="w-8 h-8 flex items-center justify-center rounded-md bg-white dark:bg-neutral-800 border border-slate-200/50 dark:border-neutral-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-neutral-700 disabled:opacity-40 disabled:cursor-not-allowed transition-ui"
             >
               <Minus className="w-4 h-4" />
             </button>
             <button
               type="button"
               onClick={handleReset}
-              disabled={zoom <= minZoom && !hasActiveFilters}
-              aria-label="Reset view and filters"
-              title="Reset view and filters"
-              className="w-8 h-8 flex items-center justify-center rounded-md bg-white dark:bg-neutral-800 border border-slate-200/50 dark:border-neutral-700 shadow-md text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-neutral-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-300"
+              disabled={zoom <= minZoom}
+              aria-label="Reset map view"
+              title="Reset map view"
+              className="w-8 h-8 flex items-center justify-center rounded-md bg-white dark:bg-neutral-800 border border-slate-200/50 dark:border-neutral-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-neutral-700 disabled:opacity-40 disabled:cursor-not-allowed transition-ui"
             >
               <RotateCcw className="w-4 h-4" />
             </button>
@@ -273,7 +550,13 @@ export function RealCorridorMap({ corridors, getCountryName, limit, mode = 'coun
             onMouseDown={handleMouseDown}
             onMouseMove={handlePanMove}
             onMouseUp={endDrag}
-            onMouseLeave={endDrag}
+            onMouseLeave={() => {
+              endDrag();
+              if (countrySpokeHover && !pinnedPlace) {
+                if (dismissTimeoutRef.current) clearTimeout(dismissTimeoutRef.current);
+                setHoveredPlace(null);
+              }
+            }}
           >
             <defs>
               <filter id="corridor-glow">
@@ -285,21 +568,81 @@ export function RealCorridorMap({ corridors, getCountryName, limit, mode = 'coun
               </filter>
             </defs>
 
-            <rect width="800" height="500" className="fill-[#F7FAFC] dark:fill-neutral-900" />
+            <rect
+              width="800"
+              height="500"
+              className="fill-[#F7FAFC] dark:fill-neutral-900"
+              onClick={() => {
+                if (draggedRef.current) return;
+                closePlace();
+              }}
+            />
 
-            {geojson.features.map((geo: any, i: number) => {
+            {features.map((geo: any, i: number) => {
               const pathData = pathGenerator(geo as any);
               if (!pathData) return null;
+              const metric = showAdoption ? lookupAdoption(geo.id) : undefined;
+              const alpha2 = metric?.isoAlpha2 ?? (mode === 'country' ? alpha2FromFeatureId(geo.id) : undefined);
+              const regionKey = metric?.macroRegion ?? undefined;
+              const hoverKey = mode === 'region' ? regionKey : alpha2;
+              const hasSpokes = hoverKey != null && spokeIds.has(hoverKey);
+              const interactive = Boolean(
+                countrySpokeHover &&
+                  hoverKey &&
+                  (showAdoption ? (mode === 'country' ? metric || hasSpokes : regionKey) : hasSpokes),
+              );
+              const isFocus = Boolean(interactive && activePlace && activePlace === hoverKey);
+
+              let fill = '#e2e8f0';
+              let stroke = '#cbd5e1';
+              let strokeWidth = 0.5;
+              let opacity = 0.6;
+
+              if (showAdoption) {
+                fill = NO_DATA_COLOR;
+                stroke = '#cbd5e1';
+                strokeWidth = 0.5;
+                opacity = 0.8;
+                if (mode === 'region') {
+                  const rc = regionKey ? regionColorMap.get(regionKey) : undefined;
+                  if (rc) {
+                    fill = rc;
+                    opacity = 0.9;
+                    stroke = '#64748b';
+                    strokeWidth = 1;
+                  }
+                } else if (metric?.relativeAdoptionIndex != null) {
+                  fill = adoptionFill(metric.relativeAdoptionIndex);
+                  opacity = 0.9;
+                  stroke = '#64748b';
+                  strokeWidth = 1;
+                }
+                if (isFocus) {
+                  stroke = 'var(--brand-400)';
+                  strokeWidth = 2;
+                  opacity = 1;
+                }
+              }
 
               return (
                 <path
                   key={i}
                   d={pathData}
-                  fill="#e2e8f0"
-                  stroke="#cbd5e1"
-                  strokeWidth={0.5}
-                  opacity={0.6}
-                  className="pointer-events-none"
+                  fill={fill}
+                  stroke={stroke}
+                  strokeWidth={strokeWidth}
+                  opacity={opacity}
+                  className={interactive ? 'cursor-pointer transition-[fill,opacity,stroke] duration-150' : 'pointer-events-none'}
+                  onMouseEnter={interactive && hoverKey ? () => enterPlace(hoverKey) : undefined}
+                  onMouseLeave={interactive ? leavePlace : undefined}
+                  onClick={
+                    interactive && hoverKey
+                      ? () => {
+                          if (draggedRef.current) return;
+                          pinPlace(hoverKey);
+                        }
+                      : undefined
+                  }
                 />
               );
             })}
@@ -313,39 +656,45 @@ export function RealCorridorMap({ corridors, getCountryName, limit, mode = 'coun
               const toPoint = projection(toCoords);
               if (!fromPoint || !toPoint) return null;
 
-              const isHovered = hoveredCorridor === index;
-              const isSelected = selectedCorridor === index;
-              const sw = lineWidth(corridor.totalValue);
-              const color = lineColor(corridor.totalValue);
-
               const dx = toPoint[0] - fromPoint[0];
               const dy = toPoint[1] - fromPoint[1];
               const distance = Math.sqrt(dx * dx + dy * dy);
+              if (distance < 1) return null;
               const offset = distance * 0.15;
-
               const midX = (fromPoint[0] + toPoint[0]) / 2;
               const midY = (fromPoint[1] + toPoint[1]) / 2;
               const perpX = -dy / distance;
               const perpY = dx / distance;
               const controlX = midX + perpX * offset;
               const controlY = midY + perpY * offset;
-
               const path = `M ${fromPoint[0]} ${fromPoint[1]} Q ${controlX} ${controlY} ${toPoint[0]} ${toPoint[1]}`;
+
+              const onSpoke =
+                countrySpokeHover &&
+                activePlace != null &&
+                (corridor.id1 === activePlace || corridor.id2 === activePlace);
+              const isHovered = !countrySpokeHover && hoveredCorridor === index;
+              const isSelected = !countrySpokeHover && selectedCorridor === index;
+              const lit = isHovered || isSelected || onSpoke;
+              const sw = lineWidth(corridor.totalValue);
+              const color = lineColor(corridor.totalValue);
 
               return (
                 <path
-                  key={index}
+                  key={`${corridor.id1}-${corridor.id2}-${index}`}
                   d={path}
-                  stroke={isHovered || isSelected ? '#fff' : color}
-                  strokeWidth={isHovered || isSelected ? sw + 1.5 : sw}
+                  pathLength={1}
+                  stroke={lit ? '#ffe08a' : color}
+                  strokeWidth={lit ? sw + 1.25 : sw}
                   fill="none"
-                  opacity={isHovered || isSelected ? 1 : 0.85}
-                  onMouseEnter={(e) => handleCorridorHover(e, index)}
-                  onMouseLeave={scheduleDismiss}
-                  onClick={() => handleCorridorClick(index)}
-                  className="cursor-pointer transition-all duration-300"
-                  filter={isHovered || isSelected ? 'url(#corridor-glow)' : undefined}
+                  opacity={lit ? 1 : 0.45}
+                  onMouseEnter={countrySpokeHover ? undefined : (e) => handleCorridorHover(e, index)}
+                  onMouseLeave={countrySpokeHover ? undefined : scheduleDismiss}
+                  onClick={countrySpokeHover ? undefined : () => handleCorridorClick(index)}
+                  className={`${countrySpokeHover ? 'pointer-events-none' : 'cursor-pointer'} animate-map-draw transition-[stroke-width,opacity] duration-150`}
+                  filter={lit ? 'url(#corridor-glow)' : undefined}
                   strokeLinecap="round"
+                  style={{ strokeDasharray: 1, strokeDashoffset: 1 }}
                 />
               );
             })}
@@ -353,17 +702,35 @@ export function RealCorridorMap({ corridors, getCountryName, limit, mode = 'coun
             {Object.entries(centroids).map(([code, coords]) => {
               const point = projection(coords);
               if (!point) return null;
+              const isFocus = countrySpokeHover && activePlace === code;
+              const hasSpokes = spokeIds.has(code);
 
               if (mode === 'region') {
                 return (
-                  <g key={code}>
+                  <g
+                    key={code}
+                    onMouseEnter={countrySpokeHover && hasSpokes ? () => enterPlace(code) : undefined}
+                    onMouseLeave={countrySpokeHover ? leavePlace : undefined}
+                    onClick={
+                      countrySpokeHover && hasSpokes
+                        ? () => {
+                            if (draggedRef.current) return;
+                            pinPlace(code);
+                          }
+                        : undefined
+                    }
+                    className={countrySpokeHover && hasSpokes ? 'cursor-pointer' : undefined}
+                  >
+                    {countrySpokeHover && hasSpokes && (
+                      <circle cx={point[0]} cy={point[1]} r={26} fill="transparent" />
+                    )}
                     <circle
                       cx={point[0]}
                       cy={point[1]}
                       r={18}
                       fill="var(--brand)"
-                      stroke="#475569"
-                      strokeWidth={1.5}
+                      stroke={isFocus ? '#fff' : '#475569'}
+                      strokeWidth={isFocus ? 2.5 : 1.5}
                     />
                     <text
                       x={point[0]}
@@ -380,28 +747,71 @@ export function RealCorridorMap({ corridors, getCountryName, limit, mode = 'coun
                 );
               }
 
-              const iso2 = countryCodeToISO2[code];
-              if (!iso2) return null;
+              if (!drawnEndpointIds.has(code)) return null;
 
               return (
-                <g key={code}>
-                  <circle
-                    cx={point[0]}
-                    cy={point[1]}
-                    r={10}
-                    fill="#1e293b"
-                    stroke="#475569"
-                    strokeWidth={1.5}
+                <circle
+                  key={code}
+                  cx={point[0]}
+                  cy={point[1]}
+                  r={isFocus ? 4.5 : 3}
+                  fill={isFocus ? '#ffe08a' : '#f5d090'}
+                  stroke={isFocus ? '#fff' : 'rgba(15,23,42,0.7)'}
+                  strokeWidth={isFocus ? 1.25 : 0.75}
+                  className="pointer-events-none"
+                />
+              );
+            })}
+
+            {countrySpokeHover && pinned && activePlace && displayItems
+              .filter((corridor) => corridor.id1 === activePlace || corridor.id2 === activePlace)
+              .sort((a, b) => b.totalValue - a.totalValue)
+              .slice(0, 5)
+              .map((corridor, index) => {
+              const fromCoords = centroids[corridor.id1];
+              const toCoords = centroids[corridor.id2];
+              if (!fromCoords || !toCoords) return null;
+              const fromPoint = projection(fromCoords);
+              const toPoint = projection(toCoords);
+              if (!fromPoint || !toPoint) return null;
+              const dx = toPoint[0] - fromPoint[0];
+              const dy = toPoint[1] - fromPoint[1];
+              const distance = Math.sqrt(dx * dx + dy * dy);
+              if (distance < 1) return null;
+              const offset = distance * 0.15;
+              const control: [number, number] = [
+                (fromPoint[0] + toPoint[0]) / 2 + (-dy / distance) * offset,
+                (fromPoint[1] + toPoint[1]) / 2 + (dx / distance) * offset,
+              ];
+              const origin = corridor.id1 === activePlace ? fromPoint : toPoint;
+              const dest = corridor.id1 === activePlace ? toPoint : fromPoint;
+              const [cx, cy] = quadPoint(origin as [number, number], control, dest as [number, number], 0.55);
+              const partner = corridor.id1 === activePlace ? corridor.id2 : corridor.id1;
+              const label = `${partner}  ${formatValue(corridor.totalValue)}`;
+              const cardW = Math.min(108, 36 + label.length * 4.1);
+              return (
+                <g key={`card-${corridor.id1}-${corridor.id2}-${index}`} className="pointer-events-none">
+                  <rect
+                    x={cx - cardW / 2}
+                    y={cy - 9}
+                    width={cardW}
+                    height={18}
+                    rx={5}
+                    className="fill-[var(--ink)]"
+                    stroke="rgba(255,255,255,0.18)"
+                    strokeWidth={0.75}
                   />
-                  <image
-                    href={`https://flagcdn.com/w40/${iso2}.png`}
-                    x={point[0] - 8}
-                    y={point[1] - 6}
-                    width="16"
-                    height="12"
-                    className="pointer-events-none"
-                    style={{ borderRadius: '2px' }}
-                  />
+                  <text
+                    x={cx}
+                    y={cy + 3.5}
+                    textAnchor="middle"
+                    fontSize="8"
+                    fontWeight="600"
+                    fill="white"
+                    className="tabular-nums"
+                  >
+                    {label}
+                  </text>
                 </g>
               );
             })}
@@ -409,10 +819,208 @@ export function RealCorridorMap({ corridors, getCountryName, limit, mode = 'coun
         </div>
       </div>
 
-      {hoveredData && (
+      {countrySpokeHover && pinned && activePlace && (
+        <div className="bg-white dark:bg-neutral-800 rounded-xl border border-slate-200/50 dark:border-neutral-700 overflow-hidden">
+          <div className="bg-[var(--brand)]/10 dark:bg-[var(--brand)]/15 px-4 py-2 border-b border-slate-200 dark:border-neutral-700">
+            <h3 className="font-bold text-[var(--brand-700)] dark:text-[var(--brand-300)] text-lg flex items-center gap-2">
+              {mode === 'country' && (
+                <CountryFlag isoAlpha2={hoveredMetric?.isoAlpha2 ?? activePlace} className="w-5 h-5" />
+              )}
+              {mode === 'country' ? (hoveredMetric?.name ?? getLabel(activePlace)) : activePlace}
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              {[
+                mode === 'country' ? hoveredMetric?.region : `${hoveredRegion?.countryCount ?? '—'} countries`,
+                corridorCaption,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-slate-200 dark:divide-neutral-700">
+            <div className="px-4 py-3 space-y-4">
+              <div>
+                <div className="text-xs font-semibold text-[var(--brand-700)] dark:text-[var(--brand-300)] italic mb-2">Economic integration</div>
+                <div className="space-y-2 text-xs">
+                  {mode === 'country' && hoveredMetric ? (
+                    <div className="flex justify-between items-center gap-3">
+                      <span className="text-slate-500 dark:text-slate-400">Stablecoin TX value share</span>
+                      <span className="text-slate-800 dark:text-slate-100 font-bold text-base tabular-nums">{fmtPct(hoveredMetric.txValueShare)}</span>
+                    </div>
+                  ) : hoveredRegion ? (
+                    <div className="flex justify-between items-center gap-3">
+                      <span className="text-slate-500 dark:text-slate-400">Stablecoin TX value share</span>
+                      <span className="text-slate-800 dark:text-slate-100 font-bold text-base tabular-nums">{fmtPct(hoveredRegion.txValueShare)}</span>
+                    </div>
+                  ) : null}
+                  {hoveredSpokeCount > 0 && (
+                    <>
+                      <div className="flex justify-between items-center gap-3">
+                        <span className="text-slate-500 dark:text-slate-400">Outbound corridor volume</span>
+                        <span className="text-slate-800 dark:text-slate-100 font-semibold tabular-nums">{formatValue(corridorTotals.outbound)}</span>
+                      </div>
+                      <div className="flex justify-between items-center gap-3">
+                        <span className="text-slate-500 dark:text-slate-400">Inbound corridor volume</span>
+                        <span className="text-slate-800 dark:text-slate-100 font-semibold tabular-nums">{formatValue(corridorTotals.inbound)}</span>
+                      </div>
+                      {corridorTotals.usdShare != null && (
+                        <div className="flex justify-between items-center gap-3">
+                          <span className="text-slate-500 dark:text-slate-400">USD-referenced share</span>
+                          <span className="text-slate-800 dark:text-slate-100 font-semibold tabular-nums">{fmtPct(corridorTotals.usdShare)}</span>
+                        </div>
+                      )}
+                    </>
+                  )}
+                  {mode === 'country' && hoveredMetric?.relativeAdoptionIndex != null && (
+                    <>
+                      <div className="flex justify-between items-center gap-3 pt-1">
+                        <span className="text-slate-500 dark:text-slate-400">Adoption index (rank)</span>
+                        <span className="text-slate-800 dark:text-slate-100 font-semibold tabular-nums">
+                          #{hoveredMetric.adoptionRank}
+                          <span className="text-slate-500 dark:text-slate-400 text-xs font-normal"> of {hoveredMetric.eligibleCountries}</span>
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center gap-3">
+                        <span className="text-slate-500 dark:text-slate-400">Wallets per 100k</span>
+                        <span className="text-slate-800 dark:text-slate-100 font-semibold tabular-nums">{fmtPer100k(hoveredMetric.adoptionRate)}</span>
+                      </div>
+                      <div className="flex justify-between items-center gap-3">
+                        <span className="text-slate-500 dark:text-slate-400">Wallets holding stablecoins</span>
+                        <span className="text-slate-800 dark:text-slate-100 font-semibold tabular-nums">{fmtWallets(hoveredMetric.activeWallets)}</span>
+                      </div>
+                    </>
+                  )}
+                  {mode === 'region' && hoveredRegion && (
+                    <>
+                      <div className="flex justify-between items-center gap-3 pt-1">
+                        <span className="text-slate-500 dark:text-slate-400">Adoption rate</span>
+                        <span className="text-slate-800 dark:text-slate-100 font-semibold tabular-nums">{fmtPct(hoveredRegion.adoptionRate)}</span>
+                      </div>
+                      <div className="flex justify-between items-center gap-3">
+                        <span className="text-slate-500 dark:text-slate-400">Wallets holding stablecoins</span>
+                        <span className="text-slate-800 dark:text-slate-100 font-semibold tabular-nums">{fmtWallets(hoveredRegion.activeWallets)}</span>
+                      </div>
+                    </>
+                  )}
+                  {mode === 'country' && hoveredMetric && hoveredMetric.relativeAdoptionIndex == null && hoveredMetric.activeWallets > 0 && (
+                    <p className="text-slate-500 dark:text-slate-400 italic">
+                      Not enough wallets to rank ({fmtWallets(hoveredMetric.activeWallets)} — needs &gt;10k)
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="px-4 py-3">
+              <div className="text-xs font-semibold text-[var(--brand-700)] dark:text-[var(--brand-300)] italic mb-2">Corridors</div>
+              {activeCorridors.length === 0 ? (
+                <p className="text-xs text-slate-500 dark:text-slate-400 italic">No international corridors</p>
+              ) : (
+                <div className="max-h-56 overflow-y-auto pr-1">
+                  {drawnSpokeCount === 0 && limit != null && (
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400 pb-1.5">
+                      Not in the {limit} largest corridors drawn on the map
+                    </p>
+                  )}
+                  {activeCorridors.map((row) => (
+                    <div
+                      key={row.partner}
+                      className="flex items-start justify-between gap-3 py-1.5 border-b border-slate-100 dark:border-neutral-700/80 last:border-b-0"
+                    >
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        {mode === 'country' && <CountryFlag isoAlpha2={row.partner} className="w-4 h-3 rounded-sm shrink-0" />}
+                        <span className="text-xs font-medium text-slate-800 dark:text-slate-100 truncate">{getLabel(row.partner)}</span>
+                      </div>
+                      <div className="text-right shrink-0 tabular-nums">
+                        <div className="text-xs font-semibold text-slate-800 dark:text-slate-100">{formatValue(row.totalValue)}</div>
+                        <div className="text-[10px] text-slate-500 dark:text-slate-400">
+                          → {formatValue(row.outbound)} · ← {formatValue(row.inbound)}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {showCorridorDetails && activeCorridors.length > 0 && (
+            <div className="border-t border-slate-200 dark:border-neutral-700 overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-slate-200 dark:border-neutral-700 bg-slate-50/80 dark:bg-neutral-900/60 text-slate-500 dark:text-slate-400">
+                    <th className="px-3 py-2 text-left font-medium">Partner</th>
+                    <th className="px-3 py-2 text-right font-medium">Total</th>
+                    <th className="px-3 py-2 text-right font-medium">Outbound</th>
+                    <th className="px-3 py-2 text-right font-medium">Inbound</th>
+                    <th className="px-3 py-2 text-right font-medium">USD share</th>
+                    <th className="px-3 py-2 text-left font-medium">Outbound coins</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {activeCorridors.map((row) => (
+                    <tr key={`detail-${row.partner}`} className="border-b border-slate-100 dark:border-neutral-700/80 last:border-b-0">
+                      <td className="px-3 py-2">
+                        <span className="inline-flex items-center gap-1.5 text-slate-800 dark:text-slate-100 font-medium">
+                          {mode === 'country' && <CountryFlag isoAlpha2={row.partner} className="w-4 h-3 rounded-sm" />}
+                          {getLabel(row.partner)}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 text-right tabular-nums font-semibold text-slate-800 dark:text-slate-100">{formatValue(row.totalValue)}</td>
+                      <td className="px-3 py-2 text-right tabular-nums text-slate-700 dark:text-slate-200">{formatValue(row.outbound)}</td>
+                      <td className="px-3 py-2 text-right tabular-nums text-slate-700 dark:text-slate-200">{formatValue(row.inbound)}</td>
+                      <td className="px-3 py-2 text-right tabular-nums text-slate-700 dark:text-slate-200">{fmtPct(row.dollarizationIndex)}</td>
+                      <td className="px-3 py-2 text-slate-500 dark:text-slate-400">{coinSummary(row.outboundCoins)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          <div className="px-4 py-2 border-t border-slate-200 dark:border-neutral-700 flex items-center gap-2 flex-wrap justify-end">
+            {mode === 'country' && (
+              <button
+                type="button"
+                onClick={() => {
+                  goToCountry({
+                    countryId: hoveredMetric?.countryId ?? activePlace,
+                    name: hoveredMetric?.name ?? getLabel(activePlace),
+                    isoAlpha2: hoveredMetric?.isoAlpha2 ?? activePlace,
+                  });
+                }}
+                className="px-3 py-1.5 text-xs font-semibold rounded-md text-white bg-[var(--brand)] hover:bg-[var(--brand-700)] transition-colors"
+              >
+                Details
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setShowCorridorDetails((v) => !v)}
+              disabled={activeCorridors.length === 0}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-md border transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+                showCorridorDetails
+                  ? 'border-[var(--brand)] text-[var(--brand)] bg-[var(--brand)]/10'
+                  : 'border-slate-300 dark:border-neutral-600 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-neutral-700'
+              }`}
+            >
+              Corridor details
+            </button>
+            <button
+              type="button"
+              onClick={closePlace}
+              className="px-3 py-1.5 text-xs font-semibold rounded-md text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-neutral-700 transition-colors"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {hoveredData && !countrySpokeHover && (
         <div
-          className="fixed z-50 bg-white/97 dark:bg-neutral-800/97 backdrop-blur-md border border-[var(--brand)]/25 dark:border-[var(--brand)]/35 rounded-xl shadow-xl transition-all overflow-hidden"
-          style={{ left: tooltipLeft, top: tooltipTop, width: tooltipWidth }}
+          className="absolute left-1/2 -translate-x-1/2 top-4 z-20 w-[min(94%,36rem)] bg-white/97 dark:bg-neutral-800/97 backdrop-blur-md border border-[var(--brand)]/25 dark:border-[var(--brand)]/35 rounded-xl transition-ui overflow-hidden animate-in fade-in-0 zoom-in-95 duration-150"
           onMouseEnter={() => {
             tooltipHoveredRef.current = true;
             if (dismissTimeoutRef.current) clearTimeout(dismissTimeoutRef.current);
@@ -447,7 +1055,7 @@ export function RealCorridorMap({ corridors, getCountryName, limit, mode = 'coun
                   <th className="px-3 py-2 text-center font-semibold border-l border-slate-200 dark:border-neutral-700">
                     {mode === 'country' ? (
                       <button
-                        onClick={() => navigate(`/country/${hoveredData.id1}`, { state: { name: getLabel(hoveredData.id1), isoAlpha2: hoveredData.id1 } })}
+                        onClick={() => navigate(countryPath({ isoAlpha2: hoveredData.id1, name: getLabel(hoveredData.id1) }), { state: { name: getLabel(hoveredData.id1), isoAlpha2: hoveredData.id1 } })}
                         className="inline-flex items-center gap-1 text-[var(--brand)] dark:text-[var(--brand-300)] hover:underline cursor-pointer"
                         title={`View ${getLabel(hoveredData.id1)} country page`}
                       >
@@ -460,7 +1068,7 @@ export function RealCorridorMap({ corridors, getCountryName, limit, mode = 'coun
                     <span className="text-slate-400 dark:text-slate-500 font-normal mx-1">→</span>
                     {mode === 'country' ? (
                       <button
-                        onClick={() => navigate(`/country/${hoveredData.id2}`, { state: { name: getLabel(hoveredData.id2), isoAlpha2: hoveredData.id2 } })}
+                        onClick={() => navigate(countryPath({ isoAlpha2: hoveredData.id2, name: getLabel(hoveredData.id2) }), { state: { name: getLabel(hoveredData.id2), isoAlpha2: hoveredData.id2 } })}
                         className="inline-flex items-center gap-1 text-[var(--brand)] dark:text-[var(--brand-300)] hover:underline cursor-pointer"
                         title={`View ${getLabel(hoveredData.id2)} country page`}
                       >
@@ -475,7 +1083,7 @@ export function RealCorridorMap({ corridors, getCountryName, limit, mode = 'coun
                   <th className="px-3 py-2 text-center font-semibold border-l border-slate-200 dark:border-neutral-700">
                     {mode === 'country' ? (
                       <button
-                        onClick={() => navigate(`/country/${hoveredData.id2}`, { state: { name: getLabel(hoveredData.id2), isoAlpha2: hoveredData.id2 } })}
+                        onClick={() => navigate(countryPath({ isoAlpha2: hoveredData.id2, name: getLabel(hoveredData.id2) }), { state: { name: getLabel(hoveredData.id2), isoAlpha2: hoveredData.id2 } })}
                         className="inline-flex items-center gap-1 text-[var(--brand)] dark:text-[var(--brand-300)] hover:underline cursor-pointer"
                         title={`View ${getLabel(hoveredData.id2)} country page`}
                       >
@@ -488,7 +1096,7 @@ export function RealCorridorMap({ corridors, getCountryName, limit, mode = 'coun
                     <span className="text-slate-400 dark:text-slate-500 font-normal mx-1">→</span>
                     {mode === 'country' ? (
                       <button
-                        onClick={() => navigate(`/country/${hoveredData.id1}`, { state: { name: getLabel(hoveredData.id1), isoAlpha2: hoveredData.id1 } })}
+                        onClick={() => navigate(countryPath({ isoAlpha2: hoveredData.id1, name: getLabel(hoveredData.id1) }), { state: { name: getLabel(hoveredData.id1), isoAlpha2: hoveredData.id1 } })}
                         className="inline-flex items-center gap-1 text-[var(--brand)] dark:text-[var(--brand-300)] hover:underline cursor-pointer"
                         title={`View ${getLabel(hoveredData.id1)} country page`}
                       >
@@ -565,14 +1173,11 @@ export function RealCorridorMap({ corridors, getCountryName, limit, mode = 'coun
             </table>
           </div>
 
-          {/* Footer */}
-          <div className="px-4 py-2 border-t border-slate-200 dark:border-neutral-700 flex items-center gap-1.5 text-xs text-slate-400 dark:text-slate-500">
-            <span>Data provided by</span>
-            <SourceBadge source="allium" label="Corridor volume data" />
-            {mode === 'country' && (
+          {mode === 'country' && (
+            <div className="px-4 py-2 border-t border-slate-200 dark:border-neutral-700 flex items-center text-xs text-slate-400 dark:text-slate-500">
               <span className="ml-auto italic">Click a country to view details</span>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       )}
 

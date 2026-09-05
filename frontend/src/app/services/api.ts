@@ -1,4 +1,8 @@
-const BASE_URL = 'http://localhost:3003/v1';
+import { prettyCountryName, resolveCountryNumericId, shortCountryName } from '../lib/countryRoutes';
+
+const BASE_URL =
+    import.meta.env.VITE_API_BASE_URL ||
+    (import.meta.env.DEV ? 'http://localhost:3003/v1' : '/v1');
 
 export interface ApiCountry {
   id: number;
@@ -150,15 +154,9 @@ export interface CountryPage<T> {
   items: T[];
 }
 
-/** Resolve a country URL param (numeric string or alpha-2) to an integer numeric ID. */
+/** Resolve a country slug (japan) or ISO code to the numeric id used by the API. */
 export function resolveToNumericId(code: string): number | null {
-  if (/^\d+$/.test(code)) return parseInt(code, 10);
-  const TABLE: Record<string, number> = {
-    US:840, BR:76, AR:32, MX:484, NG:566, KE:404, IN:356, CN:156, JP:392,
-    TR:792, DE:276, FR:250, GB:826, VE:862, PH:608, AU:36, AT:40, TW:158,
-    ID:360, KR:410, NL:528, ZA:710, UA:804, IR:364,
-  };
-  return TABLE[code.toUpperCase()] ?? null;
+  return resolveCountryNumericId(code);
 }
 
 async function fetchJson<T>(path: string): Promise<T> {
@@ -169,9 +167,27 @@ async function fetchJson<T>(path: string): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+function withPrettyName<T extends { name: string; countryId?: string; isoAlpha2?: string; id?: number }>(row: T): T {
+  const countryId = row.countryId ?? (row.id != null ? String(row.id) : undefined);
+  const name = prettyCountryName({ name: row.name, countryId, isoAlpha2: row.isoAlpha2 });
+  return name ? { ...row, name } : row;
+}
+
+function withPrettyPartnerNames(flow: CountryCorridorFlow): CountryCorridorFlow {
+  return {
+    ...flow,
+    fromName: flow.fromName
+      ? prettyCountryName({ name: flow.fromName, countryId: flow.from }) || shortCountryName(flow.fromName)
+      : flow.fromName,
+    toName: flow.toName
+      ? prettyCountryName({ name: flow.toName, countryId: flow.to }) || shortCountryName(flow.toName)
+      : flow.toName,
+  };
+}
+
 export const api = {
-  getCountry: (numericId: number) =>
-    fetchJson<ApiCountry>(`/countries/${numericId}`),
+  getCountry: async (numericId: number) =>
+    withPrettyName(await fetchJson<ApiCountry>(`/countries/${numericId}`)),
 
   getCountryIssuers: (numericId: number) =>
     fetchJson<ApiIssuer[]>(`/countries/${numericId}/regulated-issuers`),
@@ -185,7 +201,9 @@ export const api = {
   getAdoptionAnalytics: (year: number, month?: number) => {
     const params = new URLSearchParams({ year: String(year) });
     if (month !== undefined) params.set('month', String(month));
-    return fetchJson<CountryAdoptionMetric[]>(`/analytics/adoption?${params}`);
+    return fetchJson<CountryAdoptionMetric[]>(`/analytics/adoption?${params}`).then((rows) =>
+      rows.map(withPrettyName),
+    );
   },
 
   getRegionalAdoptionAnalytics: (year: number, month?: number) => {
@@ -217,17 +235,26 @@ export const api = {
   getCountryOverview: (numericId: number, year: number, month?: number) => {
     const params = new URLSearchParams({ year: String(year) });
     if (month !== undefined) params.set('month', String(month));
-    return fetchJson<CountryOverview>(`/analytics/countries/${numericId}/overview?${params}`);
+    return fetchJson<CountryOverview>(`/analytics/countries/${numericId}/overview?${params}`).then(withPrettyName);
   },
 
   getCountryCorridors: (numericId: number, year: number, month?: number) => {
     const params = new URLSearchParams({ year: String(year) });
     if (month !== undefined) params.set('month', String(month));
-    return fetchJson<CountryCorridorBreakdown>(`/analytics/countries/${numericId}/corridors?${params}`);
+    return fetchJson<CountryCorridorBreakdown>(`/analytics/countries/${numericId}/corridors?${params}`).then(
+      (data) => ({
+        ...data,
+        inflows: data.inflows.map(withPrettyPartnerNames),
+        outflows: data.outflows.map(withPrettyPartnerNames),
+      }),
+    );
   },
 
   getCountriesRegulation: () =>
-    fetchJson<CountryPage<CountryRegulationInfo>>('/countries?pageSize=200'),
+    fetchJson<CountryPage<CountryRegulationInfo>>('/countries?pageSize=200').then((page) => ({
+      ...page,
+      items: page.items.map(withPrettyName),
+    })),
 
   getGlobalInsights: (year: number, month?: number) => {
     const params = new URLSearchParams({ year: String(year) });
