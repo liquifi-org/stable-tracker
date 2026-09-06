@@ -26,6 +26,8 @@ import { countryPath } from '../../app/lib/countryRoutes';
 type GeoMode = 'country' | 'region';
 type TableKind = 'countries' | 'corridors';
 
+const TOP_NAMED_CORRIDORS = 12;
+
 function pctChange(current: number, previous: number): number | null {
   return previous > 0 ? ((current - previous) / previous) * 100 : null;
 }
@@ -42,6 +44,7 @@ export function OverviewView() {
   const [regionalData, setRegionalData] = useState<RegionalAdoptionMetric[]>([]);
   const [geoMode, setGeoMode] = useState<GeoMode>('country');
   const [tableKind, setTableKind] = useState<TableKind>('countries');
+  const [showAllCorridors, setShowAllCorridors] = useState(false);
   const [corridorData, setCorridorData] = useState<CorridorFlow[]>([]);
   const [corridorLoading, setCorridorLoading] = useState(false);
   const [previousCorridorVolume, setPreviousCorridorVolume] = useState<number | null>(null);
@@ -96,6 +99,10 @@ export function OverviewView() {
       .then(setCorridorData)
       .catch(() => setCorridorData([]))
       .finally(() => setCorridorLoading(false));
+  }, [filters.year, filters.month, filters.regionFrom, filters.regionTo, filters.stablecoin, filters.referenceAsset]);
+
+  useEffect(() => {
+    setShowAllCorridors(false);
   }, [filters.year, filters.month, filters.regionFrom, filters.regionTo, filters.stablecoin, filters.referenceAsset]);
 
   useEffect(() => {
@@ -490,7 +497,9 @@ export function OverviewView() {
                   {tableKind === 'corridors'
                     ? geoMode === 'region'
                       ? `${regionalCorridors.length} pairs · domestic not in this data`
-                      : 'Top 12 by volume · domestic not in this data'
+                      : showAllCorridors || bidirectionalCorridors.length <= TOP_NAMED_CORRIDORS
+                        ? `${bidirectionalCorridors.length} pairs · domestic not in this data`
+                        : `Top ${TOP_NAMED_CORRIDORS} of ${bidirectionalCorridors.length} by volume · domestic not in this data`
                     : geoMode === 'region'
                       ? `${regionalData.length} regions`
                       : `${adoptionTableData.length} countries · gray on the map is <10k wallets`}
@@ -509,7 +518,14 @@ export function OverviewView() {
             </div>
 
             {tableKind === 'corridors' ? (
-              <div className="divide-y divide-[var(--hairline)]">
+              <>
+              <div
+                className={`divide-y divide-[var(--hairline)]${
+                  showAllCorridors && geoMode === 'country' && bidirectionalCorridors.length > TOP_NAMED_CORRIDORS
+                    ? ' max-h-[28rem] overflow-y-auto pr-1'
+                    : ''
+                }`}
+              >
                 {corridorLoading && bidirectionalCorridors.length === 0 ? (
                   <Skeleton className="h-40 w-full" />
                 ) : geoMode === 'region' ? (
@@ -526,7 +542,10 @@ export function OverviewView() {
                       />
                     ))
                 ) : (
-                  bidirectionalCorridors.slice(0, 12).map((pair) => {
+                  (showAllCorridors
+                    ? bidirectionalCorridors
+                    : bidirectionalCorridors.slice(0, TOP_NAMED_CORRIDORS)
+                  ).map((pair) => {
                     const leftId = alpha2ToNumeric.get(pair.country1);
                     return (
                       <NamedCorridorRow
@@ -561,6 +580,18 @@ export function OverviewView() {
                   })
                 )}
               </div>
+              {geoMode === 'country' && bidirectionalCorridors.length > TOP_NAMED_CORRIDORS && (
+                <button
+                  type="button"
+                  onClick={() => setShowAllCorridors((open) => !open)}
+                  className="mt-3 text-[13px] font-medium text-[var(--brand-700)] dark:text-[var(--brand-300)] hover:underline"
+                >
+                  {showAllCorridors
+                    ? `Show top ${TOP_NAMED_CORRIDORS}`
+                    : `Show all ${bidirectionalCorridors.length}`}
+                </button>
+              )}
+              </>
             ) : geoMode === 'country' && adoptionTableData.length > 0 ? (
               <DataTable
                 data={adoptionTableData}
