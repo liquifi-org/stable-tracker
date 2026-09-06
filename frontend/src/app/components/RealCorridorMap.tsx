@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router';
-import { geoPath } from 'd3-geo';
+import { geoCentroid, geoPath } from 'd3-geo';
 import { feature } from 'topojson-client';
 import { Plus, Minus, RotateCcw, ChevronDown } from 'lucide-react';
 import { useMapZoomPan } from '../hooks/useMapZoomPan';
@@ -10,6 +10,7 @@ import { useCurrencyFormat } from '../hooks/useCurrencyFormat';
 import { CountryFlag } from './CountryFlag';
 import type { CountryAdoptionMetric, RegionalAdoptionMetric } from '../services/api';
 import { countryPath } from '../lib/countryRoutes';
+import { ISO_COUNTRIES } from '../lib/iso3166';
 
 type MapViewMode = 'country' | 'region';
 
@@ -41,7 +42,6 @@ interface BidirectionalRegionalCorridor {
 interface RealCorridorMapProps {
   corridors: BidirectionalCorridor[];
   getCountryName: (code: string) => string;
-  limit?: number;
   mode?: MapViewMode;
   regionalCorridors?: BidirectionalRegionalCorridor[];
   /** Mercator scale in the map viewBox. Default 140. Lower is more zoomed out. */
@@ -76,13 +76,9 @@ const countryCentroids: Record<string, [number, number]> = {
 };
 
 /** world-atlas numeric ids → corridor alpha-2 used by centroids / flows. */
-const NUMERIC_TO_ALPHA2: Record<string, string> = {
-  '840': 'US', '484': 'MX', '076': 'BR', '032': 'AR', '862': 'VE',
-  '826': 'GB', '250': 'FR', '276': 'DE', '792': 'TR', '566': 'NG',
-  '404': 'KE', '356': 'IN', '156': 'CN', '392': 'JP', '608': 'PH',
-  '036': 'AU', '040': 'AT', '158': 'TW', '360': 'ID', '410': 'KR',
-  '528': 'NL', '710': 'ZA', '804': 'UA', '364': 'IR',
-};
+const NUMERIC_TO_ALPHA2: Record<string, string> = Object.fromEntries(
+  ISO_COUNTRIES.map((c) => [c.numeric, c.alpha2]),
+);
 
 function alpha2FromFeatureId(id: unknown): string | undefined {
   return NUMERIC_TO_ALPHA2[String(id).padStart(3, '0')];
@@ -151,7 +147,6 @@ function quadPoint(
 export function RealCorridorMap({
   corridors,
   getCountryName,
-  limit,
   mode = 'country',
   regionalCorridors = [],
   projectionScale = 140,
@@ -231,7 +226,20 @@ export function RealCorridorMap({
     resetView();
   };
 
-  const centroids = mode === 'region' ? regionCentroids : countryCentroids;
+  const countryCentroidMap = useMemo(() => {
+    const mapped: Record<string, [number, number]> = { ...countryCentroids };
+    if (!worldData) return mapped;
+    const geojson = feature(worldData, worldData.objects.countries) as GeoJSON.FeatureCollection;
+    for (const geo of filterMapFeatures(geojson.features, hideAntarctica)) {
+      const alpha2 = NUMERIC_TO_ALPHA2[String(geo.id).padStart(3, '0')];
+      if (!alpha2 || countryCentroids[alpha2]) continue;
+      const [lon, lat] = geoCentroid(geo as GeoJSON.Feature);
+      if (Number.isFinite(lon) && Number.isFinite(lat)) mapped[alpha2] = [lon, lat];
+    }
+    return mapped;
+  }, [worldData, hideAntarctica]);
+
+  const centroids = mode === 'region' ? regionCentroids : countryCentroidMap;
   const getLabel = mode === 'region' ? (id: string) => id : getCountryName;
 
   const allItems: DisplayCorridor[] = useMemo(() => {
@@ -261,7 +269,14 @@ export function RealCorridorMap({
       }));
   }, [mode, corridors, regionalCorridors]);
 
-  const displayItems = limit !== undefined ? allItems.slice(0, limit) : allItems;
+  const displayItems = allItems;
+  const paintItems = useMemo(
+    () =>
+      displayItems
+        .map((corridor, index) => ({ corridor, index }))
+        .sort((a, b) => a.corridor.totalValue - b.corridor.totalValue),
+    [displayItems],
+  );
 
   const spokeIds = useMemo(() => {
     const ids = new Set<string>();
@@ -339,17 +354,9 @@ export function RealCorridorMap({
       .sort((a, b) => b.totalValue - a.totalValue);
   }, [allItems, activePlace]);
   const hoveredSpokeCount = activeCorridors.length;
-  const drawnSpokeCount = useMemo(() => {
-    if (!activePlace) return 0;
-    return displayItems.filter((c) => c.id1 === activePlace || c.id2 === activePlace).length;
-  }, [displayItems, activePlace]);
   const corridorCaption = (() => {
     if (hoveredSpokeCount === 0) return 'No international corridors';
-    const n = `${hoveredSpokeCount} international corridor${hoveredSpokeCount === 1 ? '' : 's'}`;
-    if (drawnSpokeCount === 0 && limit != null) {
-      return `${n} · not in the ${limit} largest`;
-    }
-    return n;
+    return `${hoveredSpokeCount} international corridor${hoveredSpokeCount === 1 ? '' : 's'}`;
   })();
   const corridorTotals = useMemo(() => {
     const outbound = activeCorridors.reduce((s, c) => s + c.outbound, 0);
@@ -658,7 +665,7 @@ export function RealCorridorMap({
               );
             })}
 
-            {displayItems.map((corridor, index) => {
+            {paintItems.map(({ corridor, index }) => {
               const fromCoords = centroids[corridor.id1];
               const toCoords = centroids[corridor.id2];
               if (!fromCoords || !toCoords) return null;
@@ -942,11 +949,6 @@ export function RealCorridorMap({
                 <p className="text-xs text-slate-500 dark:text-slate-400 italic">No international corridors</p>
               ) : (
                 <div className="max-h-56 overflow-y-auto pr-1">
-                  {drawnSpokeCount === 0 && limit != null && (
-                    <p className="text-[10px] text-slate-500 dark:text-slate-400 pb-1.5">
-                      Not in the {limit} largest corridors drawn on the map
-                    </p>
-                  )}
                   {activeCorridors.map((row) => (
                     <div
                       key={row.partner}

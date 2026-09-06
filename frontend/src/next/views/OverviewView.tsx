@@ -465,7 +465,6 @@ export function OverviewView() {
                 regionalAdoption={regionalData}
                 mode={geoMode}
                 getCountryName={(alpha2) => countryNameByAlpha2.get(alpha2) ?? alpha2}
-                limit={20}
                 hideAntarctica
                 countrySpokeHover
               />
