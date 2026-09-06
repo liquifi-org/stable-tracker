@@ -1,6 +1,8 @@
 import { useEffect } from 'react';
 
 const SITE = 'Stablecoin Tracker';
+const SITE_ORIGIN = 'https://stabletracker.org';
+const OG_IMAGE = `${SITE_ORIGIN}/og-image.png`;
 
 export const SEO = {
   site: SITE,
@@ -76,13 +78,20 @@ export function usePageMeta(opts: {
     document.title = title;
     upsertMeta('name', 'description', description);
     upsertMeta('name', 'robots', 'index,follow');
+    upsertMeta('property', 'og:site_name', SITE);
     upsertMeta('property', 'og:title', title);
     upsertMeta('property', 'og:description', description);
     upsertMeta('property', 'og:type', 'website');
     upsertMeta('property', 'og:url', url);
-    upsertMeta('name', 'twitter:card', 'summary');
+    upsertMeta('property', 'og:image', OG_IMAGE);
+    upsertMeta('property', 'og:image:type', 'image/png');
+    upsertMeta('property', 'og:image:width', '1200');
+    upsertMeta('property', 'og:image:height', '630');
+    upsertMeta('property', 'og:image:alt', SITE);
+    upsertMeta('name', 'twitter:card', 'summary_large_image');
     upsertMeta('name', 'twitter:title', title);
     upsertMeta('name', 'twitter:description', description);
+    upsertMeta('name', 'twitter:image', OG_IMAGE);
     upsertCanonical(url);
     let data: object | null = null;
     if (json) {
