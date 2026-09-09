@@ -3,6 +3,7 @@ import alliumLogo from '../../assets/logos/allium.svg';
 import strideLogoWhite from '../../assets/logos/stride_white.svg';
 import firmshiftLogo from '../../assets/logos/firmshift.svg';
 import eyLogoWhite from '../../assets/logos/ey_white.png';
+import stablecoinInsiderLogo from '../../assets/logos/stablecoin_insider.png';
 
 const GITHUB_URL = 'https://github.com/liquifi-org/stable-tracker';
 const CURRENT_YEAR = new Date().getFullYear();
@@ -41,6 +42,20 @@ export function Footer() {
             <li>
               <a href="https://firmshift.com" target="_blank" rel="noopener noreferrer" title="FirmShift">
                 <img src={firmshiftLogo} alt="FirmShift" className="footer-logo footer-logo-firmshift" />
+              </a>
+            </li>
+            <li>
+              <a
+                href="https://stablecoininsider.org"
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Stablecoin Insider"
+              >
+                <img
+                  src={stablecoinInsiderLogo}
+                  alt="Stablecoin Insider"
+                  className="footer-logo footer-logo-stablecoin-insider"
+                />
               </a>
             </li>
           </ul>

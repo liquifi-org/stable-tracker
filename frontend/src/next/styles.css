@@ -120,6 +120,9 @@ html.next-ia .footer-logo-firmshift {
   height: calc(var(--footer-ey-height) * 1.35 / 1.85);
   filter: brightness(0) invert(1);
 }
+html.next-ia .footer-logo-stablecoin-insider {
+  height: calc(var(--footer-ey-height) * 1.7 / 1.85);
+}
 html.next-ia .footer-logo-stride {
   display: block;
   height: calc(var(--footer-ey-height) * 0.95 / 1.85);
@@ -135,7 +138,7 @@ html.next-ia .footer-logo-stride img {
   margin-top: calc(var(--footer-ey-height) * 0.95 / 1.85 * -15 / 211);
 }
 
-@media (max-width: 70rem) {
+@media (max-width: 80rem) {
   html.next-ia {
     --footer-ey-width: calc(1.85rem * 4167 / 1420);
   }
@@ -144,7 +147,7 @@ html.next-ia .footer-logo-stride img {
   }
 }
 
-@media (max-width: 34rem) {
+@media (max-width: 40rem) {
   html.next-ia .footer-logos {
     flex-wrap: wrap;
     gap: 1.25rem 2rem;
