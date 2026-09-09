@@ -10,12 +10,12 @@ const CURRENT_YEAR = new Date().getFullYear();
 export function Footer() {
   return (
     <footer className="ink-header mt-auto border-t border-white/[0.08]">
-      <div className="px-5 sm:px-8 py-7 flex flex-col xl:flex-row xl:items-end xl:justify-between gap-8">
+      <div className="px-5 sm:px-8 py-9 flex flex-col gap-8">
         <div>
-          <p className="text-[11px] font-semibold tracking-[0.18em] uppercase text-white/45 mb-5">
+          <p className="text-[11px] font-semibold tracking-[0.18em] uppercase text-white/45 mb-6">
             Contributing organizations
           </p>
-          <ul className="flex items-center gap-x-9 gap-y-5 flex-wrap list-none p-0 m-0">
+          <ul className="footer-logos">
             <li>
               <a href="https://www.ey.com" target="_blank" rel="noopener noreferrer" title="EY">
                 <img src={eyLogoWhite} alt="EY" className="footer-logo footer-logo-ey" />

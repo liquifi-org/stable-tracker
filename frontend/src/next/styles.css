@@ -14,6 +14,8 @@ html.next-ia {
   --muted-ink: #6a645c;
   --ink-text: #1c1915;
   --radius: 0.85rem;
+  --footer-ey-width: 200px;
+  --footer-ey-height: calc(var(--footer-ey-width) * 1420 / 4167);
 }
 
 html.next-ia.dark {
@@ -77,7 +79,24 @@ html.next-ia .ink-header {
   border-bottom: 1px solid color-mix(in oklab, white 8%, transparent);
 }
 
-/* Footer logos: flatten to white on ink, same optical height */
+/* Footer logos: EY wordmark is 200px on a wide row. If that row would wrap,
+ * drop to the previous compact size first; wrap only after that. */
+html.next-ia .footer-logos {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: flex-end;
+  gap: 3.5rem;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+html.next-ia .footer-logos li,
+html.next-ia .footer-logos a {
+  display: flex;
+  align-items: flex-end;
+  flex-shrink: 0;
+  line-height: 0;
+}
 html.next-ia .footer-logo {
   display: block;
   width: auto;
@@ -90,29 +109,46 @@ html.next-ia a:hover .footer-logo-stride {
   opacity: 1;
 }
 html.next-ia .footer-logo-ey {
-  height: 1.85rem;
+  width: var(--footer-ey-width);
+  height: auto;
 }
 html.next-ia .footer-logo-allium {
-  height: 1.55rem;
+  height: calc(var(--footer-ey-height) * 1.55 / 1.85);
   filter: brightness(0) invert(1);
 }
 html.next-ia .footer-logo-firmshift {
-  height: 1.35rem;
+  height: calc(var(--footer-ey-height) * 1.35 / 1.85);
   filter: brightness(0) invert(1);
 }
 html.next-ia .footer-logo-stride {
   display: block;
-  height: 1.35rem;
-  width: 6.4rem;
+  height: calc(var(--footer-ey-height) * 0.95 / 1.85);
+  width: calc(var(--footer-ey-height) * 0.95 / 1.85 * 1012 / 211);
   overflow: hidden;
   opacity: 0.88;
 }
 html.next-ia .footer-logo-stride img {
   display: block;
-  height: 2.45rem;
+  height: calc(var(--footer-ey-height) * 0.95 / 1.85 * 446 / 211);
   width: auto;
   max-width: none;
-  margin-top: -0.08rem;
+  margin-top: calc(var(--footer-ey-height) * 0.95 / 1.85 * -15 / 211);
+}
+
+@media (max-width: 70rem) {
+  html.next-ia {
+    --footer-ey-width: calc(1.85rem * 4167 / 1420);
+  }
+  html.next-ia .footer-logos {
+    gap: 2.25rem;
+  }
+}
+
+@media (max-width: 34rem) {
+  html.next-ia .footer-logos {
+    flex-wrap: wrap;
+    gap: 1.25rem 2rem;
+  }
 }
 
 /* Tables: ink header instead of electric brand bar */
