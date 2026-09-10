@@ -60,10 +60,10 @@ export function resolveMapActivate(opts: {
 }): { type: 'disambiguate'; ids: string[] } | { type: 'pin'; id: string } | { type: 'close' } {
   const uniqueHits = [...new Set(opts.hits.map((h) => h.id))].filter((id) => opts.selectable.has(id));
   const pathOk = opts.pathId && opts.selectable.has(opts.pathId) ? opts.pathId : null;
+  if (pathOk) return { type: 'pin', id: pathOk };
   if (opts.zoom < MAP_DISAMBIGUATE_ZOOM && uniqueHits.length > 1) {
     return { type: 'disambiguate', ids: uniqueHits };
   }
-  if (pathOk) return { type: 'pin', id: pathOk };
   if (uniqueHits.length >= 1) return { type: 'pin', id: uniqueHits[0] };
   return { type: 'close' };
 }

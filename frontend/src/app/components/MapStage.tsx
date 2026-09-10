@@ -42,7 +42,7 @@ export function MapStageFrame({
         className={
           fullscreen
             ? 'relative h-dvh bg-[#F7FAFC] dark:bg-neutral-900'
-            : 'relative px-2 py-2 sm:px-5 sm:py-3 bg-[#F7FAFC] dark:bg-neutral-900'
+            : 'relative px-2 py-2 sm:px-5 sm:py-3 bg-[#F7FAFC] dark:bg-neutral-900 touch-none'
         }
       >
         {children}

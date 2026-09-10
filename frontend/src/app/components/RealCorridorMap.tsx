@@ -183,10 +183,14 @@ export function RealCorridorMap({
   const compact = useCompactMap();
   const finePointer = useFinePointer();
   const hoverEnabled = finePointer;
+  const onTapRef = useRef<(x: number, y: number, target: EventTarget | null) => void>(() => {});
   const {
     svgRef, setSvgRef, viewBox, zoom, minZoom, maxZoom, zoomIn, zoomOut, resetView, flyTo,
-    isDragging, draggedRef, pinchActiveRef, svgListeners,
-  } = useMapZoomPan({ coarse: !finePointer });
+    isDragging,
+  } = useMapZoomPan({
+    coarse: !finePointer,
+    onTap: (x, y, target) => onTapRef.current(x, y, target),
+  });
   const filters = useFilters();
   const navigate = useNavigate();
   const goToCountry = (ref: { name?: string; isoAlpha2?: string; countryId?: string }) => {
@@ -531,12 +535,10 @@ export function RealCorridorMap({
   };
 
   const handleCorridorClick = (index: number) => {
-    if (draggedRef.current) return;
     setSelectedCorridor(index);
   };
 
   const activateAt = (clientX: number, clientY: number, target: EventTarget | null) => {
-    if (draggedRef.current || pinchActiveRef.current) return;
     const svg = svgRef.current;
     if (!svg) return;
     const hits = nearestPlaces(svg, clientX, clientY, hitPlaces);
@@ -564,6 +566,7 @@ export function RealCorridorMap({
     }
     closePlace();
   };
+  onTapRef.current = activateAt;
 
   const hoveredData = hoveredCorridor !== null ? displayItems[hoveredCorridor] : null;
   const selectedData = selectedCorridor !== null ? displayItems[selectedCorridor] : null;
@@ -583,9 +586,19 @@ export function RealCorridorMap({
             {mode === 'country' && (
               <MapRegionJumps onJump={(id) => flyToPlace(id, compact ? 2.3 : 2)} />
             )}
+            {countrySpokeHover && pinned && activePlace && (
+              <button
+                type="button"
+                onClick={closePlace}
+                className="inline-flex items-center gap-1.5 rounded-full bg-white/95 dark:bg-neutral-800/95 border border-slate-200/60 dark:border-neutral-700 px-2.5 py-1.5 text-[11px] font-medium text-slate-800 dark:text-slate-100"
+              >
+                {mode === 'country' ? (hoveredMetric?.name ?? getLabel(activePlace)) : activePlace}
+                <span className="text-slate-400" aria-hidden>✕</span>
+              </button>
+            )}
             {countrySpokeHover && !seenHover && !activePlace && (
               <div className="pointer-events-none text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                {hoverEnabled ? 'Hover a country — click to open corridors' : 'Tap a country to open corridors'}
+                {hoverEnabled ? 'Hover a country — click to open corridors' : 'Tap a country · tap the ocean to clear'}
               </div>
             )}
             {countrySpokeHover && hoverEnabled && !pinned && activePlace && (
@@ -690,12 +703,6 @@ export function RealCorridorMap({
             ref={setSvgRef}
             viewBox={viewBox}
             className={`${fullscreen ? MAP_SVG_FULLSCREEN_CLASS : MAP_SVG_CLASS} ${zoom > minZoom ? (isDragging ? 'cursor-grabbing' : 'cursor-grab') : ''}`}
-            {...svgListeners}
-            onPointerUp={(e) => {
-              svgListeners.onPointerUp(e);
-              if (e.button !== 0 && e.pointerType === 'mouse') return;
-              activateAt(e.clientX, e.clientY, e.target);
-            }}
             onMouseLeave={() => {
               if (countrySpokeHover && hoverEnabled && !pinnedPlace) {
                 if (dismissTimeoutRef.current) clearTimeout(dismissTimeoutRef.current);

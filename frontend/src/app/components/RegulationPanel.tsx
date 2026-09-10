@@ -79,10 +79,14 @@ export function RegulationPanel({
   const compact = useCompactMap();
   const finePointer = useFinePointer();
   const hoverEnabled = finePointer;
+  const onTapRef = useRef<(x: number, y: number, target: EventTarget | null) => void>(() => {});
   const {
     svgRef, setSvgRef, viewBox, zoom, minZoom, maxZoom, zoomIn, zoomOut, resetView, flyTo,
-    isDragging, draggedRef, pinchActiveRef, svgListeners,
-  } = useMapZoomPan({ coarse: !finePointer });
+    isDragging,
+  } = useMapZoomPan({
+    coarse: !finePointer,
+    onTap: (x, y, target) => onTapRef.current(x, y, target),
+  });
   const inspectorRef = useRef<HTMLDivElement>(null);
 
   const scrollToInspector = () => {
@@ -197,7 +201,6 @@ export function RegulationPanel({
   };
 
   const handleCountryClick = (id: string) => {
-    if (draggedRef.current) return;
     const country = countryDataMap.get(id);
     if (!country) return;
     if (pinnedId === id) {
@@ -272,7 +275,6 @@ export function RegulationPanel({
   });
 
   const activateAt = (clientX: number, clientY: number, target: EventTarget | null) => {
-    if (draggedRef.current || pinchActiveRef.current) return;
     const svg = svgRef.current;
     if (!svg) return;
     const hits = nearestPlaces(svg, clientX, clientY, hitPlaces);
@@ -300,6 +302,7 @@ export function RegulationPanel({
     }
     closePlace();
   };
+  onTapRef.current = activateAt;
 
   const inspector = pinnedCountry ? (
     <>
@@ -447,12 +450,6 @@ export function RegulationPanel({
               ref={setSvgRef}
               viewBox={viewBox}
               className={`${fullscreen ? MAP_SVG_FULLSCREEN_CLASS : MAP_SVG_CLASS} ${zoom > minZoom ? (isDragging ? 'cursor-grabbing' : 'cursor-grab') : ''}`}
-              {...svgListeners}
-              onPointerUp={(e) => {
-                svgListeners.onPointerUp(e);
-                if (e.button !== 0 && e.pointerType === 'mouse') return;
-                activateAt(e.clientX, e.clientY, e.target);
-              }}
               onMouseLeave={() => {
                 if (hoverEnabled && !pinnedId) setHoveredId(null);
               }}
@@ -540,6 +537,7 @@ export function RegulationPanel({
         {compact ? (
           <MapInspectorSheet
             open={Boolean(pinnedCountry)}
+            overlay={fullscreen}
             onOpenChange={(open) => {
               if (!open) closePlace();
             }}
