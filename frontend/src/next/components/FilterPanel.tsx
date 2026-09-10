@@ -252,7 +252,7 @@ export function FilterPanel() {
           <b className="text-slate-600 dark:text-slate-300">Outbound vs GDP</b> is international outbound corridors ÷ (annual GDP × period months / 12). Rank includes countries with outbound volume and GDP.
         </p>
         <p>
-          <b className="text-slate-600 dark:text-slate-300">Wallets per 100k</b> is wallets ÷ World Bank population. It is a people-scale figure, not the rank.
+          <b className="text-slate-600 dark:text-slate-300">Wallets per 100k</b> is wallets ÷ population (World Bank, then CIA / Wikipedia where the Bank is silent). It is a people-scale figure, not the rank.
         </p>
         <p>
           <b className="text-slate-600 dark:text-slate-300">Digital dollars</b> is the share of corridor USD volume in USD-referenced stablecoins.
@@ -264,7 +264,7 @@ export function FilterPanel() {
           <b className="text-slate-600 dark:text-slate-300">Live framework</b> is regulatory stage and does not change with the month slider.
         </p>
         <p>
-          Corridor maps are <b className="text-slate-600 dark:text-slate-300">international pairs only</b>. Domestic volume is not in this dataset.
+          Corridor maps are <b className="text-slate-600 dark:text-slate-300">international pairs only</b>, using Allium adjusted volume (CEX / DEX / infra / MEV / short-term routing stripped). Domestic volume is not in this dataset.
         </p>
       </div>
     </>

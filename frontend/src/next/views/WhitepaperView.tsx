@@ -3,7 +3,7 @@ import { Link } from 'react-router';
 import { FileText, Printer, Quote, Check } from 'lucide-react';
 import { SEO, usePageMeta } from '../lib/seo';
 
-const VERSION = '1.1';
+const VERSION = '1.2';
 const PUBLISHED = '10 September 2026';
 const SITE_URL = 'https://stabletracker.org';
 const CITE = `Stablecoin Tracker. (2026). Whitepaper: measuring stablecoin usage, corridors, and regulation (v${VERSION}). ${SITE_URL}/whitepaper`;
@@ -247,7 +247,7 @@ export function WhitepaperView() {
             />
             <Principle
               name="Named sources"
-              body="On-chain activity is Allium. Population and remittance outflows are World Bank. Nominal GDP is World Bank NY.GDP.MKTP.CD, with IMF WEO, CIA Factbook, and Wikipedia fallbacks where the Bank is silent (Taiwan is the usual case). Regulatory stage, licenses, and reserve-type permissions are Stride."
+              body="On-chain activity is Allium. Population is World Bank SP.POP.TOTL, with CIA Factbook and Wikipedia fallbacks where the Bank is silent (Taiwan is the usual case). Remittance outflows are World Bank. Nominal GDP is World Bank NY.GDP.MKTP.CD, with IMF WEO, CIA Factbook, and Wikipedia fallbacks. Regulatory stage, licenses, and reserve-type permissions are Stride."
             />
           </dl>
         </Section>
@@ -278,15 +278,17 @@ export function WhitepaperView() {
             wallet penetration = active wallets ÷ population
           </Formula>
           <p>
-            Population is the latest World Bank <code>SP.POP.TOTL</code> figure on the country
-            record. The overview table also shows wallets per 100,000 people
+            Population is the latest figure on the country record. World Bank
+            <code>SP.POP.TOTL</code> is first. Where the Bank is silent — Taiwan is the usual case —
+            we store CIA World Factbook or Wikipedia demographics, then a pinned last-resort
+            figure. The overview table also shows wallets per 100,000 people
             (<em>rate × 100,000</em>). This is a people-scale figure and a reading aid for market
             classification. It is <strong>not</strong> the country rank.
           </p>
           <p>
-            If population is missing, penetration is zero. Taiwan is the usual World Bank gap for
-            this series; GDP for Taiwan is filled from IMF WEO so the country can still be ranked
-            under §3.3.
+            If population is still missing after those fallbacks, the table shows an em dash rather
+            than a zero rate. GDP for Taiwan is filled from IMF WEO so the country can still be
+            ranked under §3.3.
           </p>
 
           <h3 className="display text-xl mt-8 mb-2">3.3 GDP intensity and adoption rank</h3>
@@ -324,15 +326,20 @@ export function WhitepaperView() {
           <h3 className="display text-xl mt-8 mb-2">3.4 Corridor volume</h3>
           <p>
             A corridor snapshot is one Allium aggregate per (sender country × receiver country ×
-            token) per month, stored as a transaction of type <code>corridor</code>. Volume is the
-            sum of those USD amounts for the selected period, optionally filtered by token, reference
-            asset, and region. The overview map merges A→B with B→A into an undirected pair so the
-            reader sees a route, then splits the pair to show which side sent more.
+            token) per month, stored as a transaction of type <code>corridor</code>. The source
+            table is <code>stablecoins.intelligence.enriched_transfers</code>, restricted to
+            transfers that pass Allium’s Visa-methodology <code>is_adjusted_volume</code> gate:
+            both sides are organic addresses (not CEX, DeFi, or infrastructure), and bot / MEV /
+            short-term-routing flags are applied. That strips DEX liquidity legs, exchange hot-wallet
+            hops, bridges, and most pump-style routing. It is not a remittance series.
           </p>
           <p>
-            Sender = receiver (domestic) rows are not displayed. Regional corridors are the same
-            international pairs rolled up by each country’s macro-region, dropping intra-region
-            flows.
+            Volume is the sum of those USD amounts for the selected period, optionally filtered by
+            token, reference asset, and region. The overview map merges A→B with B→A into an
+            undirected pair so the reader sees a route, then splits the pair to show which side
+            sent more. Sender = receiver (domestic) rows are not displayed. Regional corridors are
+            the same international pairs rolled up by each country’s macro-region, dropping
+            intra-region flows.
           </p>
 
           <h3 className="display text-xl mt-8 mb-2">3.5 Dollarization index</h3>
@@ -353,11 +360,11 @@ export function WhitepaperView() {
             Remittances are World Bank <code>BM.TRF.PWKR.CD.DT</code> — personal remittances paid,
             current USD, the latest non-empty year, stored on the country and pro-rated to the
             selected month so a monthly corridor total is not compared with a yearly official
-            figure. The ratio is a comparison, not an identity: stablecoin corridors include
-            treasury, trading, and commercial payments that are not remittances, and official
-            remittances include channels that are not stablecoins. A high ratio means “this rail is
-            large relative to the recorded remittance outflows,” not “X% of remittances are
-            stablecoins.”
+            figure. The ratio is a comparison, not an identity: even after the adjusted-volume
+            gate, corridors still include organic P2P, commercial, and some treasury payments that
+            are not remittances, and official remittances include channels that are not stablecoins.
+            A high ratio means “this rail is large relative to the recorded remittance outflows,”
+            not “X% of remittances are stablecoins.”
           </p>
 
           <h3 className="display text-xl mt-8 mb-2">3.7 Regulatory stage</h3>
@@ -442,14 +449,17 @@ export function WhitepaperView() {
                 </tr>
                 <tr className="border-t border-[var(--hairline)]">
                   <td className="px-3 py-2">International corridor volume</td>
-                  <td className="px-3 py-2">Allium Explorer</td>
+                  <td className="px-3 py-2">
+                    Allium <code>enriched_transfers</code>, <code>is_adjusted_volume</code>
+                  </td>
                   <td className="px-3 py-2">Monthly snapshot</td>
                   <td className="px-3 py-2">Sender / receiver country</td>
                 </tr>
                 <tr className="border-t border-[var(--hairline)]">
                   <td className="px-3 py-2">Population</td>
                   <td className="px-3 py-2">
-                    World Bank Open Data, indicator <code>SP.POP.TOTL</code>
+                    World Bank Open Data, indicator <code>SP.POP.TOTL</code>;
+                    CIA Factbook / Wikipedia where the Bank is silent
                   </td>
                   <td className="px-3 py-2">Yearly (latest non-empty)</td>
                   <td className="px-3 py-2">ISO alpha-3 → numeric</td>
@@ -554,8 +564,14 @@ export function WhitepaperView() {
             </li>
             <li>
               <strong>Remittance ratios are a comparison of unlike series.</strong> See §3.6.
-              Official remittances lag, miss informal channels, and are annual; corridors include
-              non-remittance payments.
+              Official remittances lag, miss informal channels, and are annual; adjusted corridors
+              still include organic payments that are not remittances.
+            </li>
+            <li>
+              <strong>Adjusted volume is not a census of payments.</strong> CEX deposits and
+              withdrawals are excluded, so a remittance that only appears as “off an exchange,
+              then one hop” is undercounted. Newly unlabeled DEX or pump programs can leak in
+              until Allium’s weekly attribution catches them.
             </li>
             <li>
               <strong>Coverage follows the sources.</strong> Chains, tokens, and countries Allium

@@ -587,10 +587,12 @@ paths:
   /admin/sync/population:
     post:
       tags: [Admin]
-      summary: Sync country population figures (World Bank)
+      summary: Sync country population figures
       description: |
         Private maintenance endpoint. Fetches the latest population per country
-        from the World Bank Open Data API and upserts it onto the Country docs.
+        from World Bank Open Data, then CIA Factbook / Wikipedia / pinned
+        fallbacks for territories the Bank does not publish, and upserts it
+        onto the Country docs.
 
         Requires the secret admin token (env `ADMIN_SYNC_TOKEN`) sent in the
         `x-admin-token` header.
@@ -1020,6 +1022,9 @@ components:
         activeWallets:
           type: integer
           description: Number of active wallets holding stablecoins.
+        population:
+          type: number
+          description: Latest stored headcount. Omitted when no source could fill it.
         txValueShare:
           type: number
           format: double
@@ -1112,6 +1117,7 @@ components:
         region: { type: string }
         adoptionRate: { type: number, format: double, description: Wallet penetration (not the rank) }
         activeWallets: { type: integer, description: Wallets holding stablecoins (latest monthly Allium snapshot) }
+        population: { type: number, description: Latest stored headcount. Omitted when no source could fill it. }
         txValueShare: { type: number, format: double }
         dollarizationIndex: { type: number, format: double, minimum: 0, maximum: 1 }
         gdp: { type: number, format: double }

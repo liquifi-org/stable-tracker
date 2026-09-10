@@ -394,9 +394,11 @@ export function CountryBriefingView() {
             loading={overviewLoading}
             value={overview ? overview.activeWallets.toLocaleString() : '—'}
             sub={
-              overview
+              overview?.population && overview.population > 0
                 ? `${fmtPer100k(overview.adoptionRate)} per 100k · ${fmtPct(overview.adoptionRate)} of population`
-                : undefined
+                : overview
+                  ? 'Population not available'
+                  : undefined
             }
             trend={walletsChangePct}
             trendFormat={(v) => `${v.toFixed(1)}%`}
