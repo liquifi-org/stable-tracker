@@ -118,7 +118,6 @@ function LayoutBody({ isDark, toggle }: { isDark: boolean; toggle: () => void })
                 aria-label="Search countries"
               >
                 <Search className="h-3.5 w-3.5" />
-                <span>Search</span>
                 <kbd className="font-sans text-[10px] text-white/50 border border-white/15 rounded px-1">⌘K</kbd>
               </button>
               <button
