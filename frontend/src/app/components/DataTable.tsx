@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState, type ReactNode } from 'react';
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ChevronUp, ChevronDown } from 'lucide-react';
 
 interface Column {
@@ -17,6 +17,8 @@ interface DataTableProps {
   onRowClick?: (row: any) => void;
   /** When false, render every row at full height with no pager. Default true. */
   paginate?: boolean;
+  isExpandable?: (row: any) => boolean;
+  renderExpanded?: (row: any) => ReactNode;
 }
 
 export function DataTable({
@@ -28,14 +30,31 @@ export function DataTable({
   resetKey,
   onRowClick,
   paginate = true,
+  isExpandable,
+  renderExpanded,
 }: DataTableProps) {
   const [currentPage, setCurrentPage] = useState(0);
   const [sortKey, setSortKey] = useState<string | null>(defaultSortKey ?? null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>(defaultSortDirection);
+  const [expandedKeys, setExpandedKeys] = useState<Set<string>>(() => new Set());
+  const canExpand = Boolean(renderExpanded);
 
   useEffect(() => {
     setCurrentPage(0);
+    setExpandedKeys(new Set());
   }, [resetKey, data.length]);
+
+  const rowKey = (row: any, index: number) =>
+    String(row.countryId ?? row.isoAlpha2 ?? row.alpha2 ?? row.region ?? index);
+
+  const toggleExpanded = (key: string) => {
+    setExpandedKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
 
   const handleSort = (key: string) => {
     if (sortKey === key) {
@@ -75,6 +94,7 @@ export function DataTable({
         <table className="w-full">
           <thead className="sticky top-0 z-10 border-b border-white/10" style={{ backgroundColor: 'var(--brand)' }}>
             <tr>
+              {canExpand ? <th className="w-8 px-1 py-3" aria-hidden /> : null}
               {columns.map((column) => (
                 <th
                   key={column.key}
@@ -94,21 +114,60 @@ export function DataTable({
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-200 dark:divide-neutral-700">
-            {paginatedData.map((row, index) => (
-              <tr
-                key={row.countryId ?? row.isoAlpha2 ?? row.alpha2 ?? row.region ?? index}
-                onClick={onRowClick ? () => onRowClick(row) : undefined}
-                className={`transition-ui bg-white dark:bg-neutral-800 hover:bg-slate-50 dark:hover:bg-neutral-700/50 ${
-                  onRowClick ? 'cursor-pointer' : ''
-                }`}
-              >
-                {columns.map((column) => (
-                  <td key={column.key} className="px-4 py-3 text-sm text-slate-700 dark:text-slate-200">
-                    {column.render ? column.render(row[column.key], row) : row[column.key]}
-                  </td>
-                ))}
-              </tr>
-            ))}
+            {paginatedData.map((row, index) => {
+              const key = rowKey(row, index);
+              const expandable = canExpand && (isExpandable ? isExpandable(row) : true);
+              const expanded = expandable && expandedKeys.has(key);
+              return (
+                <Fragment key={key}>
+                  <tr
+                    onClick={() => {
+                      if (expandable) {
+                        toggleExpanded(key);
+                        return;
+                      }
+                      onRowClick?.(row);
+                    }}
+                    className={`transition-ui bg-white dark:bg-neutral-800 hover:bg-slate-50 dark:hover:bg-neutral-700/50 ${
+                      expandable || onRowClick ? 'cursor-pointer' : ''
+                    }`}
+                  >
+                    {canExpand ? (
+                      <td className="px-1 py-3 w-8">
+                        {expandable ? (
+                          <button
+                            type="button"
+                            aria-expanded={expanded}
+                            aria-label={expanded ? 'Collapse row' : 'Expand row'}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              toggleExpanded(key);
+                            }}
+                            className="p-1 rounded text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-neutral-700 transition-ui"
+                          >
+                            {expanded
+                              ? <ChevronDown className="w-4 h-4" />
+                              : <ChevronRight className="w-4 h-4" />}
+                          </button>
+                        ) : null}
+                      </td>
+                    ) : null}
+                    {columns.map((column) => (
+                      <td key={column.key} className="px-4 py-3 text-sm text-slate-700 dark:text-slate-200">
+                        {column.render ? column.render(row[column.key], row) : row[column.key]}
+                      </td>
+                    ))}
+                  </tr>
+                  {expanded && renderExpanded ? (
+                    <tr className="bg-slate-50/80 dark:bg-neutral-900/40">
+                      <td colSpan={columns.length + 1} className="px-3 py-2">
+                        {renderExpanded(row)}
+                      </td>
+                    </tr>
+                  ) : null}
+                </Fragment>
+              );
+            })}
           </tbody>
         </table>
       </div>

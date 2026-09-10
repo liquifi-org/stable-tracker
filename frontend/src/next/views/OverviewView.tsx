@@ -18,7 +18,7 @@ import {
   type CountryRegulationInfo,
 } from '../../app/services/api';
 import { fmtPct, fmtPer100k } from '../lib/format';
-import { TokenMixBar, NamedCorridorOriginHeader, NamedCorridorDestRow } from '../components/TokenMixBar';
+import { TokenMixBar, NamedCorridorDestRow } from '../components/TokenMixBar';
 import { UsageRegulationMatrix, type UsageRuleRow } from '../components/UsageRegulationMatrix';
 import { InsightCards, type InsightBreakdown } from '../components/InsightCards';
 import { countryPath } from '../../app/lib/countryRoutes';
@@ -45,7 +45,6 @@ function formatMultiple(ratio: number): string {
 }
 
 type GeoMode = 'country' | 'region';
-type TableKind = 'countries' | 'corridors';
 
 function pctChange(current: number, previous: number): number | null {
   return previous > 0 ? ((current - previous) / previous) * 100 : null;
@@ -62,7 +61,6 @@ export function OverviewView() {
   const [adoptionLoading, setAdoptionLoading] = useState(false);
   const [regionalData, setRegionalData] = useState<RegionalAdoptionMetric[]>([]);
   const [geoMode, setGeoMode] = useState<GeoMode>('country');
-  const [tableKind, setTableKind] = useState<TableKind>('corridors');
   const [corridorData, setCorridorData] = useState<CorridorFlow[]>([]);
   const [corridorLoading, setCorridorLoading] = useState(false);
   const [previousCorridorVolume, setPreviousCorridorVolume] = useState<number | null>(null);
@@ -311,6 +309,15 @@ export function OverviewView() {
       .sort((a, b) => b.total - a.total);
   }, [directedRegionalCorridors]);
 
+  const destsByOriginAlpha = useMemo(
+    () => new Map(corridorsGroupedByOrigin.map((g) => [g.fromAlpha, g.dests])),
+    [corridorsGroupedByOrigin],
+  );
+  const destsByOriginRegion = useMemo(
+    () => new Map(regionalCorridorsGroupedByOrigin.map((g) => [g.fromRegion, g.dests])),
+    [regionalCorridorsGroupedByOrigin],
+  );
+
   const corridorsByCountry = useMemo(() => {
     const outboundMap = new Map<string, number>();
     for (const pair of bidirectionalCorridors) {
@@ -530,10 +537,19 @@ export function OverviewView() {
       key: 'name',
       header: 'Country',
       render: (value: string, row: CountryAdoptionMetric) => (
-        <span className="flex items-center gap-2">
+        <button
+          type="button"
+          className="flex items-center gap-2 text-left hover:underline underline-offset-2"
+          onClick={(event) => {
+            event.stopPropagation();
+            navigate(countryPath({ countryId: row.countryId, name: row.name, isoAlpha2: row.isoAlpha2 }), {
+              state: { name: row.name, isoAlpha2: row.isoAlpha2 },
+            });
+          }}
+        >
           <CountryFlag isoAlpha2={row.isoAlpha2} />
           {value}
-        </span>
+        </button>
       ),
     },
     {
@@ -717,103 +733,15 @@ export function OverviewView() {
 
           <div className="surface p-5">
             <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
-              <h4 className="display text-xl">
-                {tableKind === 'corridors'
-                  ? geoMode === 'region'
-                    ? 'Named regional corridors'
-                    : 'Named international corridors'
-                  : geoMode === 'region'
-                    ? 'Regions'
-                    : 'Countries'}
-              </h4>
-              <div className="flex items-center gap-3">
-                <span className="text-xs text-[var(--muted-ink)]">
-                  {tableKind === 'corridors'
-                    ? geoMode === 'region'
-                      ? `${directedRegionalCorridors.length} corridors · grouped by origin`
-                      : `${directedCorridors.length} corridors · grouped by origin`
-                    : geoMode === 'region'
-                      ? `${regionalData.length} regions`
-                      : `${adoptionTableData.length} countries · gray on the map is no outbound corridors or no GDP`}
-                </span>
-                <SegmentedControl
-                  layoutId="next-usage-table"
-                  size="sm"
-                  value={tableKind}
-                  onChange={setTableKind}
-                  options={[
-                    { value: 'countries', label: geoMode === 'region' ? 'Regions' : 'Countries' },
-                    { value: 'corridors', label: 'Corridors' },
-                  ]}
-                />
-              </div>
+              <h4 className="display text-xl">{geoMode === 'region' ? 'Regions' : 'Countries'}</h4>
+              <span className="text-xs text-[var(--muted-ink)]">
+                {geoMode === 'region'
+                  ? `${regionalData.length} regions · unwrap a row for outbound corridors`
+                  : `${adoptionTableData.length} countries · unwrap a row for outbound corridors · name opens the briefing`}
+              </span>
             </div>
 
-            {tableKind === 'corridors' ? (
-              <div className="relative">
-                <div className="named-corridors-scroll max-h-[48rem] overflow-y-auto">
-                  {corridorLoading && directedCorridors.length === 0 ? (
-                    <Skeleton className="h-40 w-full" />
-                  ) : geoMode === 'region' ? (
-                    regionalCorridorsGroupedByOrigin.map((group) => (
-                      <div key={group.fromRegion} className="border-b border-[var(--hairline)] last:border-b-0">
-                        <NamedCorridorOriginHeader
-                          name={group.fromRegion}
-                          volume={group.total}
-                          destCount={group.dests.length}
-                          formatVolume={formatCurrency}
-                        />
-                        {group.dests.map((dest) => (
-                          <NamedCorridorDestRow
-                            key={`${group.fromRegion}-${dest.toRegion}`}
-                            name={dest.toRegion}
-                            volume={dest.volume}
-                            formatVolume={formatCurrency}
-                          />
-                        ))}
-                      </div>
-                    ))
-                  ) : (
-                    corridorsGroupedByOrigin.map((group) => (
-                      <div key={group.fromAlpha} className="border-b border-[var(--hairline)] last:border-b-0">
-                        <NamedCorridorOriginHeader
-                          name={countryNameByAlpha2.get(group.fromAlpha) ?? group.fromAlpha}
-                          alpha={group.fromAlpha}
-                          volume={group.total}
-                          destCount={group.dests.length}
-                          formatVolume={formatCurrency}
-                          onClick={
-                            alpha2ToNumeric.has(group.fromAlpha)
-                              ? () => openCountry(group.fromAlpha)
-                              : undefined
-                          }
-                        />
-                        {group.dests.map((dest) => (
-                          <NamedCorridorDestRow
-                            key={`${group.fromAlpha}-${dest.toAlpha}`}
-                            name={countryNameByAlpha2.get(dest.toAlpha) ?? dest.toAlpha}
-                            alpha={dest.toAlpha}
-                            volume={dest.volume}
-                            formatVolume={formatCurrency}
-                            onClick={
-                              alpha2ToNumeric.has(dest.toAlpha)
-                                ? () => openCountry(dest.toAlpha)
-                                : undefined
-                            }
-                          />
-                        ))}
-                      </div>
-                    ))
-                  )}
-                </div>
-                {(geoMode === 'region' ? directedRegionalCorridors.length : directedCorridors.length) > 10 && (
-                  <div
-                    aria-hidden
-                    className="pointer-events-none absolute bottom-0 left-0 right-2.5 h-10 bg-gradient-to-t from-[var(--paper-raised)] to-transparent"
-                  />
-                )}
-              </div>
-            ) : geoMode === 'country' && adoptionTableData.length > 0 ? (
+            {geoMode === 'country' && adoptionTableData.length > 0 ? (
               <DataTable
                 data={adoptionTableData}
                 columns={adoptionColumns}
@@ -822,6 +750,31 @@ export function OverviewView() {
                 pageSize={10}
                 paginate={false}
                 resetKey={`${filters.year}-${filters.month}-adoption`}
+                isExpandable={(row) => (destsByOriginAlpha.get(row.isoAlpha2)?.length ?? 0) > 0}
+                renderExpanded={(row) => {
+                  const dests = destsByOriginAlpha.get(row.isoAlpha2) ?? [];
+                  return (
+                    <div className="space-y-0.5">
+                      <p className="text-[11px] text-[var(--muted-ink)] px-1.5 pb-1">
+                        {dests.length} outbound {dests.length === 1 ? 'corridor' : 'corridors'}
+                      </p>
+                      {dests.map((dest) => (
+                        <NamedCorridorDestRow
+                          key={`${row.isoAlpha2}-${dest.toAlpha}`}
+                          name={countryNameByAlpha2.get(dest.toAlpha) ?? dest.toAlpha}
+                          alpha={dest.toAlpha}
+                          volume={dest.volume}
+                          formatVolume={formatCurrency}
+                          onClick={
+                            alpha2ToNumeric.has(dest.toAlpha)
+                              ? () => openCountry(dest.toAlpha)
+                              : undefined
+                          }
+                        />
+                      ))}
+                    </div>
+                  );
+                }}
                 onRowClick={(row) =>
                   navigate(countryPath({ countryId: row.countryId, name: row.name, isoAlpha2: row.isoAlpha2 }), {
                     state: { name: row.name, isoAlpha2: row.isoAlpha2 },
@@ -837,6 +790,25 @@ export function OverviewView() {
                 pageSize={10}
                 paginate={false}
                 resetKey={`${filters.year}-${filters.month}-region`}
+                isExpandable={(row) => (destsByOriginRegion.get(row.region)?.length ?? 0) > 0}
+                renderExpanded={(row) => {
+                  const dests = destsByOriginRegion.get(row.region) ?? [];
+                  return (
+                    <div className="space-y-0.5">
+                      <p className="text-[11px] text-[var(--muted-ink)] px-1.5 pb-1">
+                        {dests.length} outbound {dests.length === 1 ? 'corridor' : 'corridors'}
+                      </p>
+                      {dests.map((dest) => (
+                        <NamedCorridorDestRow
+                          key={`${row.region}-${dest.toRegion}`}
+                          name={dest.toRegion}
+                          volume={dest.volume}
+                          formatVolume={formatCurrency}
+                        />
+                      ))}
+                    </div>
+                  );
+                }}
               />
             ) : (
               <Skeleton className="h-40 w-full" />
