@@ -777,6 +777,26 @@ export function OverviewView() {
         )}
       </div>
 
+      <InsightCards
+        periodLabel={periodLabel}
+        loading={globalInsightsLoading && !globalInsights}
+        corridorLoading={corridorLoading && corridorVolume === 0}
+        wallets={globalInsights?.totalActiveWallets}
+        walletsTrend={walletsTrend}
+        corridorVolume={corridorVolume}
+        corridorTrend={corridorTrend}
+        dollarization={corridorDollarShare}
+        dollarizationTrendPp={dollarizationTrendPp}
+        outflowRatio={outflowRatio}
+        outflowTrendPp={outflowTrendPp}
+        walletBreakdown={walletBreakdown}
+        corridorBreakdown={corridorBreakdown}
+        outflowBreakdown={outflowBreakdown}
+        dollarizationBreakdown={dollarizationBreakdown}
+        onSelectUsage={() => filters.setMapType('adoption')}
+        formatCurrency={formatCurrency}
+      />
+
       {isUsage && (
         <div className="space-y-6">
           <div className="relative">
@@ -800,26 +820,6 @@ export function OverviewView() {
               <div className="absolute inset-0 rounded-xl bg-white/40 dark:bg-neutral-950/40 pointer-events-none" />
             )}
           </div>
-
-          <InsightCards
-            periodLabel={periodLabel}
-            loading={globalInsightsLoading && !globalInsights}
-            corridorLoading={corridorLoading && corridorVolume === 0}
-            wallets={globalInsights?.totalActiveWallets}
-            walletsTrend={walletsTrend}
-            corridorVolume={corridorVolume}
-            corridorTrend={corridorTrend}
-            dollarization={corridorDollarShare}
-            dollarizationTrendPp={dollarizationTrendPp}
-            outflowRatio={outflowRatio}
-            outflowTrendPp={outflowTrendPp}
-            walletBreakdown={walletBreakdown}
-            corridorBreakdown={corridorBreakdown}
-            outflowBreakdown={outflowBreakdown}
-            dollarizationBreakdown={dollarizationBreakdown}
-            onSelectUsage={() => filters.setMapType('adoption')}
-            formatCurrency={formatCurrency}
-          />
 
           <div className="surface p-5">
             <h4 className="display text-xl mb-3">
@@ -921,25 +921,6 @@ export function OverviewView() {
             hideAntarctica
             focusCountryId={focusCountryId}
             focusNonce={focusNonce}
-          />
-          <InsightCards
-            periodLabel={periodLabel}
-            loading={globalInsightsLoading && !globalInsights}
-            corridorLoading={corridorLoading && corridorVolume === 0}
-            wallets={globalInsights?.totalActiveWallets}
-            walletsTrend={walletsTrend}
-            corridorVolume={corridorVolume}
-            corridorTrend={corridorTrend}
-            dollarization={corridorDollarShare}
-            dollarizationTrendPp={dollarizationTrendPp}
-            outflowRatio={outflowRatio}
-            outflowTrendPp={outflowTrendPp}
-            walletBreakdown={walletBreakdown}
-            corridorBreakdown={corridorBreakdown}
-            outflowBreakdown={outflowBreakdown}
-            dollarizationBreakdown={dollarizationBreakdown}
-            onSelectUsage={() => filters.setMapType('adoption')}
-            formatCurrency={formatCurrency}
           />
           <div className="surface p-5">
             <h4 className="display text-xl mb-1">Usage × rules</h4>

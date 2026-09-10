@@ -8,7 +8,6 @@ const MAX_ZOOM_FINE = 4;
 const MAX_ZOOM_COARSE = 8;
 const ZOOM_STEP = 0.5;
 const DRAG_THRESHOLD = 8;
-const WHEEL_SENSITIVITY = 0.0018;
 
 interface Pan {
   x: number;
@@ -50,13 +49,12 @@ function panKeepingFocus(
   };
 }
 
-/** Shared zoom + pan for the map SVG viewBox. Pointer, pinch, wheel, flyTo. */
+/** Shared zoom + pan for the map SVG viewBox. Pointer, pinch, flyTo. */
 export function useMapZoomPan(options: { coarse?: boolean } = {}) {
   const maxZoom = options.coarse ? MAX_ZOOM_COARSE : MAX_ZOOM_FINE;
   const [zoom, setZoom] = useState(MIN_ZOOM);
   const [pan, setPan] = useState<Pan>({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
-  const [svgMounted, setSvgMounted] = useState(false);
 
   const svgRef = useRef<SVGSVGElement | null>(null);
   const zoomRef = useRef(zoom);
@@ -82,7 +80,6 @@ export function useMapZoomPan(options: { coarse?: boolean } = {}) {
 
   const setSvgRef = useCallback((node: SVGSVGElement | null) => {
     svgRef.current = node;
-    setSvgMounted(!!node);
   }, []);
 
   const commit = useCallback((nextZoom: number, nextPan: Pan) => {
@@ -244,22 +241,6 @@ export function useMapZoomPan(options: { coarse?: boolean } = {}) {
   useLayoutEffect(() => {
     if (zoomRef.current > maxZoom) commit(maxZoom, panRef.current);
   }, [maxZoom, commit]);
-
-  useLayoutEffect(() => {
-    const svg = svgRef.current;
-    if (!svg || !svgMounted) return;
-    const onWheel = (e: WheelEvent) => {
-      e.preventDefault();
-      const rect = svg.getBoundingClientRect();
-      const z0 = zoomRef.current;
-      const factor = Math.exp(-e.deltaY * WHEEL_SENSITIVITY);
-      const z1 = clampZoom(z0 * factor, maxZoomRef.current);
-      if (z1 === z0 && z1 !== MIN_ZOOM) return;
-      schedule(z1, panKeepingFocus(z0, panRef.current, z1, e.clientX, e.clientY, rect));
-    };
-    svg.addEventListener('wheel', onWheel, { passive: false });
-    return () => svg.removeEventListener('wheel', onWheel);
-  }, [schedule, svgMounted]);
 
   const viewW = VIEW_W / zoom;
   const viewH = VIEW_H / zoom;
