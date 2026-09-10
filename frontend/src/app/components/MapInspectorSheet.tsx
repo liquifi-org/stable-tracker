@@ -1,25 +1,19 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { X } from 'lucide-react';
-
-const HEIGHTS = ['28dvh', '52dvh', '84dvh'] as const;
 
 export function MapInspectorSheet({
   open,
   onOpenChange,
   title,
   children,
+  overlay = false,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: string;
   children: ReactNode;
+  overlay?: boolean;
 }) {
-  const [snap, setSnap] = useState(1);
-
-  useEffect(() => {
-    if (open) setSnap(1);
-  }, [open, title]);
-
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -36,18 +30,14 @@ export function MapInspectorSheet({
       role="dialog"
       aria-modal="false"
       aria-label={title}
-      className="fixed inset-x-0 bottom-0 z-50 flex flex-col rounded-t-2xl border-t border-slate-200/60 dark:border-neutral-700 bg-white dark:bg-neutral-800 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_32px_rgba(15,23,42,0.18)]"
-      style={{ height: HEIGHTS[snap] }}
+      className={
+        overlay
+          ? 'fixed inset-x-0 bottom-0 z-50 flex max-h-[40dvh] flex-col rounded-t-2xl border-t border-slate-200/60 dark:border-neutral-700 bg-white dark:bg-neutral-800 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_32px_rgba(15,23,42,0.18)]'
+          : 'flex max-h-[52dvh] flex-col rounded-xl border border-slate-200/50 dark:border-neutral-700 bg-white dark:bg-neutral-800 overflow-hidden'
+      }
     >
-      <div className="relative flex items-center justify-end px-2 pt-1.5 shrink-0">
-        <button
-          type="button"
-          aria-label="Resize details"
-          onClick={() => setSnap((s) => (s + 1) % HEIGHTS.length)}
-          className="absolute left-1/2 -translate-x-1/2 h-8 w-16 flex items-center justify-center"
-        >
-          <span className="h-1.5 w-12 rounded-full bg-slate-300 dark:bg-neutral-600" />
-        </button>
+      <div className="flex items-center justify-between gap-2 px-2 pt-1.5 shrink-0">
+        <p className="min-w-0 truncate px-2 text-sm font-semibold text-slate-800 dark:text-slate-100">{title}</p>
         <button
           type="button"
           aria-label="Close details"
