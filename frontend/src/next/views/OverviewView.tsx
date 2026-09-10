@@ -599,12 +599,6 @@ export function OverviewView() {
       ),
     },
     {
-      key: 'adoptionRate',
-      header: '% of population',
-      render: (value: number, row: CountryAdoptionMetric) =>
-        row.population && row.population > 0 ? fmtPct(value) : '—',
-    },
-    {
       key: 'stablecoinPctOfRemittances',
       header: '% of official remittances',
       render: (value: number | null) => (value != null ? fmtPct(value) : '—'),
