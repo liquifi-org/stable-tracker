@@ -756,6 +756,9 @@ export function OverviewView() {
   const displayedRegions = selectedPlace && geoMode === 'region'
     ? regionalData.filter((r) => r.region === selectedPlace)
     : regionalData;
+  const displayedCorridorCount = geoMode === 'region'
+    ? displayedRegions.reduce((n, r) => n + (destsByOriginRegion.get(r.region)?.length ?? 0), 0)
+    : displayedAdoption.reduce((n, c) => n + (destsByOriginAlpha.get(c.isoAlpha2)?.length ?? 0), 0);
   const countryExpandKeys = selectedPlace && geoMode === 'country'
     ? displayedAdoption.map((c) => c.countryId)
     : [];
@@ -850,8 +853,8 @@ export function OverviewView() {
           <div id="overview-geo-table" className="surface p-5">
             <h4 className="display text-xl mb-3">
               {geoMode === 'region'
-                ? `${displayedRegions.length} ${displayedRegions.length === 1 ? 'region' : 'regions'}, ${directedRegionalCorridors.length} corridors`
-                : `${displayedAdoption.length} ${displayedAdoption.length === 1 ? 'country' : 'countries'}, ${directedCorridors.length} corridors`}
+                ? `${displayedRegions.length} ${displayedRegions.length === 1 ? 'region' : 'regions'}, ${displayedCorridorCount} ${displayedCorridorCount === 1 ? 'corridor' : 'corridors'}`
+                : `${displayedAdoption.length} ${displayedAdoption.length === 1 ? 'country' : 'countries'}, ${displayedCorridorCount} ${displayedCorridorCount === 1 ? 'corridor' : 'corridors'}`}
             </h4>
 
             {geoMode === 'country' && adoptionTableData.length > 0 ? (
