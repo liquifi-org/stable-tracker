@@ -671,7 +671,7 @@ export function OverviewView() {
                   {tableKind === 'corridors'
                     ? geoMode === 'region'
                       ? `${directedRegionalCorridors.length} corridors`
-                      : `${directedCorridors.length} corridors`}
+                      : `${directedCorridors.length} corridors`
                     : geoMode === 'region'
                       ? `${regionalData.length} regions`
                       : `${adoptionTableData.length} countries · gray on the map is no outbound corridors or no GDP`}
