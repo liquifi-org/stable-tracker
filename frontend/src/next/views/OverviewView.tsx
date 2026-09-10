@@ -732,14 +732,11 @@ export function OverviewView() {
           </div>
 
           <div className="surface p-5">
-            <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
-              <h4 className="display text-xl">{geoMode === 'region' ? 'Regions' : 'Countries'}</h4>
-              <span className="text-xs text-[var(--muted-ink)]">
-                {geoMode === 'region'
-                  ? `${regionalData.length} regions, ${directedRegionalCorridors.length} corridors`
-                  : `${adoptionTableData.length} countries, ${directedCorridors.length} corridors`}
-              </span>
-            </div>
+            <h4 className="display text-xl mb-3">
+              {geoMode === 'region'
+                ? `${regionalData.length} regions, ${directedRegionalCorridors.length} corridors`
+                : `${adoptionTableData.length} countries, ${directedCorridors.length} corridors`}
+            </h4>
 
             {geoMode === 'country' && adoptionTableData.length > 0 ? (
               <DataTable
