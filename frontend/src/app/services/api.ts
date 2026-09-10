@@ -53,6 +53,8 @@ export interface CountryAdoptionMetric {
   txValueShare: number;
   unit?: string;
   remittancesSent?: number;
+  servicesImports?: number;
+  officialOutflows?: number;
   gdp?: number;
   gdpYear?: number;
   gdpSource?: string;

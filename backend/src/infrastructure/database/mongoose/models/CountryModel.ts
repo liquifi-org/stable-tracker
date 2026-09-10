@@ -15,6 +15,12 @@ export interface ICountryDoc extends Document {
     /** world-bank | world-bank-secondary-income | cbc-bop */
     remittancesSource?: string;
     remittancesSyncedAt?: Date;
+    /** Services imports, BoP current US$. World Bank first, then pinned national BOP. */
+    servicesImports?: number;
+    servicesImportsYear?: number;
+    /** world-bank | cbc-bop */
+    servicesImportsSource?: string;
+    servicesImportsSyncedAt?: Date;
     /** Nominal GDP, current US$. World Bank first, then CIA / Wikipedia / pinned fallbacks. */
     gdp?: number;
     gdpYear?: number;
@@ -53,6 +59,10 @@ const CountrySchema = new Schema<ICountryDoc>(
         remittancesYear: { type: Number },
         remittancesSource: { type: String },
         remittancesSyncedAt: { type: Date },
+        servicesImports: { type: Number },
+        servicesImportsYear: { type: Number },
+        servicesImportsSource: { type: String },
+        servicesImportsSyncedAt: { type: Date },
         gdp: { type: Number },
         gdpYear: { type: Number },
         gdpSource: { type: String },

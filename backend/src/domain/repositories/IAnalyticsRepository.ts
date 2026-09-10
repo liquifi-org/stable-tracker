@@ -50,6 +50,10 @@ export interface CountryAdoptionMetric {
     txValueShare: number;
     unit: 'ratio' | 'percent';
     remittancesSent?: number;
+    /** Services imports for the selected period (annual × period months / 12). */
+    servicesImports?: number;
+    /** remittancesSent + servicesImports when either series is present. */
+    officialOutflows?: number;
     /** Annual nominal GDP, current USD. Null when no source could fill it (EU aggregate). */
     gdp?: number;
     gdpYear?: number;

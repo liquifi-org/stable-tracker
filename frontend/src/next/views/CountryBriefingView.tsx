@@ -222,6 +222,10 @@ export function CountryBriefingView() {
     adoptionRow?.remittancesSent && adoptionRow.remittancesSent > 0
       ? totalOutbound / adoptionRow.remittancesSent
       : null;
+  const outflowRatio =
+    adoptionRow?.officialOutflows && adoptionRow.officialOutflows > 0
+      ? totalOutbound / adoptionRow.officialOutflows
+      : null;
 
   const market = overview
     ? classifyMarket({
@@ -410,10 +414,10 @@ export function CountryBriefingView() {
             value={overview ? fmtPct(overview.txValueShare) : '—'}
           />
           <MetricCard
-            label="Vs official remittances"
-            hint="Outbound corridors ÷ World Bank remittances sent (annual / 12)."
+            label="Vs official outflows"
+            hint="Outbound corridors ÷ (remittances paid + services imports), annual / 12. Goods trade is excluded."
             loading={corridorsLoading}
-            value={remittanceRatio != null ? fmtPct(remittanceRatio) : '—'}
+            value={outflowRatio != null ? fmtPct(outflowRatio) : '—'}
           />
         </div>
       </section>

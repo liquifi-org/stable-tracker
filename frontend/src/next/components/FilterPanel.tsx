@@ -265,7 +265,7 @@ export function FilterPanel() {
           <b className="text-slate-600 dark:text-slate-300">Digital dollars</b> is the share of corridor USD volume in USD-referenced stablecoins.
         </p>
         <p>
-          <b className="text-slate-600 dark:text-slate-300">Vs remittances</b> uses official annual remittances sent (World Bank personal remittances, then secondary-income / national BOP where that series is silent), divided by 12. Not a monthly series.
+          <b className="text-slate-600 dark:text-slate-300">Vs official outflows</b> is outbound corridors ÷ (World Bank personal remittances paid + services imports), each annual figure divided by 12. Goods trade is excluded. The global card sums only countries with outbound corridors.
         </p>
         <p>
           <b className="text-slate-600 dark:text-slate-300">Live framework</b> is regulatory stage and does not change with the month slider.
