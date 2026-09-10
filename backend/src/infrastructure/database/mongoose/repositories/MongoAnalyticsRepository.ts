@@ -83,18 +83,14 @@ export class MongoAnalyticsRepository implements IAnalyticsRepository {
         activeWallets: number;
         txValueShare: number;
         remittancesSent?: number;
+        gdp?: number;
+        gdpYear?: number;
+        gdpSource?: string;
+        outboundVolume: number;
+        gdpIntensity: number;
     }[]> {
         const { year, month, referenceAsset, stablecoinId, countryId, region } = params;
-        const { start, end } = periodBoundaries(year, month);
-
-        // Optionally narrow down which stablecoin IDs to include
-        let stablecoinIds: string[] | null = null;
-        if (stablecoinId && stablecoinId !== 'All') {
-            stablecoinIds = [stablecoinId];
-        } else if (referenceAsset) {
-            const coins = await StablecoinModel.find({ referenceAsset }).lean();
-            stablecoinIds = coins.map((c) => c.stablecoinId);
-        }
+        const { end } = periodBoundaries(year, month);
 
         // Build country filter
         const countryFilter: Record<string, unknown> = {};
@@ -127,12 +123,21 @@ export class MongoAnalyticsRepository implements IAnalyticsRepository {
             this.periodKey(year, month),
         );
 
-        // Transaction values per country (senderCountryId)
+        // Outbound international corridors — same grain as /analytics/corridors.
+        const periodFilter = month
+            ? { period: `${year}-${String(month).padStart(2, '0')}` }
+            : { period: { $gte: `${year}-01`, $lte: `${year}-12` } };
         const txFilter: Record<string, unknown> = {
+            type: 'corridor',
+            source: 'allium',
             senderCountryId: { $in: countryIds },
-            date: { $gte: start, $lte: end },
+            ...periodFilter,
         };
-        if (stablecoinIds) txFilter['stablecoinId'] = { $in: stablecoinIds };
+        if (stablecoinId && stablecoinId !== 'All') {
+            txFilter['tokenSymbol'] = stablecoinId.toUpperCase();
+        } else if (referenceAsset && referenceAsset !== 'All') {
+            txFilter['tokenSymbol'] = { $regex: referenceAsset, $options: 'i' };
+        }
 
         const txAgg = await TransactionModel.aggregate<{ _id: string; totalValue: number }>([
             { $match: txFilter },
@@ -155,6 +160,9 @@ export class MongoAnalyticsRepository implements IAnalyticsRepository {
             const txValueShare = globalTotal > 0 ? txValue / globalTotal : 0;
             const remittancesSent =
                 c.remittancesSent !== undefined ? (c.remittancesSent * periodMonths) / 12 : undefined;
+            const periodGdp =
+                c.gdp && c.gdp > 0 ? (c.gdp * periodMonths) / 12 : 0;
+            const gdpIntensity = periodGdp > 0 ? txValue / periodGdp : 0;
 
             return {
                 countryId: c.countryId,
@@ -166,34 +174,33 @@ export class MongoAnalyticsRepository implements IAnalyticsRepository {
                 activeWallets,
                 txValueShare,
                 remittancesSent,
+                gdp: c.gdp,
+                gdpYear: c.gdpYear,
+                gdpSource: c.gdpSource,
+                outboundVolume: txValue,
+                gdpIntensity,
             };
         });
     }
 
-    /** Rank-normalized adoption: wallets holding stablecoins / population, ranked across
-     *  the eligible geography set (> 10k wallets holding stablecoins). Countries whose
-     *  wallets-per-100k would display as the same integer share a rank (dense ranking).
-     *  Shared by the country-level adoption table and the single-country overview, so
-     *  "#X of N" means the same thing in both. */
+    /** Rank by outbound corridors ÷ period GDP. Eligible when both series are
+     *  present and outbound is positive. Ties when the displayed 0.001% band
+     *  matches. Shared by the country table and the briefing "#X of N". */
     private rankAdoptionRows(
-        rows: { countryId: string; activeWallets: number; adoptionRate: number }[],
+        rows: { countryId: string; outboundVolume: number; gdp?: number; gdpIntensity: number }[],
     ): { rankMap: Map<string, number>; eligibleCountries: number; maxRank: number } {
-        const ELIGIBILITY_THRESHOLD = 10_000;
-        // adoptionRate is wallets / population. Typical values are 0.001–0.012
-        // (100–1200 per 100k). A 1-percentage-point band (0.01) collapses the
-        // whole list into rank 1. Tie only when the per-100k figure rounds the same.
-        const RANK_TIE_THRESHOLD = 1 / 100_000;
+        const RANK_TIE_THRESHOLD = 0.00001;
         const eligible = rows
-            .filter((r) => r.activeWallets > ELIGIBILITY_THRESHOLD)
-            .sort((a, b) => b.adoptionRate - a.adoptionRate);
+            .filter((r) => (r.gdp ?? 0) > 0 && r.outboundVolume > 0 && r.gdpIntensity > 0)
+            .sort((a, b) => b.gdpIntensity - a.gdpIntensity);
 
         const rankMap = new Map<string, number>();
         let rank = 0;
-        let bandAdoptionRate = Infinity;
+        let band = Infinity;
         for (const r of eligible) {
-            if (bandAdoptionRate - r.adoptionRate >= RANK_TIE_THRESHOLD) {
+            if (band - r.gdpIntensity >= RANK_TIE_THRESHOLD) {
                 rank += 1;
-                bandAdoptionRate = r.adoptionRate;
+                band = r.gdpIntensity;
             }
             rankMap.set(r.countryId, rank);
         }
@@ -225,6 +232,11 @@ export class MongoAnalyticsRepository implements IAnalyticsRepository {
                 txValueShare: parseFloat(r.txValueShare.toFixed(6)),
                 unit: 'ratio' as const,
                 remittancesSent: r.remittancesSent,
+                gdp: r.gdp,
+                gdpYear: r.gdpYear,
+                gdpSource: r.gdpSource,
+                outboundVolume: r.outboundVolume,
+                gdpIntensity: parseFloat(r.gdpIntensity.toFixed(8)),
                 adoptionRank,
                 eligibleCountries,
                 relativeAdoptionIndex:
@@ -248,8 +260,11 @@ export class MongoAnalyticsRepository implements IAnalyticsRepository {
             activeWallets: number;
             population: number;
             txValueShare: number;
+            outboundVolume: number;
+            gdp: number;
         }
 
+        const periodMonths = params.month !== undefined ? 1 : 12;
         const byMacroRegion = new Map<string, Acc>();
         for (const row of baseRows) {
             const macroRegion = toMacroRegion(row.region);
@@ -260,26 +275,33 @@ export class MongoAnalyticsRepository implements IAnalyticsRepository {
                 activeWallets: 0,
                 population: 0,
                 txValueShare: 0,
+                outboundVolume: 0,
+                gdp: 0,
             };
             acc.countryCount += 1;
             acc.activeWallets += row.activeWallets;
             acc.population += row.population;
             acc.txValueShare += row.txValueShare;
+            acc.outboundVolume += row.outboundVolume;
+            acc.gdp += row.gdp ?? 0;
             byMacroRegion.set(macroRegion, acc);
         }
 
         return Array.from(byMacroRegion.entries())
-            .map(([region, acc]): RegionalAdoptionMetric => ({
-                region,
-                countryCount: acc.countryCount,
-                activeWallets: acc.activeWallets,
-                population: acc.population,
-                adoptionRate: acc.population > 0
-                    ? parseFloat((acc.activeWallets / acc.population).toFixed(6))
-                    : 0,
-                txValueShare: parseFloat(acc.txValueShare.toFixed(6)),
-                unit: 'ratio' as const,
-            }))
+            .map(([region, acc]): RegionalAdoptionMetric => {
+                const periodGdp = acc.gdp > 0 ? (acc.gdp * periodMonths) / 12 : 0;
+                return {
+                    region,
+                    countryCount: acc.countryCount,
+                    activeWallets: acc.activeWallets,
+                    population: acc.population,
+                    adoptionRate: periodGdp > 0
+                        ? parseFloat((acc.outboundVolume / periodGdp).toFixed(8))
+                        : 0,
+                    txValueShare: parseFloat(acc.txValueShare.toFixed(6)),
+                    unit: 'ratio' as const,
+                };
+            })
             .sort((a, b) => b.adoptionRate - a.adoptionRate);
     }
 
@@ -511,6 +533,7 @@ export class MongoAnalyticsRepository implements IAnalyticsRepository {
         const allAdoptionRows = await this.buildCountryAdoptionRows({ year, month, referenceAsset });
         const { rankMap, eligibleCountries } = this.rankAdoptionRows(allAdoptionRows);
         const adoptionRank = rankMap.get(countryId) ?? null;
+        const adoptionRow = allAdoptionRows.find((r) => r.countryId === countryId);
 
         // Compliant issuers
         const regulatedIssuerIds = countryDoc.regulatedIssuerIds ?? [];
@@ -542,6 +565,11 @@ export class MongoAnalyticsRepository implements IAnalyticsRepository {
             activeWallets,
             txValueShare: parseFloat(txValueShare.toFixed(6)),
             dollarizationIndex: parseFloat(dollarizationIndex.toFixed(6)),
+            gdp: adoptionRow?.gdp,
+            gdpYear: adoptionRow?.gdpYear,
+            gdpSource: adoptionRow?.gdpSource,
+            outboundVolume: adoptionRow?.outboundVolume ?? 0,
+            gdpIntensity: parseFloat((adoptionRow?.gdpIntensity ?? 0).toFixed(8)),
             adoptionRank,
             eligibleCountries,
             compliantIssuers: issuerDocs.map((d) => ({

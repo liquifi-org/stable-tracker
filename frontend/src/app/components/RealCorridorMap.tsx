@@ -105,13 +105,6 @@ function fmtWallets(n: number): string {
   return n.toLocaleString();
 }
 
-function fmtPer100k(rate: number): string {
-  const per100k = rate * 100_000;
-  if (per100k >= 100) return per100k.toFixed(0);
-  if (per100k >= 10) return per100k.toFixed(1);
-  return per100k.toFixed(2);
-}
-
 function fmtPct(ratio: number): string {
   const pct = ratio * 100;
   if (pct < 0.01) return pct.toFixed(4) + '%';
@@ -471,11 +464,11 @@ export function RealCorridorMap({
                 <div className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[11px] text-white/70 tabular-nums">
                   {mode === 'country' && hoveredMetric?.relativeAdoptionIndex != null && (
                     <span>
-                      #{hoveredMetric.adoptionRank} · {fmtPer100k(hoveredMetric.adoptionRate)} / 100k
+                      #{hoveredMetric.adoptionRank} · {fmtPct(hoveredMetric.gdpIntensity)} of GDP
                     </span>
                   )}
-                  {mode === 'country' && hoveredMetric && hoveredMetric.relativeAdoptionIndex == null && hoveredMetric.activeWallets > 0 && (
-                    <span>{fmtWallets(hoveredMetric.activeWallets)} wallets · not ranked</span>
+                  {mode === 'country' && hoveredMetric && hoveredMetric.relativeAdoptionIndex == null && (
+                    <span>Not ranked</span>
                   )}
                   {mode === 'region' && hoveredRegion && (
                     <span>{fmtWallets(hoveredRegion.activeWallets)} wallets</span>
@@ -490,7 +483,7 @@ export function RealCorridorMap({
             {showAdoption && (
               <div>
                 <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1.5 uppercase tracking-wide">
-                  {mode === 'region' ? 'Adoption by region' : 'Adoption index'}
+                  {mode === 'region' ? 'GDP intensity by region' : 'GDP intensity rank'}
                 </div>
                 <div className="space-y-1">
                   {mode === 'region' ? (
@@ -511,7 +504,7 @@ export function RealCorridorMap({
                   <div className="flex items-center gap-1.5">
                     <div className="w-3 h-3 rounded-sm shrink-0 border border-slate-200 dark:border-neutral-600" style={{ backgroundColor: NO_DATA_COLOR }} />
                     <span className="text-[11px] text-slate-700 dark:text-slate-300">
-                      {mode === 'region' ? 'No data' : '<10k wallets'}
+                      {mode === 'region' ? 'No data' : 'No corridor / no GDP'}
                     </span>
                   </div>
                 </div>
@@ -906,15 +899,15 @@ export function RealCorridorMap({
                   {mode === 'country' && hoveredMetric?.relativeAdoptionIndex != null && (
                     <>
                       <div className="flex justify-between items-center gap-3 pt-1">
-                        <span className="text-slate-500 dark:text-slate-400">Adoption index (rank)</span>
+                        <span className="text-slate-500 dark:text-slate-400">GDP intensity (rank)</span>
                         <span className="text-slate-800 dark:text-slate-100 font-semibold tabular-nums">
                           #{hoveredMetric.adoptionRank}
                           <span className="text-slate-500 dark:text-slate-400 text-xs font-normal"> of {hoveredMetric.eligibleCountries}</span>
                         </span>
                       </div>
                       <div className="flex justify-between items-center gap-3">
-                        <span className="text-slate-500 dark:text-slate-400">Wallets per 100k</span>
-                        <span className="text-slate-800 dark:text-slate-100 font-semibold tabular-nums">{fmtPer100k(hoveredMetric.adoptionRate)}</span>
+                        <span className="text-slate-500 dark:text-slate-400">Outbound vs GDP</span>
+                        <span className="text-slate-800 dark:text-slate-100 font-semibold tabular-nums">{fmtPct(hoveredMetric.gdpIntensity)}</span>
                       </div>
                       <div className="flex justify-between items-center gap-3">
                         <span className="text-slate-500 dark:text-slate-400">Wallets holding stablecoins</span>
@@ -925,7 +918,7 @@ export function RealCorridorMap({
                   {mode === 'region' && hoveredRegion && (
                     <>
                       <div className="flex justify-between items-center gap-3 pt-1">
-                        <span className="text-slate-500 dark:text-slate-400">Adoption rate</span>
+                        <span className="text-slate-500 dark:text-slate-400">Outbound vs GDP</span>
                         <span className="text-slate-800 dark:text-slate-100 font-semibold tabular-nums">{fmtPct(hoveredRegion.adoptionRate)}</span>
                       </div>
                       <div className="flex justify-between items-center gap-3">
@@ -934,9 +927,9 @@ export function RealCorridorMap({
                       </div>
                     </>
                   )}
-                  {mode === 'country' && hoveredMetric && hoveredMetric.relativeAdoptionIndex == null && hoveredMetric.activeWallets > 0 && (
+                  {mode === 'country' && hoveredMetric && hoveredMetric.relativeAdoptionIndex == null && (
                     <p className="text-slate-500 dark:text-slate-400 italic">
-                      Not enough wallets to rank ({fmtWallets(hoveredMetric.activeWallets)} — needs &gt;10k)
+                      Not ranked — no outbound corridors in this period, or no GDP
                     </p>
                   )}
                 </div>

@@ -250,7 +250,7 @@ export function OverviewView() {
     const previousRankMap = new Map(previousAdoptionData.map((c) => [c.countryId, c.adoptionRank]));
     const previousWalletsMap = new Map(previousAdoptionData.map((c) => [c.countryId, c.activeWallets]));
     return adoptionData
-      .filter((c) => c.activeWallets > 0)
+      .filter((c) => c.activeWallets > 0 || (c.outboundVolume ?? 0) > 0)
       .map((c) => {
         const previousRank = previousRankMap.get(c.countryId) ?? null;
         const previousWallets = previousWalletsMap.get(c.countryId) ?? null;
@@ -313,8 +313,7 @@ export function OverviewView() {
       countryId: c.countryId,
       name: c.name,
       isoAlpha2: c.isoAlpha2,
-      adoptionRate: c.adoptionRate,
-      activeWallets: c.activeWallets,
+      gdpIntensity: c.gdpIntensity,
       stage: stageMap.get(c.countryId),
     }));
   }, [adoptionData, regulation]);
@@ -331,20 +330,32 @@ export function OverviewView() {
       ),
     },
     {
-      key: 'walletsPer100k',
+      key: 'gdpIntensity',
       header: (
         <span className="flex flex-col gap-0.5">
-          Wallets per 100k people
-          <span className="text-[10px] font-normal text-white/60">Wallets ÷ population. Rank if &gt;10k wallets</span>
+          Outbound vs GDP
+          <span className="text-[10px] font-normal text-white/60">Corridors ÷ period GDP. Rank if both exist</span>
         </span>
       ),
-      render: (_: number, row: CountryAdoptionMetric & { walletsPer100k: number }) => (
+      render: (_: number, row: CountryAdoptionMetric) => (
         <span className="tabular-nums">
-          {fmtPer100k(row.adoptionRate)}
+          {(row.gdpIntensity ?? 0) > 0 ? fmtPct(row.gdpIntensity) : '—'}
           {row.adoptionRank != null && (
             <span className="ml-2 text-xs text-slate-500 dark:text-slate-400">#{row.adoptionRank}</span>
           )}
         </span>
+      ),
+    },
+    {
+      key: 'walletsPer100k',
+      header: (
+        <span className="flex flex-col gap-0.5">
+          Wallets per 100k people
+          <span className="text-[10px] font-normal text-white/60">Wallets ÷ population</span>
+        </span>
+      ),
+      render: (_: number, row: CountryAdoptionMetric) => (
+        <span className="tabular-nums">{fmtPer100k(row.adoptionRate)}</span>
       ),
     },
     {
@@ -381,7 +392,7 @@ export function OverviewView() {
     },
     {
       key: 'adoptionRate',
-      header: '% of population',
+      header: 'Outbound vs GDP',
       render: (value: number) => fmtPct(value),
     },
     {
@@ -502,7 +513,7 @@ export function OverviewView() {
                         : `Top ${TOP_NAMED_CORRIDORS} of ${bidirectionalCorridors.length} by volume · domestic not in this data`
                     : geoMode === 'region'
                       ? `${regionalData.length} regions`
-                      : `${adoptionTableData.length} countries · gray on the map is <10k wallets`}
+                      : `${adoptionTableData.length} countries · gray on the map is no outbound corridors or no GDP`}
                 </span>
                 <SegmentedControl
                   layoutId="next-usage-table"
@@ -596,7 +607,7 @@ export function OverviewView() {
               <DataTable
                 data={adoptionTableData}
                 columns={adoptionColumns}
-                defaultSortKey="walletsPer100k"
+                defaultSortKey="gdpIntensity"
                 defaultSortDirection="desc"
                 pageSize={10}
                 paginate={false}

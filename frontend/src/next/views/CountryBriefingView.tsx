@@ -270,7 +270,7 @@ export function CountryBriefingView() {
     numericId
       ? {
           title: `${name} stablecoin usage and regulation · ${SEO.site}`,
-          description: `${name} stablecoin usage, international corridor volume, wallets per 100k people, and regulatory framework. World Bank remittances.`,
+          description: `${name} stablecoin usage, outbound volume versus GDP, international corridors, and regulatory framework.`,
           path: canonicalSlug ? `/country/${canonicalSlug}` : `/country/${param}`,
           jsonLd: [
             {
@@ -370,23 +370,34 @@ export function CountryBriefingView() {
         <h3 className="kicker">Scale</h3>
         <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
           <MetricCard
-            label="Wallets per 100k people"
-            hint="Wallets ÷ population. Rank only if >10k wallets."
+            label="Outbound vs GDP"
+            hint="International outbound corridors ÷ (annual GDP × period months / 12)."
             loading={overviewLoading}
-            value={overview ? fmtPer100k(overview.adoptionRate) : '—'}
+            value={
+              overview && (overview.gdpIntensity ?? 0) > 0
+                ? fmtPct(overview.gdpIntensity)
+                : adoptionRow && (adoptionRow.gdpIntensity ?? 0) > 0
+                  ? fmtPct(adoptionRow.gdpIntensity)
+                  : '—'
+            }
             sub={
               overview?.adoptionRank != null
                 ? `#${overview.adoptionRank} of ${overview.eligibleCountries}`
-                : 'Unranked (<10k wallets)'
+                : 'Unranked (no outbound or no GDP)'
             }
             trend={rankDelta}
             trendFormat={(v) => String(v)}
           />
           <MetricCard
             label="Wallets holding stablecoins"
+            hint="Wallets ÷ population. Not the rank."
             loading={overviewLoading}
             value={overview ? overview.activeWallets.toLocaleString() : '—'}
-            sub={overview ? `${fmtPct(overview.adoptionRate)} of population` : undefined}
+            sub={
+              overview
+                ? `${fmtPer100k(overview.adoptionRate)} per 100k · ${fmtPct(overview.adoptionRate)} of population`
+                : undefined
+            }
             trend={walletsChangePct}
             trendFormat={(v) => `${v.toFixed(1)}%`}
           />

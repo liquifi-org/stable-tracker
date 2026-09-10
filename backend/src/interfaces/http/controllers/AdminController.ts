@@ -5,6 +5,7 @@ import { CountryModel } from '../../../infrastructure/database/mongoose/models/C
 import { COUNTRIES_SEED } from '../../../../migrations/data/countries.seed';
 import { run as runWalletSync } from '../../../../script/allium/sync-wallets';
 import { run as runPopulationSync } from '../../../../script/general/sync-population';
+import { run as runGdpSync } from '../../../../script/general/sync-gdp';
 import { run as runStrideCountries } from '../../../../script/stride/sync-countries';
 import { run as runStrideIssuers } from '../../../../script/stride/sync-issuers';
 import { run as runStrideStablecoins } from '../../../../script/stride/sync-stablecoins';
@@ -50,6 +51,17 @@ export class AdminController {
         }
     };
 
+    syncGdp = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            logger.info('ADMIN_SYNC_GDP_STARTED');
+            await runGdpSync();
+            logger.info('ADMIN_SYNC_GDP_COMPLETED');
+            httpResponse(req, res, 200, 'GDP sync completed.');
+        } catch (error) {
+            next(error);
+        }
+    };
+
     syncAll = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
         try {
             logger.info('ADMIN_SYNC_ALL_STARTED');
@@ -71,9 +83,11 @@ export class AdminController {
                 results['stride'] = 'skipped (STRIDE_API_KEY not configured)';
             }
 
-            // 3) Population (World Bank). Needs countries to exist.
+            // 3) Population + GDP (World Bank, then CIA / Wikipedia fallbacks).
             await runPopulationSync();
             results['population'] = 'completed';
+            await runGdpSync();
+            results['gdp'] = 'completed';
 
             // 4) Wallet counts (Allium).
             if (process.env.ALLIUM_API_KEY) {

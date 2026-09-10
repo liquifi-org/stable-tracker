@@ -21,6 +21,7 @@ import {
     assertApiKey,
     DB_URL,
     CORRIDORS_QUERY_ID,
+    CORRIDORS_RUN_LIMIT,
     runAndWait,
     type ResultRow,
 } from './_client';
@@ -54,10 +55,14 @@ function startOfMonth(year: number, month: number): string {
     return `${year}-${String(month).padStart(2, '0')}-01`;
 }
 
-/** "YYYY-MM-DD" for the last day of the given year/month. */
-function endOfMonth(year: number, month: number): string {
-    const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
-    return `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+/**
+ * Exclusive end date for Allium: first day of the month after `year`/`month`.
+ * SQL is `block_timestamp >= start_date AND block_timestamp < end_date`, so
+ * August must use end_date 2026-09-01 (not 2026-08-31, which drops the last day).
+ */
+function startOfNextMonth(year: number, month: number): string {
+    const next = new Date(Date.UTC(year, month, 1));
+    return `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, '0')}-01`;
 }
 
 function toNumber(value: unknown): number | null {
@@ -118,6 +123,34 @@ function parseRow(row: ResultRow): ParsedRow | null {
     };
 }
 
+function corridorKey(row: ParsedRow): string {
+    return `${row.senderCountryId}:${row.receiverCountryId}:${row.tokenSymbol}`;
+}
+
+/**
+ * Allium can emit the same token under mixed casings (USDT vs USDt). Uppercase
+ * first, then sum volumes so a $2k leftover cannot last-write-wins a $1.28B row.
+ */
+function collapseByToken(rows: ParsedRow[]): ParsedRow[] {
+    const merged = new Map<string, ParsedRow>();
+    for (const row of rows) {
+        const key = corridorKey(row);
+        const existing = merged.get(key);
+        if (!existing) {
+            merged.set(key, { ...row });
+            continue;
+        }
+        existing.transactionCount += row.transactionCount;
+        existing.totalUsdVolume += row.totalUsdVolume;
+        existing.usdStablecoinVolume += row.usdStablecoinVolume;
+        existing.pctUsdStablecoins =
+            existing.totalUsdVolume > 0
+                ? (existing.usdStablecoinVolume / existing.totalUsdVolume) * 100
+                : 0;
+    }
+    return [...merged.values()];
+}
+
 export async function run(year?: number, month?: number): Promise<void> {
     const startTime = Date.now();
 
@@ -127,7 +160,7 @@ export async function run(year?: number, month?: number): Promise<void> {
     const period = `${targetYear}-${String(targetMonth).padStart(2, '0')}`;
     const periodDate = new Date(`${period}-01T00:00:00.000Z`);
     const startDate = startOfMonth(targetYear, targetMonth);
-    const endDate = endOfMonth(targetYear, targetMonth);
+    const endDate = startOfNextMonth(targetYear, targetMonth);
 
     console.log(`Fetching corridor data from Allium for ${startDate} → ${endDate}...`);
 
@@ -136,11 +169,21 @@ export async function run(year?: number, month?: number): Promise<void> {
     // as sync-wallets.ts. The previous year/month params weren't bound to this
     // query's date filter, so every backfilled month silently returned the same
     // default snapshot instead of period-specific data.
-    const rows = await runAndWait(CORRIDORS_QUERY_ID, {
-        start_date: `'${startDate}'`,
-        end_date: `'${endDate}'`,
-    });
+    const rows = await runAndWait(
+        CORRIDORS_QUERY_ID,
+        {
+            start_date: `'${startDate}'`,
+            end_date: `'${endDate}'`,
+        },
+        CORRIDORS_RUN_LIMIT,
+    );
     console.log(`Received ${rows.length} row(s) from Allium.`);
+
+    if (rows.length >= CORRIDORS_RUN_LIMIT) {
+        throw new Error(
+            `Allium returned ${rows.length} rows, hitting CORRIDORS_RUN_LIMIT=${CORRIDORS_RUN_LIMIT}. Raise the limit and re-run ${period}.`,
+        );
+    }
 
     if (rows.length === 0) {
         console.warn('No rows returned, nothing to store.');
@@ -148,9 +191,8 @@ export async function run(year?: number, month?: number): Promise<void> {
     }
 
     const now = new Date();
-    let matched = 0;
     let unresolved = 0;
-    const ops: Parameters<typeof TransactionModel.bulkWrite>[0] = [];
+    const parsedRows: ParsedRow[] = [];
 
     for (const row of rows) {
         const parsed = parseRow(row);
@@ -166,10 +208,18 @@ export async function run(year?: number, month?: number): Promise<void> {
             }
             continue;
         }
+        parsedRows.push(parsed);
+    }
 
+    const collapsed = collapseByToken(parsedRows);
+    const collapsedAway = parsedRows.length - collapsed.length;
+    if (collapsedAway > 0) {
+        console.log(`Collapsed ${collapsedAway} mixed-case token duplicate(s).`);
+    }
+
+    const ops: Parameters<typeof TransactionModel.bulkWrite>[0] = [];
+    for (const parsed of collapsed) {
         const transactionId = `allium:corridor:${period}:${parsed.senderCountryId}:${parsed.receiverCountryId}:${parsed.tokenSymbol}`;
-
-        matched++;
         ops.push({
             updateOne: {
                 filter: { transactionId },
@@ -203,7 +253,7 @@ export async function run(year?: number, month?: number): Promise<void> {
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
     console.log(`Allium corridor sync complete in ${elapsed}s`);
     console.log(`Period:             ${period}`);
-    console.log(`Corridors written:  ${matched}`);
+    console.log(`Corridors written:  ${collapsed.length}`);
     console.log(`Unresolved rows:    ${unresolved}`);
 }
 

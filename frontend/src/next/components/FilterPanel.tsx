@@ -249,7 +249,10 @@ export function FilterPanel() {
       <div className="pt-4 border-t border-[var(--hairline)] space-y-2 text-xs text-[var(--muted-ink)] leading-relaxed">
         <div className="font-semibold text-[var(--ink-text)]">How to read this</div>
         <p>
-          <b className="text-slate-600 dark:text-slate-300">Wallets per 100k</b> is wallets ÷ World Bank population. Rank only includes countries with more than 10,000 wallets.
+          <b className="text-slate-600 dark:text-slate-300">Outbound vs GDP</b> is international outbound corridors ÷ (annual GDP × period months / 12). Rank includes countries with outbound volume and GDP.
+        </p>
+        <p>
+          <b className="text-slate-600 dark:text-slate-300">Wallets per 100k</b> is wallets ÷ World Bank population. It is a people-scale figure, not the rank.
         </p>
         <p>
           <b className="text-slate-600 dark:text-slate-300">Digital dollars</b> is the share of corridor USD volume in USD-referenced stablecoins.

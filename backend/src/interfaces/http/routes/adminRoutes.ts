@@ -10,6 +10,7 @@ export function createAdminRouter(ctrl: AdminController): Router {
     router.post('/sync/all', ctrl.syncAll);
     router.post('/sync/wallets', ctrl.syncWallets);
     router.post('/sync/population', ctrl.syncPopulation);
+    router.post('/sync/gdp', ctrl.syncGdp);
 
     return router;
 }

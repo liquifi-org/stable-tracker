@@ -95,7 +95,7 @@ export function InsightCards({
         value={<AnimatedNumber value={liveFrameworks} />}
         detail={
           rankedCountries > 0
-            ? `Countries with a live framework · ${rankedCountries} ranked for adoption`
+            ? `Countries with a live framework · ${rankedCountries} ranked by outbound vs GDP`
             : 'Stage 3 · not month-dependent'
         }
       />

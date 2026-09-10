@@ -259,21 +259,23 @@ Ensure:
 
 ---
 
-## 🌍 Stablecoin Adoption (population %, active wallets)
+## 🌍 Stablecoin adoption (GDP intensity)
 
-This section documents the **adoption feature**: the main metric of the adoption
-map is the **percentage of a country's population that uses stablecoins**, and on
-hover the UI shows a breakdown including the **number of active wallets holding
-stablecoins** per country.
-
-To compute this we combine two external data sources:
+The adoption map ranks countries by **outbound international corridors ÷ period GDP**.
+Wallet counts and wallets-per-100k remain on the page as a people-scale figure; they
+are not the rank.
 
 | Data | Source | Frequency | Where it lands |
 | --- | --- | --- | --- |
-| Wallets holding stablecoins per country | **Allium Explorer API** | Monthly | `walletcountsnapshots` collection (historical) |
-| Population per country | **World Bank Open Data API** | Yearly | `population` field on each `countries` doc |
+| International corridor volume | **Allium Explorer API** | Monthly | `transactions` (`type: corridor`) |
+| Nominal GDP | **World Bank** `NY.GDP.MKTP.CD`, IMF / CIA / Wikipedia fallbacks | Yearly | `gdp`, `gdpYear`, `gdpSource` on each `countries` doc |
+| Wallets holding stablecoins | **Allium Explorer API** | Monthly | `walletcountsnapshots` collection |
+| Population | **World Bank** `SP.POP.TOTL` | Yearly | `population` on each `countries` doc |
 
-`adoptionRate = walletsHoldingStablecoins / population`.
+`gdpIntensity = outboundCorridorVolume / (gdp × periodMonths / 12)`.
+
+`adoptionRate` on the API is still `walletsHoldingStablecoins / population` (wallet
+penetration). Rank, map colour, and `#N of M` use `gdpIntensity`.
 
 ### Country identifiers
 
@@ -400,7 +402,9 @@ npm run population:sync:local
 Population changes slowly, so this is meant to run **yearly**.
 
 > **Known limitation:** the World Bank does not report some territories (e.g. Taiwan),
-> so those countries end up without `population` and their `adoptionRate` is `0`.
+> so those countries end up without `population` and their wallet-penetration
+> `adoptionRate` is `0`. GDP for Taiwan is filled from IMF WEO so it can still
+> enter the GDP-intensity rank.
 
 ---
 
@@ -425,18 +429,26 @@ curl "http://localhost:3003/v1/analytics/adoption?year=2026&month=6"
     "countryId": "840",
     "name": "United States",
     "region": "North America",
-    "adoptionRate": 0.000182,   // walletsHoldingStablecoins / population
-    "activeWallets": 62017,     // from the latest Allium snapshot
-    "txValueShare": 0,
+    "adoptionRate": 0.000182,   // wallets / population (not the rank)
+    "activeWallets": 62017,
+    "gdp": 27720000000000,
+    "gdpIntensity": 0.00123,    // outbound corridors / period GDP
+    "outboundVolume": 2850000000,
+    "adoptionRank": 17,
+    "eligibleCountries": 27,
+    "txValueShare": 0.12,
     "unit": "ratio"
   }
 ]
 ```
 
 How it's computed (`MongoAnalyticsRepository.getAdoptionMetrics`):
+- `outboundVolume` = Allium international corridors for the sender country in the period.
+- `gdpIntensity` = `outboundVolume / (gdp × periodMonths / 12)`.
+- `adoptionRank` = dense 1-based rank among countries with outbound volume and GDP.
 - `activeWallets` = latest Allium snapshot with `period <= target` (falls back to a
   live `WalletModel` count when a country has no snapshot yet).
-- `adoptionRate` = `activeWallets / country.population` (0 if population is missing).
+- `adoptionRate` = `activeWallets / country.population` (wallet penetration; not ranked).
 
 #### `GET /v1/analytics/countries/{countryId}/overview` — hover breakdown
 
@@ -446,7 +458,7 @@ Detailed per-country view used when hovering a country on the map.
 curl "http://localhost:3003/v1/analytics/countries/840/overview?year=2026&month=6"
 ```
 
-Includes `adoptionRate`, `activeWallets`, `txValueShare`, `dollarizationIndex`,
+Includes `gdpIntensity`, `adoptionRank`, `adoptionRate` (wallet penetration), `activeWallets`, `txValueShare`, `dollarizationIndex`,
 plus compliant issuers, licenses and reserve types.
 
 ---
@@ -461,9 +473,10 @@ Routes (`/v1/admin`), all `POST`:
 
 | Endpoint | Action |
 | --- | --- |
-| `/v1/admin/sync/all` | Population + Allium wallets (Allium skipped if no API key) |
+| `/v1/admin/sync/all` | Population + GDP + Allium wallets (Allium skipped if no API key) |
 | `/v1/admin/sync/wallets` | Allium wallet counts only |
 | `/v1/admin/sync/population` | World Bank population only |
+| `/v1/admin/sync/gdp` | Nominal GDP (World Bank, then CIA / Wikipedia fallbacks) |
 
 **Authentication:** send the secret token in the `x-admin-token` header (or
 `Authorization: Bearer <token>`). It must match `ADMIN_SYNC_TOKEN` configured on the
@@ -507,6 +520,7 @@ Recommended cadence:
 | --- | --- | --- |
 | Allium wallets | Monthly | `npm run allium:sync:wallets` |
 | Population | Yearly | `npm run population:sync` |
+| GDP | Yearly | `npm run gdp:sync` |
 
 Example crontab entries (run from the project root):
 
@@ -516,6 +530,9 @@ Example crontab entries (run from the project root):
 
 # Population — 04:00 on Jan 1st
 0 4 1 1 * cd /path/to/stable-tracker-backend && npm run population:sync >> logs/population.log 2>&1
+
+# GDP — 04:30 on Jan 1st
+30 4 1 1 * cd /path/to/stable-tracker-backend && npm run gdp:sync >> logs/gdp.log 2>&1
 ```
 
 Alternatively, hit the admin endpoints from any external scheduler.
@@ -531,6 +548,7 @@ script/
     sync-wallets.ts            # Monthly per-country wallet snapshots
   general/
     sync-population.ts         # Yearly population from the World Bank
+    sync-gdp.ts                # Nominal GDP: World Bank + CIA / Wikipedia fallbacks
   shared/
     iso3166.ts                 # ISO 3166-1 reference + resolveCountryId()
 src/
