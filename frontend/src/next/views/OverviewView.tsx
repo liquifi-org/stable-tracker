@@ -736,8 +736,8 @@ export function OverviewView() {
               <h4 className="display text-xl">{geoMode === 'region' ? 'Regions' : 'Countries'}</h4>
               <span className="text-xs text-[var(--muted-ink)]">
                 {geoMode === 'region'
-                  ? `${regionalData.length} regions · unwrap a row for outbound corridors`
-                  : `${adoptionTableData.length} countries · unwrap a row for outbound corridors · name opens the briefing`}
+                  ? `${regionalData.length} regions, ${directedRegionalCorridors.length} corridors`
+                  : `${adoptionTableData.length} countries, ${directedCorridors.length} corridors`}
               </span>
             </div>
 
