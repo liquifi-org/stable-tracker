@@ -15,6 +15,8 @@ export interface CountryAdoptionMetricDto {
     txValueShare: number;
     unit: 'ratio' | 'percent';
     remittancesSent?: number;
+    servicesImports?: number;
+    officialOutflows?: number;
     gdp?: number;
     gdpYear?: number;
     gdpSource?: string;

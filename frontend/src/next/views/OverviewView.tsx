@@ -18,7 +18,7 @@ import {
   type CountryRegulationInfo,
 } from '../../app/services/api';
 import { fmtPct, fmtPer100k } from '../lib/format';
-import { TokenMixBar, NamedCorridorDestRow } from '../components/TokenMixBar';
+import { TokenMixBar, NamedCorridorDestRow, type TokenShare } from '../components/TokenMixBar';
 import { UsageRegulationMatrix, type UsageRuleRow } from '../components/UsageRegulationMatrix';
 import { InsightCards, type InsightBreakdown } from '../components/InsightCards';
 import { countryPath } from '../../app/lib/countryRoutes';
@@ -43,6 +43,13 @@ function formatMultiple(ratio: number): string {
   if (ratio >= 10) return `${ratio.toFixed(0)}×`;
   if (ratio >= 1) return `${ratio.toFixed(1)}×`;
   return fmtPct(ratio);
+}
+
+function tokensWithResidual(volume: number, tokens: Map<string, number>): TokenShare[] {
+  const items = Array.from(tokens.entries()).map(([name, vol]) => ({ name, volume: vol }));
+  const accounted = items.reduce((s, t) => s + t.volume, 0);
+  if (volume - accounted > 0) items.push({ name: 'Other', volume: volume - accounted });
+  return items;
 }
 
 type GeoMode = 'country' | 'region';
@@ -253,48 +260,89 @@ export function OverviewView() {
   }, [corridorData, numericToMacroRegion]);
 
   const directedCorridors = useMemo(() => {
-    const flows = new Map<string, { fromAlpha: string; toAlpha: string; volume: number }>();
+    const flows = new Map<string, {
+      fromAlpha: string;
+      toAlpha: string;
+      volume: number;
+      tokens: Map<string, number>;
+    }>();
     for (const flow of corridorData) {
       const fromAlpha = numericToAlpha2.get(flow.from);
       const toAlpha = numericToAlpha2.get(flow.to);
       if (!fromAlpha || !toAlpha || fromAlpha === toAlpha) continue;
       const key = `${fromAlpha}->${toAlpha}`;
-      const existing = flows.get(key);
-      if (existing) existing.volume += flow.value.amount;
-      else flows.set(key, { fromAlpha, toAlpha, volume: flow.value.amount });
+      const existing = flows.get(key) ?? {
+        fromAlpha,
+        toAlpha,
+        volume: 0,
+        tokens: new Map<string, number>(),
+      };
+      existing.volume += flow.value.amount;
+      for (const t of flow.topStablecoins ?? []) {
+        existing.tokens.set(t.name, (existing.tokens.get(t.name) ?? 0) + flow.value.amount * t.share);
+      }
+      flows.set(key, existing);
     }
-    return Array.from(flows.values()).sort((a, b) => b.volume - a.volume);
+    return Array.from(flows.values())
+      .map((f) => ({
+        fromAlpha: f.fromAlpha,
+        toAlpha: f.toAlpha,
+        volume: f.volume,
+        tokens: tokensWithResidual(f.volume, f.tokens),
+      }))
+      .sort((a, b) => b.volume - a.volume);
   }, [corridorData, numericToAlpha2]);
 
   const directedRegionalCorridors = useMemo(() => {
-    const flows = new Map<string, { fromRegion: string; toRegion: string; volume: number }>();
+    const flows = new Map<string, {
+      fromRegion: string;
+      toRegion: string;
+      volume: number;
+      tokens: Map<string, number>;
+    }>();
     for (const flow of corridorData) {
       const fromRegion = numericToMacroRegion.get(flow.from);
       const toRegion = numericToMacroRegion.get(flow.to);
       if (!fromRegion || !toRegion || fromRegion === toRegion) continue;
       const key = `${fromRegion}->${toRegion}`;
-      const existing = flows.get(key);
-      if (existing) existing.volume += flow.value.amount;
-      else flows.set(key, { fromRegion, toRegion, volume: flow.value.amount });
+      const existing = flows.get(key) ?? {
+        fromRegion,
+        toRegion,
+        volume: 0,
+        tokens: new Map<string, number>(),
+      };
+      existing.volume += flow.value.amount;
+      for (const t of flow.topStablecoins ?? []) {
+        existing.tokens.set(t.name, (existing.tokens.get(t.name) ?? 0) + flow.value.amount * t.share);
+      }
+      flows.set(key, existing);
     }
-    return Array.from(flows.values()).sort((a, b) => b.volume - a.volume);
+    return Array.from(flows.values())
+      .map((f) => ({
+        fromRegion: f.fromRegion,
+        toRegion: f.toRegion,
+        volume: f.volume,
+        tokens: tokensWithResidual(f.volume, f.tokens),
+      }))
+      .sort((a, b) => b.volume - a.volume);
   }, [corridorData, numericToMacroRegion]);
 
   const corridorsGroupedByOrigin = useMemo(() => {
     const groups = new Map<
       string,
-      { fromAlpha: string; total: number; dests: { toAlpha: string; volume: number }[] }
+      { fromAlpha: string; total: number; dests: { toAlpha: string; volume: number; tokens: TokenShare[] }[] }
     >();
     for (const flow of directedCorridors) {
+      const dest = { toAlpha: flow.toAlpha, volume: flow.volume, tokens: flow.tokens };
       const existing = groups.get(flow.fromAlpha);
       if (existing) {
         existing.total += flow.volume;
-        existing.dests.push({ toAlpha: flow.toAlpha, volume: flow.volume });
+        existing.dests.push(dest);
       } else {
         groups.set(flow.fromAlpha, {
           fromAlpha: flow.fromAlpha,
           total: flow.volume,
-          dests: [{ toAlpha: flow.toAlpha, volume: flow.volume }],
+          dests: [dest],
         });
       }
     }
@@ -306,18 +354,19 @@ export function OverviewView() {
   const regionalCorridorsGroupedByOrigin = useMemo(() => {
     const groups = new Map<
       string,
-      { fromRegion: string; total: number; dests: { toRegion: string; volume: number }[] }
+      { fromRegion: string; total: number; dests: { toRegion: string; volume: number; tokens: TokenShare[] }[] }
     >();
     for (const flow of directedRegionalCorridors) {
+      const dest = { toRegion: flow.toRegion, volume: flow.volume, tokens: flow.tokens };
       const existing = groups.get(flow.fromRegion);
       if (existing) {
         existing.total += flow.volume;
-        existing.dests.push({ toRegion: flow.toRegion, volume: flow.volume });
+        existing.dests.push(dest);
       } else {
         groups.set(flow.fromRegion, {
           fromRegion: flow.fromRegion,
           total: flow.volume,
-          dests: [{ toRegion: flow.toRegion, volume: flow.volume }],
+          dests: [dest],
         });
       }
     }
@@ -347,20 +396,20 @@ export function OverviewView() {
       if (!alpha2) continue;
       dollarVolMap.set(alpha2, (dollarVolMap.get(alpha2) ?? 0) + flow.value.amount * flow.dollarizationIndex);
     }
-    const remittancesMap = new Map(adoptionData.map((c) => [c.countryId, c.remittancesSent]));
+    const outflowsMap = new Map(adoptionData.map((c) => [c.countryId, c.officialOutflows]));
     return Array.from(outboundMap.entries())
       .map(([alpha2, outboundVolume]) => {
         const numericId = alpha2ToNumeric.get(alpha2) ?? '';
-        const remittancesSent = remittancesMap.get(numericId);
+        const officialOutflows = outflowsMap.get(numericId);
         return {
           countryId: numericId,
           alpha2,
           name: countryNameByAlpha2.get(alpha2) ?? alpha2,
           outboundVolume,
           dollarizationIndex: outboundVolume > 0 ? (dollarVolMap.get(alpha2) ?? 0) / outboundVolume : null,
-          remittancesSent: remittancesSent ?? null,
-          stablecoinPctOfRemittances:
-            remittancesSent && remittancesSent > 0 ? outboundVolume / remittancesSent : null,
+          officialOutflows: officialOutflows ?? null,
+          stablecoinPctOfOutflows:
+            officialOutflows && officialOutflows > 0 ? outboundVolume / officialOutflows : null,
         };
       })
       .sort((a, b) => b.outboundVolume - a.outboundVolume);
@@ -389,9 +438,9 @@ export function OverviewView() {
         return {
           ...c,
           inboundVolume: inboundByCountry.get(c.countryId) ?? 0,
-          stablecoinPctOfRemittances:
-            c.remittancesSent != null && c.remittancesSent > 0
-              ? (c.outboundVolume ?? 0) / c.remittancesSent
+          stablecoinPctOfOutflows:
+            c.officialOutflows != null && c.officialOutflows > 0
+              ? (c.outboundVolume ?? 0) / c.officialOutflows
               : null,
           rankDelta:
             c.adoptionRank != null && previousRank != null ? previousRank - c.adoptionRank : null,
@@ -492,34 +541,46 @@ export function OverviewView() {
     };
   }, [bidirectionalCorridors, countryNameByAlpha2, formatCurrency]);
 
-  const remittanceRatio =
-    globalInsights && globalInsights.totalRemittancesUsd > 0
-      ? corridorVolume / globalInsights.totalRemittancesUsd
-      : null;
-  const previousRemittanceRatio =
-    previousGlobalInsights && previousGlobalInsights.totalRemittancesUsd > 0 && previousCorridorVolume != null
-      ? previousCorridorVolume / previousGlobalInsights.totalRemittancesUsd
+  const corridorOfficialOutflows = useMemo(
+    () =>
+      adoptionData
+        .filter((c) => (c.outboundVolume ?? 0) > 0)
+        .reduce((sum, c) => sum + (c.officialOutflows ?? 0), 0),
+    [adoptionData],
+  );
+  const previousCorridorOfficialOutflows = useMemo(
+    () =>
+      previousAdoptionData
+        .filter((c) => (c.outboundVolume ?? 0) > 0)
+        .reduce((sum, c) => sum + (c.officialOutflows ?? 0), 0),
+    [previousAdoptionData],
+  );
+  const outflowRatio =
+    corridorOfficialOutflows > 0 ? corridorVolume / corridorOfficialOutflows : null;
+  const previousOutflowRatio =
+    previousCorridorOfficialOutflows > 0 && previousCorridorVolume != null
+      ? previousCorridorVolume / previousCorridorOfficialOutflows
       : null;
 
-  const remittanceBreakdown = useMemo((): InsightBreakdown | null => {
-    if (remittanceRatio == null || !globalInsights || globalInsights.totalRemittancesUsd <= 0) {
+  const outflowBreakdown = useMemo((): InsightBreakdown | null => {
+    if (outflowRatio == null || corridorOfficialOutflows <= 0) {
       return null;
     }
-    const multiples = corridorsByCountry
-      .filter((c) => c.stablecoinPctOfRemittances != null && c.stablecoinPctOfRemittances >= 1)
-      .sort((a, b) => (b.stablecoinPctOfRemittances ?? 0) - (a.stablecoinPctOfRemittances ?? 0))
+    const top = corridorsByCountry
+      .filter((c) => c.stablecoinPctOfOutflows != null)
+      .sort((a, b) => (b.stablecoinPctOfOutflows ?? 0) - (a.stablecoinPctOfOutflows ?? 0))
       .slice(0, 5)
       .map((c) => ({
         label: c.name,
-        value: `${formatCurrency(c.outboundVolume)} · ${formatMultiple(c.stablecoinPctOfRemittances ?? 0)}`,
+        value: `${formatCurrency(c.outboundVolume)} · ${formatMultiple(c.stablecoinPctOfOutflows ?? 0)}`,
       }));
     return {
-      caption: `${formatCurrency(corridorVolume)} corridors vs ${formatCurrency(globalInsights.totalRemittancesUsd)} official remittances (annual / 12)`,
-      bar: [{ key: 'corridors', share: remittanceRatio }],
-      rows: multiples,
-      note: 'A comparison of unlike series, not the share of remittances on-chain.',
+      caption: `${formatCurrency(corridorVolume)} corridors vs ${formatCurrency(corridorOfficialOutflows)} remittances + services imports (countries with outbound, annual / 12)`,
+      bar: [{ key: 'corridors', share: outflowRatio }],
+      rows: top,
+      note: 'Household remittances paid plus services imports. Goods trade is excluded. Not the share of remittances on-chain.',
     };
-  }, [remittanceRatio, globalInsights, corridorsByCountry, corridorVolume, formatCurrency]);
+  }, [outflowRatio, corridorOfficialOutflows, corridorsByCountry, corridorVolume, formatCurrency]);
 
   const dollarizationBreakdown = useMemo((): InsightBreakdown | null => {
     if (corridorVolume <= 0 || corridorDollarShare == null) return null;
@@ -616,8 +677,8 @@ export function OverviewView() {
       ),
     },
     {
-      key: 'stablecoinPctOfRemittances',
-      header: '% of official remittances',
+      key: 'stablecoinPctOfOutflows',
+      header: '% of official outflows',
       render: (value: number | null) => (value != null ? fmtPct(value) : '—'),
     },
   ];
@@ -650,9 +711,9 @@ export function OverviewView() {
     previousCorridorVolume != null && previousCorridorVolume > 0
       ? pctChange(corridorVolume, previousCorridorVolume)
       : null;
-  const remittanceTrendPp =
-    remittanceRatio != null && previousRemittanceRatio != null
-      ? (remittanceRatio - previousRemittanceRatio) * 100
+  const outflowTrendPp =
+    outflowRatio != null && previousOutflowRatio != null
+      ? (outflowRatio - previousOutflowRatio) * 100
       : null;
   const dollarizationTrendPp =
     corridorDollarShare != null && previousCorridorDollarShare != null
@@ -737,11 +798,11 @@ export function OverviewView() {
             corridorTrend={corridorTrend}
             dollarization={corridorDollarShare}
             dollarizationTrendPp={dollarizationTrendPp}
-            remittanceRatio={remittanceRatio}
-            remittanceTrendPp={remittanceTrendPp}
+            outflowRatio={outflowRatio}
+            outflowTrendPp={outflowTrendPp}
             walletBreakdown={walletBreakdown}
             corridorBreakdown={corridorBreakdown}
-            remittanceBreakdown={remittanceBreakdown}
+            outflowBreakdown={outflowBreakdown}
             dollarizationBreakdown={dollarizationBreakdown}
             onSelectUsage={() => filters.setMapType('adoption')}
             formatCurrency={formatCurrency}
@@ -777,6 +838,7 @@ export function OverviewView() {
                           name={countryNameByAlpha2.get(dest.toAlpha) ?? dest.toAlpha}
                           alpha={dest.toAlpha}
                           volume={dest.volume}
+                          tokens={dest.tokens}
                           formatVolume={formatCurrency}
                           onClick={
                             alpha2ToNumeric.has(dest.toAlpha)
@@ -816,6 +878,7 @@ export function OverviewView() {
                           key={`${row.region}-${dest.toRegion}`}
                           name={dest.toRegion}
                           volume={dest.volume}
+                          tokens={dest.tokens}
                           formatVolume={formatCurrency}
                         />
                       ))}
@@ -856,11 +919,11 @@ export function OverviewView() {
             corridorTrend={corridorTrend}
             dollarization={corridorDollarShare}
             dollarizationTrendPp={dollarizationTrendPp}
-            remittanceRatio={remittanceRatio}
-            remittanceTrendPp={remittanceTrendPp}
+            outflowRatio={outflowRatio}
+            outflowTrendPp={outflowTrendPp}
             walletBreakdown={walletBreakdown}
             corridorBreakdown={corridorBreakdown}
-            remittanceBreakdown={remittanceBreakdown}
+            outflowBreakdown={outflowBreakdown}
             dollarizationBreakdown={dollarizationBreakdown}
             onSelectUsage={() => filters.setMapType('adoption')}
             formatCurrency={formatCurrency}

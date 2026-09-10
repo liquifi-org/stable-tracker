@@ -34,9 +34,9 @@ export function InsightCards({
   dollarization,
   dollarizationTrendPp,
   dollarizationBreakdown,
-  remittanceRatio,
-  remittanceTrendPp,
-  remittanceBreakdown,
+  outflowRatio,
+  outflowTrendPp,
+  outflowBreakdown,
   onSelectUsage,
   formatCurrency,
 }: {
@@ -52,9 +52,9 @@ export function InsightCards({
   dollarization: number | null;
   dollarizationTrendPp: number | null;
   dollarizationBreakdown: InsightBreakdown | null;
-  remittanceRatio: number | null;
-  remittanceTrendPp: number | null;
-  remittanceBreakdown: InsightBreakdown | null;
+  outflowRatio: number | null;
+  outflowTrendPp: number | null;
+  outflowBreakdown: InsightBreakdown | null;
   onSelectUsage: () => void;
   formatCurrency: (n: number) => string;
 }) {
@@ -83,20 +83,20 @@ export function InsightCards({
         breakdown={corridorBreakdown}
       />
       <InsightCard
-        kicker="Vs remittances"
+        kicker="Vs outflows"
         icon={Percent}
         loading={loading || corridorLoading}
         onClick={onSelectUsage}
         value={
           <AnimatedNumber
-            value={remittanceRatio != null ? remittanceRatio * 100 : null}
+            value={outflowRatio != null ? outflowRatio * 100 : null}
             format={(n) => `${n.toFixed(1)}%`}
           />
         }
-        trend={remittanceTrendPp}
+        trend={outflowTrendPp}
         trendFormat={(v) => `${v.toFixed(1)}pp`}
-        detail="Corridor volume vs official remittances"
-        breakdown={remittanceBreakdown}
+        detail="Corridors vs remittances + services imports"
+        breakdown={outflowBreakdown}
       />
       <InsightCard
         kicker="Dollarization"

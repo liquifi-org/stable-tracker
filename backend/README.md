@@ -530,6 +530,8 @@ Recommended cadence:
 | Allium adjusted corridors | Monthly | `npm run allium:sync:corridors` |
 | Population | Yearly | `npm run population:sync` |
 | GDP | Yearly | `npm run gdp:sync` |
+| Remittances paid | Yearly | `npm run remittances:sync` |
+| Services imports | Yearly | `npm run services:sync` |
 
 Example crontab entries (run from the project root):
 

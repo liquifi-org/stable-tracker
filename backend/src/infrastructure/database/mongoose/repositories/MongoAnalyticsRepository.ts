@@ -83,6 +83,8 @@ export class MongoAnalyticsRepository implements IAnalyticsRepository {
         activeWallets: number;
         txValueShare: number;
         remittancesSent?: number;
+        servicesImports?: number;
+        officialOutflows?: number;
         gdp?: number;
         gdpYear?: number;
         gdpSource?: string;
@@ -147,10 +149,13 @@ export class MongoAnalyticsRepository implements IAnalyticsRepository {
         const txMap = new Map<string, number>(txAgg.map((r) => [r._id, r.totalValue]));
         const globalTotal = Array.from(txMap.values()).reduce((sum, v) => sum + v, 0);
 
-        // World Bank remittances are annual; tx value / active wallets above are scoped to the
-        // requested period (one month, or the full year when no month is given). Pro-rate the
-        // annual figure down to that same period so ratios against it are apples-to-apples.
+        // World Bank remittances and services imports are annual; tx value / active
+        // wallets above are scoped to the requested period (one month, or the full
+        // year when no month is given). Pro-rate the annual figures down to that
+        // same period so ratios against them are apples-to-apples.
         const periodMonths = month !== undefined ? 1 : 12;
+        const periodShare = (annual?: number): number | undefined =>
+            annual && annual > 0 ? (annual * periodMonths) / 12 : undefined;
 
         return countries.map((c) => {
             const activeWallets = snapshotMap.get(c.countryId) ?? walletMap.get(c.countryId) ?? 0;
@@ -158,9 +163,11 @@ export class MongoAnalyticsRepository implements IAnalyticsRepository {
             const adoptionRate =
                 c.population && c.population > 0 ? activeWallets / c.population : 0;
             const txValueShare = globalTotal > 0 ? txValue / globalTotal : 0;
-            const remittancesSent =
-                c.remittancesSent && c.remittancesSent > 0
-                    ? (c.remittancesSent * periodMonths) / 12
+            const remittancesSent = periodShare(c.remittancesSent);
+            const servicesImports = periodShare(c.servicesImports);
+            const officialOutflows =
+                remittancesSent != null || servicesImports != null
+                    ? (remittancesSent ?? 0) + (servicesImports ?? 0)
                     : undefined;
             const periodGdp =
                 c.gdp && c.gdp > 0 ? (c.gdp * periodMonths) / 12 : 0;
@@ -176,6 +183,8 @@ export class MongoAnalyticsRepository implements IAnalyticsRepository {
                 activeWallets,
                 txValueShare,
                 remittancesSent,
+                servicesImports,
+                officialOutflows,
                 gdp: c.gdp,
                 gdpYear: c.gdpYear,
                 gdpSource: c.gdpSource,
@@ -235,6 +244,8 @@ export class MongoAnalyticsRepository implements IAnalyticsRepository {
                 txValueShare: parseFloat(r.txValueShare.toFixed(6)),
                 unit: 'ratio' as const,
                 remittancesSent: r.remittancesSent,
+                servicesImports: r.servicesImports,
+                officialOutflows: r.officialOutflows,
                 gdp: r.gdp,
                 gdpYear: r.gdpYear,
                 gdpSource: r.gdpSource,

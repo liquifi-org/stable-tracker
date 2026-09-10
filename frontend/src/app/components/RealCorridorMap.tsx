@@ -296,12 +296,23 @@ export function RealCorridorMap({
 
   const displayItems = allItems;
   const paintItems = useMemo(() => {
-    const cap = compact ? 40 : displayItems.length;
-    return displayItems
-      .slice(0, cap)
+    const top = compact ? displayItems.slice(0, 40) : displayItems;
+    const selectedSpokes =
+      compact && pinnedPlace
+        ? displayItems.filter((c) => c.id1 === pinnedPlace || c.id2 === pinnedPlace)
+        : [];
+    const seen = new Set<string>();
+    const merged: DisplayCorridor[] = [];
+    for (const corridor of [...top, ...selectedSpokes]) {
+      const key = `${corridor.id1}|${corridor.id2}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      merged.push(corridor);
+    }
+    return merged
       .map((corridor, index) => ({ corridor, index }))
       .sort((a, b) => a.corridor.totalValue - b.corridor.totalValue);
-  }, [displayItems, compact]);
+  }, [displayItems, compact, pinnedPlace]);
 
   const spokeIds = useMemo(() => {
     const ids = new Set<string>();
@@ -854,7 +865,7 @@ export function RealCorridorMap({
                   className={`${countrySpokeHover ? 'pointer-events-none' : 'cursor-pointer'} ${compact ? '' : 'animate-map-draw'} transition-[stroke-width,opacity] duration-150`}
                   filter={lit && !compact ? 'url(#corridor-glow)' : undefined}
                   strokeLinecap="round"
-                  style={{ strokeDasharray: 1, strokeDashoffset: 1 }}
+                  style={compact ? undefined : { strokeDasharray: 1, strokeDashoffset: 1 }}
                 />
               );
             })}

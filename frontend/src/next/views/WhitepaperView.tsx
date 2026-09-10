@@ -3,7 +3,7 @@ import { Link } from 'react-router';
 import { FileText, Printer, Quote, Check } from 'lucide-react';
 import { SEO, usePageMeta } from '../lib/seo';
 
-const VERSION = '1.3';
+const VERSION = '1.4';
 const PUBLISHED = '10 September 2026';
 const SITE_URL = 'https://stabletracker.org';
 const AUTHORS = [
@@ -205,7 +205,7 @@ export function WhitepaperView() {
             country-level picture of <em>where</em> these instruments are used, <em>which corridors</em>{' '}
             carry the volume, and <em>which jurisdictions</em> have a live rulebook. Stablecoin Tracker
             is an open-source observatory that joins on-chain wallet and corridor observations with
-            official population, GDP, and remittance series and with a country-level regulatory taxonomy.
+            official population, GDP, remittance, and services-import series and with a country-level regulatory taxonomy.
           </p>
           <p>
             This paper is the specification behind stabletracker.org. It defines every headline
@@ -387,22 +387,32 @@ export function WhitepaperView() {
             see what sits in the residual — that naming list is ours, not Allium’s.
           </p>
 
-          <h3 className="display text-xl mt-8 mb-2">3.6 Volume versus official remittances</h3>
+          <h3 className="display text-xl mt-8 mb-2">3.6 Volume versus official outflows</h3>
           <Formula>
-            remittance ratio = corridor volume ÷ (annual remittances sent × period months / 12)
+            outflow ratio = corridor volume ÷ ((remittances paid + services imports) × period months / 12)
           </Formula>
           <p>
+            The headline comparison is a payments-shaped official basket, not remittances alone.
             Remittances are World Bank <code>BM.TRF.PWKR.CD.DT</code> — personal remittances paid,
-            current USD, the latest non-empty year, stored on the country and pro-rated to the
-            selected month so a monthly corridor total is not compared with a yearly official
-            figure. Where that series is unpublished, we store World Bank
-            <code>BM.TRF.PRVT.CD</code> (private secondary-income payments; Singapore) or a
-            national last-resort figure (Taiwan CBC secondary-income payments). Iran has no
-            current official outflow series. The ratio is a comparison, not an identity: even after the adjusted-volume
-            gate, corridors still include organic P2P, commercial, and some treasury payments that
-            are not remittances, and official remittances include channels that are not stablecoins.
-            A high ratio means “this rail is large relative to the recorded remittance outflows,”
-            not “X% of remittances are stablecoins.”
+            current USD, the latest non-empty year. Where that series is unpublished, we store
+            World Bank <code>BM.TRF.PRVT.CD</code> (private secondary-income payments; Singapore)
+            or a national last-resort figure (Taiwan CBC secondary-income payments). Services
+            imports are World Bank <code>BM.GSR.NFSV.CD</code>, observations from 2018 or later,
+            with Taiwan CBC services debit as the last-resort pin. Both annual figures are
+            pro-rated to the selected month. Goods imports are excluded: they rebuild GDP, which
+            already has its own intensity rank. Secondary income is not added on top of personal
+            remittances.
+          </p>
+          <p>
+            The overview card sums that basket only for countries with outbound corridor volume
+            in the selected period, so the 5% figure is not diluted by US/Gulf/EU official
+            outflows Allium does not geo-tag. Iran has no current official remittance or services
+            series and stays as an em dash. The ratio is still a comparison of unlike series:
+            adjusted corridors include organic P2P, commercial, and some treasury payments;
+            official remittances and services include SWIFT and cash channels that are not
+            stablecoins. A high ratio means “this rail is large relative to recorded household
+            plus service outflows,” not “X% of remittances are stablecoins.” Country-briefing
+            market labels in §3.8 still use remittances paid alone (threshold 15%).
           </p>
 
           <h3 className="display text-xl mt-8 mb-2">3.7 Regulatory stage</h3>
@@ -459,7 +469,7 @@ export function WhitepaperView() {
             Country briefings add a short label derived from the metrics above. It is a reading aid,
             not a score. Necessity markets are material usage without a live framework.
             Remittance corridors have outbound volume large relative to official remittances
-            (threshold: 15%). Infrastructure markets have live rules, a large wallet base, and low
+            paid — not the widened outflows basket in §3.6 — (threshold: 15%). Infrastructure markets have live rules, a large wallet base, and low
             population penetration. Digital-dollar savings markets are those where most corridor
             volume is USD-referenced (threshold: 55%).
           </p>
@@ -522,6 +532,15 @@ export function WhitepaperView() {
                   <td className="px-3 py-2">ISO alpha-3 → numeric</td>
                 </tr>
                 <tr className="border-t border-[var(--hairline)]">
+                  <td className="px-3 py-2">Services imports</td>
+                  <td className="px-3 py-2">
+                    World Bank <code>BM.GSR.NFSV.CD</code> (2018+);
+                    Taiwan CBC services debit where the Bank is silent
+                  </td>
+                  <td className="px-3 py-2">Yearly, pro-rated to the month</td>
+                  <td className="px-3 py-2">ISO alpha-3 → numeric</td>
+                </tr>
+                <tr className="border-t border-[var(--hairline)]">
                   <td className="px-3 py-2">Stage, licenses, reserve types</td>
                   <td className="px-3 py-2">
                     <a href="https://tracker.stride.sc" className="underline decoration-[var(--hairline)] hover:decoration-[var(--brand)]">Stride</a>
@@ -558,16 +577,17 @@ export function WhitepaperView() {
           </p>
           <p>
             Four insight cards sit above the map in both lenses: wallets holding stablecoins,
-            international corridor volume, corridor volume versus official remittances, and
-            dollarization (USD-referenced share of corridor volume). Hovering a card opens a
-            composition popover (top countries, pairs, remittance multiples, or named non-USD
-            tokens). Clicking a card returns you to the usage lens; it does not change the month
-            and it does not open the regulatory view.
+            international corridor volume, corridor volume versus official outflows (remittances
+            paid plus services imports, corridor countries only), and dollarization
+            (USD-referenced share of corridor volume). Hovering a card opens a composition
+            popover (top countries, pairs, outflow ratios, or named non-USD tokens). Clicking a
+            card returns you to the usage lens; it does not change the month and it does not
+            open the regulatory view.
           </p>
           <p>
             Usage view is the corridor map, a country (or region) table, and the token mix.
             The country table is the default list: In, Out, outbound as a share of period GDP
-            with rank, wallet count, and outbound versus official remittances. Rows with outbound
+            with rank, wallet count, and outbound versus official outflows. Rows with outbound
             destinations unwrap in place. Region mode uses the same pattern for APAC, Americas,
             and EMEIA, with regional outbound ÷ period GDP. Regulatory view is the usage × rules
             matrix (median GDP intensity × live vs not-live) plus the stage map.
@@ -582,7 +602,7 @@ export function WhitepaperView() {
           <h3 className="display text-xl mt-8 mb-2">5.2 Country briefing</h3>
           <p>
             A briefing is the unit of analysis. It stacks scale (GDP intensity and rank, wallets
-            per 100k, share of global corridor volume, outbound versus remittances), money
+            per 100k, share of global corridor volume, outbound versus official outflows), money
             (inbound and outbound volume, dollarization, token mix), and rules (stage, regulator,
             reserve-type permissions, licenses). Month-over-month badges use the previous closed
             month as the baseline. Classification labels in §3.8 sit above those blocks so a reader
@@ -619,9 +639,10 @@ export function WhitepaperView() {
               markets. Do not treat corridor volume as national turnover.
             </li>
             <li>
-              <strong>Remittance ratios are a comparison of unlike series.</strong> See §3.6.
-              Official remittances lag, miss informal channels, and are annual; adjusted corridors
-              still include organic payments that are not remittances.
+              <strong>Outflow ratios are a comparison of unlike series.</strong> See §3.6.
+              Official remittances and services lag, miss informal channels, and are annual;
+              adjusted corridors still include organic payments that are not remittances or
+              imported services. Goods trade is left out of the denominator on purpose.
             </li>
             <li>
               <strong>Adjusted volume is not a census of payments.</strong> CEX deposits and
@@ -679,8 +700,8 @@ export function WhitepaperView() {
             country; chain-level and issuer-level cuts that do not collapse into “Other”; richer
             history so a time slider can replay closed months the way CBDC Tracker replays
             initiative status; and machine-readable downloads of the monthly snapshots the API
-            already serves. Rank-by-GDP, adjusted corridor volume, remittance and population
-            fallbacks, and nested outbound corridors are already in the product — this paper is
+              already serves. Rank-by-GDP, adjusted corridor volume, remittance, services-import,
+              and population fallbacks, and nested outbound corridors are already in the product — this paper is
             the specification for those, not a promise of them.
           </p>
           <p>
@@ -736,6 +757,19 @@ export function WhitepaperView() {
                 https://data.worldbank.org/indicator/BM.TRF.PWKR.CD.DT
               </a>
               . Secondary-income fallback: <code>BM.TRF.PRVT.CD</code>.
+            </li>
+            <li>
+              World Bank. Service imports (BoP, current US$) (<code>BM.GSR.NFSV.CD</code>).{' '}
+              <a href="https://data.worldbank.org/indicator/BM.GSR.NFSV.CD" className="underline decoration-[var(--hairline)] hover:decoration-[var(--brand)]">
+                https://data.worldbank.org/indicator/BM.GSR.NFSV.CD
+              </a>
+            </li>
+            <li>
+              Central Bank of the Republic of China (Taiwan). Balance of payments, annual:
+              secondary-income payments and services debit where World Bank is silent.{' '}
+              <a href="https://www.cbc.gov.tw/en/" className="underline decoration-[var(--hairline)] hover:decoration-[var(--brand)]">
+                https://www.cbc.gov.tw/en/
+              </a>
             </li>
             <li>
               International Monetary Fund. World Economic Outlook database (nominal GDP for
