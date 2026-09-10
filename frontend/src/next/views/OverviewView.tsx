@@ -514,7 +514,9 @@ export function OverviewView() {
         </span>
       ),
       render: (_: number, row: CountryAdoptionMetric) => (
-        <span className="tabular-nums">{fmtPer100k(row.adoptionRate)}</span>
+        <span className="tabular-nums">
+          {row.population && row.population > 0 ? fmtPer100k(row.adoptionRate) : '—'}
+        </span>
       ),
     },
     {
@@ -532,7 +534,8 @@ export function OverviewView() {
     {
       key: 'adoptionRate',
       header: '% of population',
-      render: (value: number) => fmtPct(value),
+      render: (value: number, row: CountryAdoptionMetric) =>
+        row.population && row.population > 0 ? fmtPct(value) : '—',
     },
     {
       key: 'stablecoinPctOfRemittances',

@@ -7,6 +7,8 @@ export interface ICountryDoc extends Document {
     region: string;
     population?: number;
     populationYear?: number;
+    /** world-bank | cia-factbook | wikipedia */
+    populationSource?: string;
     populationSyncedAt?: Date;
     remittancesSent?: number;
     remittancesYear?: number;
@@ -43,6 +45,7 @@ const CountrySchema = new Schema<ICountryDoc>(
         region: { type: String, required: true, enum: WORLD_REGION_VALUES, index: true },
         population: { type: Number },
         populationYear: { type: Number },
+        populationSource: { type: String },
         populationSyncedAt: { type: Date },
         remittancesSent: { type: Number },
         remittancesYear: { type: Number },

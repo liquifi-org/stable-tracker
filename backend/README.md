@@ -270,7 +270,7 @@ are not the rank.
 | International corridor volume | **Allium Explorer API** | Monthly | `transactions` (`type: corridor`) |
 | Nominal GDP | **World Bank** `NY.GDP.MKTP.CD`, IMF / CIA / Wikipedia fallbacks | Yearly | `gdp`, `gdpYear`, `gdpSource` on each `countries` doc |
 | Wallets holding stablecoins | **Allium Explorer API** | Monthly | `walletcountsnapshots` collection |
-| Population | **World Bank** `SP.POP.TOTL` | Yearly | `population` on each `countries` doc |
+| Population | **World Bank** `SP.POP.TOTL`, CIA / Wikipedia fallbacks | Yearly | `population`, `populationYear`, `populationSource` on each `countries` doc |
 
 `gdpIntensity = outboundCorridorVolume / (gdp × periodMonths / 12)`.
 
@@ -364,9 +364,10 @@ In practice this runs **monthly** via cron (or the admin endpoint below).
 
 Script: `script/general/sync-population.ts`.
 
-**Source:** [World Bank Open Data](https://data.worldbank.org/) — indicator
-**`SP.POP.TOTL`** (total population). It is **free and needs no API key**, which is
-why it was chosen over a scraper.
+**Primary source:** [World Bank Open Data](https://data.worldbank.org/) — indicator
+**`SP.POP.TOTL`** (total population). It is **free and needs no API key**.
+Territories the Bank omits (Taiwan and a few others) are filled from CIA
+Factbook, Wikipedia, then a pinned last-resort figure.
 
 Request used:
 
@@ -401,10 +402,12 @@ npm run population:sync:local
 
 Population changes slowly, so this is meant to run **yearly**.
 
-> **Known limitation:** the World Bank does not report some territories (e.g. Taiwan),
-> so those countries end up without `population` and their wallet-penetration
-> `adoptionRate` is `0`. GDP for Taiwan is filled from IMF WEO so it can still
-> enter the GDP-intensity rank.
+> **Gaps:** the World Bank does not report some territories (e.g. Taiwan). The
+> population sync then fills CIA World Factbook, Wikipedia demographics, and a
+> pinned last-resort figure, and stores `populationSource`. The API omits
+> `population` when still empty so the UI can show an em dash instead of a
+> zero rate. GDP for Taiwan is filled from IMF WEO so it can still enter the
+> GDP-intensity rank.
 
 ---
 
@@ -475,7 +478,8 @@ Routes (`/v1/admin`), all `POST`:
 | --- | --- |
 | `/v1/admin/sync/all` | Population + GDP + Allium wallets (Allium skipped if no API key) |
 | `/v1/admin/sync/wallets` | Allium wallet counts only |
-| `/v1/admin/sync/population` | World Bank population only |
+| `/v1/admin/sync/corridors` | Allium adjusted-volume corridors (optional `year` / `month` in the body) |
+| `/v1/admin/sync/population` | Population (World Bank, then CIA / Wikipedia fallbacks) |
 | `/v1/admin/sync/gdp` | Nominal GDP (World Bank, then CIA / Wikipedia fallbacks) |
 
 **Authentication:** send the secret token in the `x-admin-token` header (or
@@ -519,6 +523,7 @@ Recommended cadence:
 | Script | Suggested schedule | npm script |
 | --- | --- | --- |
 | Allium wallets | Monthly | `npm run allium:sync:wallets` |
+| Allium adjusted corridors | Monthly | `npm run allium:sync:corridors` |
 | Population | Yearly | `npm run population:sync` |
 | GDP | Yearly | `npm run gdp:sync` |
 

@@ -11,6 +11,7 @@ export interface CountryAdoptionMetricDto {
     macroRegion: string | null;
     adoptionRate: number;
     activeWallets: number;
+    population?: number;
     txValueShare: number;
     unit: 'ratio' | 'percent';
     remittancesSent?: number;
@@ -64,6 +65,7 @@ export interface CountryOverviewDto {
     region: string;
     adoptionRate: number;
     activeWallets: number;
+    population?: number;
     txValueShare: number;
     dollarizationIndex: number;
     gdp?: number;

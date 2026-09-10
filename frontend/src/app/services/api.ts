@@ -49,6 +49,7 @@ export interface CountryAdoptionMetric {
   macroRegion: string | null;
   adoptionRate: number;
   activeWallets: number;
+  population?: number;
   txValueShare: number;
   unit?: string;
   remittancesSent?: number;
@@ -108,6 +109,7 @@ export interface CountryOverview {
   region: string;
   adoptionRate: number;
   activeWallets: number;
+  population?: number;
   txValueShare: number;
   dollarizationIndex: number;
   gdp?: number;

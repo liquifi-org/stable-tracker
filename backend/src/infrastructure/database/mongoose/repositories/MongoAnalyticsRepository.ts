@@ -78,7 +78,7 @@ export class MongoAnalyticsRepository implements IAnalyticsRepository {
         isoAlpha2: string;
         name: string;
         region: string;
-        population: number;
+        population?: number;
         adoptionRate: number;
         activeWallets: number;
         txValueShare: number;
@@ -169,7 +169,7 @@ export class MongoAnalyticsRepository implements IAnalyticsRepository {
                 isoAlpha2: NUMERIC_TO_ALPHA2.get(c.countryId) ?? '',
                 name: publicCountryName(c.countryId, c.name),
                 region: c.region,
-                population: c.population ?? 0,
+                population: c.population && c.population > 0 ? c.population : undefined,
                 adoptionRate,
                 activeWallets,
                 txValueShare,
@@ -229,6 +229,7 @@ export class MongoAnalyticsRepository implements IAnalyticsRepository {
                 macroRegion: toMacroRegion(r.region),
                 adoptionRate: parseFloat(r.adoptionRate.toFixed(6)),
                 activeWallets: r.activeWallets,
+                population: r.population,
                 txValueShare: parseFloat(r.txValueShare.toFixed(6)),
                 unit: 'ratio' as const,
                 remittancesSent: r.remittancesSent,
@@ -280,7 +281,7 @@ export class MongoAnalyticsRepository implements IAnalyticsRepository {
             };
             acc.countryCount += 1;
             acc.activeWallets += row.activeWallets;
-            acc.population += row.population;
+            acc.population += row.population ?? 0;
             acc.txValueShare += row.txValueShare;
             acc.outboundVolume += row.outboundVolume;
             acc.gdp += row.gdp ?? 0;
@@ -563,6 +564,9 @@ export class MongoAnalyticsRepository implements IAnalyticsRepository {
             region: countryDoc.region,
             adoptionRate: parseFloat(adoptionRate.toFixed(6)),
             activeWallets,
+            population: countryDoc.population && countryDoc.population > 0
+                ? countryDoc.population
+                : undefined,
             txValueShare: parseFloat(txValueShare.toFixed(6)),
             dollarizationIndex: parseFloat(dollarizationIndex.toFixed(6)),
             gdp: adoptionRow?.gdp,
