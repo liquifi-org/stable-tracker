@@ -1,5 +1,6 @@
 import { CountryFlag } from '../../app/components/CountryFlag';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '../../app/components/ui/hover-card';
+import type { CSSProperties } from 'react';
 
 export interface TokenShare {
   name: string;
@@ -67,13 +68,18 @@ function TokenMixLegend({
 export function TokenMixStrip({
   items,
   className = '',
+  style,
 }: {
   items: TokenShare[];
   className?: string;
+  style?: CSSProperties;
 }) {
   const { total, display } = displayTokens(items);
   return (
-    <div className={`flex rounded-full overflow-hidden bg-slate-200/80 dark:bg-neutral-800 ${className || 'h-2'}`}>
+    <div
+      className={`flex rounded-full overflow-hidden bg-slate-200/80 dark:bg-neutral-800 ${className || 'h-2'}`}
+      style={style}
+    >
       {total > 0 &&
         display.map((item) => (
           <div
@@ -110,6 +116,7 @@ export function NamedCorridorDestRow({
   tokens,
   formatVolume,
   onClick,
+  barShare = 1,
 }: {
   name: string;
   alpha?: string;
@@ -117,8 +124,11 @@ export function NamedCorridorDestRow({
   tokens?: TokenShare[];
   formatVolume: (n: number) => string;
   onClick?: () => void;
+  /** Share of the largest dest in this origin (0–1). Sizes the strip. */
+  barShare?: number;
 }) {
   const { total, display } = displayTokens(tokens ?? []);
+  const widthPct = Math.max(0.04, Math.min(1, barShare)) * 100;
   const cls = onClick
     ? 'w-full text-left hover:bg-[var(--paper)] cursor-pointer'
     : 'w-full text-left';
@@ -129,7 +139,9 @@ export function NamedCorridorDestRow({
         {alpha && <CountryFlag isoAlpha2={alpha} className="w-4 h-4" />}
         <span className="truncate text-sm text-[var(--ink-text)]">{name}</span>
       </div>
-      <TokenMixStrip items={tokens ?? []} className="h-2 flex-1 min-w-[4rem]" />
+      <div className="flex-1 min-w-[4rem]">
+        <TokenMixStrip items={tokens ?? []} className="h-2 min-w-[1.25rem]" style={{ width: `${widthPct}%` }} />
+      </div>
       <div className="text-sm tabular-nums text-[var(--ink-text)] shrink-0 w-[4.5rem] text-right">{formatVolume(volume)}</div>
     </button>
   );

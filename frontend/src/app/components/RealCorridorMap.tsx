@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router';
 import { geoCentroid, geoPath } from 'd3-geo';
 import { feature } from 'topojson-client';
-import { ChevronDown } from 'lucide-react';
 import { useMapZoomPan } from '../hooks/useMapZoomPan';
 import { useCompactMap, useFinePointer } from '../hooks/useMediaQuery';
 import { filterMapFeatures, MAP_VIEW_H, MAP_VIEW_W, worldMapProjection } from '../lib/worldMapProjection';
@@ -21,8 +20,6 @@ import {
   MapStageFrame,
   MapZoomCluster,
 } from './MapStage';
-import { MapInspectorSheet } from './MapInspectorSheet';
-import { UsagePlaceInspector as UsageInspector } from './UsagePlaceInspector';
 import type { CountryAdoptionMetric, RegionalAdoptionMetric } from '../services/api';
 import { countryPath } from '../lib/countryRoutes';
 import { ISO_COUNTRIES } from '../lib/iso3166';
@@ -70,6 +67,8 @@ interface RealCorridorMapProps {
   regionalAdoption?: RegionalAdoptionMetric[];
   focusPlace?: string | null;
   focusNonce?: number;
+  /** Click a country/region: first click selects, second click on the same place clears. */
+  onSelectPlace?: (id: string | null) => void;
 }
 
 /** Normalized shape both country- and region-mode corridors render against. */
@@ -166,6 +165,7 @@ export function RealCorridorMap({
   regionalAdoption = [],
   focusPlace = null,
   focusNonce = 0,
+  onSelectPlace,
 }: RealCorridorMapProps) {
   const { formatCurrency: formatValue } = useCurrencyFormat();
   const [worldData, setWorldData] = useState<any>(null);
@@ -173,7 +173,6 @@ export function RealCorridorMap({
   const [selectedCorridor, setSelectedCorridor] = useState<number | null>(null);
   const [hoveredPlace, setHoveredPlace] = useState<string | null>(null);
   const [pinnedPlace, setPinnedPlace] = useState<string | null>(null);
-  const [showCorridorDetails, setShowCorridorDetails] = useState(false);
   const [seenHover, setSeenHover] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const [disambiguate, setDisambiguate] = useState<{
@@ -197,17 +196,8 @@ export function RealCorridorMap({
   };
   const tooltipHoveredRef = useRef(false);
   const dismissTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const inspectorRef = useRef<HTMLDivElement>(null);
-
-  const scrollToInspector = () => {
-    const el = inspectorRef.current;
-    if (!el) return;
-    const header = document.querySelector('.sticky.top-0');
-    const headerH = header instanceof HTMLElement ? header.getBoundingClientRect().height : 0;
-    const keepMap = Math.round((window.innerHeight - headerH) * 0.42);
-    const top = window.scrollY + el.getBoundingClientRect().top - headerH - keepMap;
-    window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
-  };
+  const onSelectPlaceRef = useRef(onSelectPlace);
+  onSelectPlaceRef.current = onSelectPlace;
 
   const scheduleDismiss = () => {
     dismissTimeoutRef.current = setTimeout(() => {
@@ -236,15 +226,15 @@ export function RealCorridorMap({
     }
     setPinnedPlace(code);
     setHoveredPlace(code);
-    setShowCorridorDetails(false);
     setSeenHover(true);
+    onSelectPlaceRef.current?.(code);
   };
   const closePlace = () => {
     if (dismissTimeoutRef.current) clearTimeout(dismissTimeoutRef.current);
     setPinnedPlace(null);
     setHoveredPlace(null);
-    setShowCorridorDetails(false);
     setDisambiguate(null);
+    onSelectPlaceRef.current?.(null);
   };
 
   const handleReset = () => {
@@ -394,13 +384,6 @@ export function RealCorridorMap({
     if (hoveredSpokeCount === 0) return 'No international corridors';
     return `${hoveredSpokeCount} international corridor${hoveredSpokeCount === 1 ? '' : 's'}`;
   })();
-  const corridorTotals = useMemo(() => {
-    const outbound = activeCorridors.reduce((s, c) => s + c.outbound, 0);
-    const inbound = activeCorridors.reduce((s, c) => s + c.inbound, 0);
-    const total = outbound + inbound;
-    const usd = activeCorridors.reduce((s, c) => s + c.totalValue * c.dollarizationIndex, 0);
-    return { outbound, inbound, total, usdShare: total > 0 ? usd / total : null };
-  }, [activeCorridors]);
 
   const maxVolume = displayItems[0]?.totalValue ?? 1;
   const minVolume = displayItems[displayItems.length - 1]?.totalValue ?? 0;
@@ -436,8 +419,8 @@ export function RealCorridorMap({
 
   useEffect(() => {
     setPinnedPlace(null);
-    setShowCorridorDetails(false);
     setDisambiguate(null);
+    onSelectPlaceRef.current?.(null);
   }, [filters.year, filters.month, filters.stablecoin, filters.regionFrom, filters.regionTo, mode]);
 
   useEffect(() => {
@@ -480,9 +463,9 @@ export function RealCorridorMap({
       if (!alpha || mode === 'region') return;
       setPinnedPlace(alpha);
       setHoveredPlace(alpha);
-      setShowCorridorDetails(false);
       setSeenHover(true);
       setDisambiguate(null);
+      onSelectPlaceRef.current?.(alpha);
       if (!projection) return;
       const coords = countryCentroidMap[alpha];
       if (!coords) return;
@@ -497,7 +480,6 @@ export function RealCorridorMap({
     if (!focusPlace || mode === 'region' || !projection) return;
     setPinnedPlace(focusPlace);
     setHoveredPlace(focusPlace);
-    setShowCorridorDetails(false);
     setSeenHover(true);
     setDisambiguate(null);
     const coords = countryCentroidMap[focusPlace];
@@ -593,25 +575,6 @@ export function RealCorridorMap({
     { label: 'Peak', width: 5, color: '#f5c14a' },
   ];
 
-  const inspector = countrySpokeHover && pinned && activePlace ? (
-    <UsageInspector
-      mode={mode}
-      activePlace={activePlace}
-      hoveredMetric={hoveredMetric}
-      hoveredRegion={hoveredRegion}
-      corridorCaption={corridorCaption}
-      corridorTotals={corridorTotals}
-      hoveredSpokeCount={hoveredSpokeCount}
-      activeCorridors={activeCorridors}
-      showCorridorDetails={showCorridorDetails}
-      setShowCorridorDetails={setShowCorridorDetails}
-      formatValue={formatValue}
-      getLabel={getLabel}
-      goToCountry={goToCountry}
-      closePlace={closePlace}
-    />
-  ) : null;
-
   return (
     <div className="relative space-y-3">
       <MapStageFrame fullscreen={fullscreen}>
@@ -622,7 +585,7 @@ export function RealCorridorMap({
             )}
             {countrySpokeHover && !seenHover && !activePlace && (
               <div className="pointer-events-none text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                {hoverEnabled ? 'Hover a country — click to select' : 'Tap a country'}
+                {hoverEnabled ? 'Hover a country — click to open corridors' : 'Tap a country to open corridors'}
               </div>
             )}
             {countrySpokeHover && hoverEnabled && !pinned && activePlace && (
@@ -980,38 +943,7 @@ export function RealCorridorMap({
               );
             })}
           </svg>
-          {countrySpokeHover && pinned && !compact && (
-            <button
-              type="button"
-              onClick={scrollToInspector}
-              className="flex w-full flex-col items-center gap-0.5 pt-2 text-[11px] font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
-            >
-              See details
-              <ChevronDown className="w-3.5 h-3.5" aria-hidden />
-            </button>
-          )}
       </MapStageFrame>
-
-      {compact ? (
-        <MapInspectorSheet
-          open={Boolean(countrySpokeHover && pinned && activePlace)}
-          onOpenChange={(open) => {
-            if (!open) closePlace();
-          }}
-          title={mode === 'country' ? (hoveredMetric?.name ?? (activePlace ? getLabel(activePlace) : 'Country')) : (activePlace ?? 'Region')}
-        >
-          {inspector}
-        </MapInspectorSheet>
-      ) : (
-        inspector && (
-        <div
-          ref={inspectorRef}
-          className="bg-white dark:bg-neutral-800 rounded-xl border border-slate-200/50 dark:border-neutral-700 overflow-hidden"
-        >
-          {inspector}
-        </div>
-        )
-      )}
 
       {hoveredData && !countrySpokeHover && (
         <div
