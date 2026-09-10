@@ -266,6 +266,23 @@ export const api = {
       items: page.items.map(withPrettyName),
     })),
 
+  submitContact: async (payload: {
+    name: string;
+    email: string;
+    subject?: string;
+    message: string;
+    company?: string;
+  }): Promise<void> => {
+    const response = await fetch(`${BASE_URL}/contact`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+  },
+
   getGlobalInsights: (year: number, month?: number) => {
     const params = new URLSearchParams({ year: String(year) });
     if (month !== undefined) params.set('month', String(month));

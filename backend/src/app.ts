@@ -13,6 +13,9 @@ import { requestLogger } from './middleware/requestLogger';
 
 const app: Application = express();
 
+// Nginx (and similar) sit in front in production; needed for accurate req.ip.
+app.set('trust proxy', 1);
+
 // Security middleware — relax CSP for Swagger UI in non-production
 app.use(
     helmet({
