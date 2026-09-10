@@ -258,7 +258,7 @@ export function FilterPanel() {
           <b className="text-slate-600 dark:text-slate-300">Digital dollars</b> is the share of corridor USD volume in USD-referenced stablecoins.
         </p>
         <p>
-          <b className="text-slate-600 dark:text-slate-300">Vs remittances</b> uses World Bank annual remittances sent, divided by 12. Not a monthly series.
+          <b className="text-slate-600 dark:text-slate-300">Vs remittances</b> uses official annual remittances sent (World Bank personal remittances, then secondary-income / national BOP where that series is silent), divided by 12. Not a monthly series.
         </p>
         <p>
           <b className="text-slate-600 dark:text-slate-300">Live framework</b> is regulatory stage and does not change with the month slider.

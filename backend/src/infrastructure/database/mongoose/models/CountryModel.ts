@@ -12,6 +12,8 @@ export interface ICountryDoc extends Document {
     populationSyncedAt?: Date;
     remittancesSent?: number;
     remittancesYear?: number;
+    /** world-bank | world-bank-secondary-income | cbc-bop */
+    remittancesSource?: string;
     remittancesSyncedAt?: Date;
     /** Nominal GDP, current US$. World Bank first, then CIA / Wikipedia / pinned fallbacks. */
     gdp?: number;
@@ -49,6 +51,7 @@ const CountrySchema = new Schema<ICountryDoc>(
         populationSyncedAt: { type: Date },
         remittancesSent: { type: Number },
         remittancesYear: { type: Number },
+        remittancesSource: { type: String },
         remittancesSyncedAt: { type: Date },
         gdp: { type: Number },
         gdpYear: { type: Number },
