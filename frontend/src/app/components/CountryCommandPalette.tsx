@@ -13,6 +13,7 @@ import { api, type CountryAdoptionMetric } from '../services/api';
 import { CountryFlag } from './CountryFlag';
 import { countryPath } from '../lib/countryRoutes';
 import { useFilters } from '../context/FilterContext';
+import { isDisplayableWalletCount } from '../lib/displayFloors';
 
 export function CountryCommandPalette() {
   const [open, setOpen] = useState(false);
@@ -40,22 +41,11 @@ export function CountryCommandPalette() {
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
-    Promise.all([
-      api.getAdoptionAnalytics(filters.year, filters.month),
-      api.getCorridors(filters.year, filters.month),
-    ])
-      .then(([adoption, corridors]) => {
+    api.getAdoptionAnalytics(filters.year, filters.month)
+      .then((adoption) => {
         if (cancelled) return;
-        const inbound = new Map<string, number>();
-        for (const flow of corridors) {
-          inbound.set(flow.to, (inbound.get(flow.to) ?? 0) + flow.value.amount);
-        }
         const withData = adoption
-          .filter((c) =>
-            c.activeWallets > 0
-            || (c.outboundVolume ?? 0) > 0
-            || (inbound.get(c.countryId) ?? 0) > 0,
-          )
+          .filter((c) => isDisplayableWalletCount(c.activeWallets))
           .sort((a, b) => a.name.localeCompare(b.name));
         setCountries(withData);
       })

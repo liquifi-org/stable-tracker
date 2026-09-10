@@ -126,6 +126,16 @@ export function useMapZoomPan(options: { coarse?: boolean } = {}) {
     commit(nextZoom, { x: viewX - VIEW_W / 2, y: viewY - VIEW_H / 2 });
   }, [commit]);
 
+  const releaseCapture = (e: React.PointerEvent<SVGSVGElement>) => {
+    try {
+      if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      }
+    } catch {
+      /* Safari can throw if the node is already gone */
+    }
+  };
+
   const onPointerDown = (e: React.PointerEvent<SVGSVGElement>) => {
     e.currentTarget.setPointerCapture(e.pointerId);
     pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -156,7 +166,6 @@ export function useMapZoomPan(options: { coarse?: boolean } = {}) {
       panX: panRef.current.x,
       panY: panRef.current.y,
     };
-    setIsDragging(true);
   };
 
   const onPointerMove = (e: React.PointerEvent<SVGSVGElement>) => {
@@ -190,7 +199,10 @@ export function useMapZoomPan(options: { coarse?: boolean } = {}) {
     if (!drag || drag.id !== e.pointerId) return;
     const dx = e.clientX - drag.startX;
     const dy = e.clientY - drag.startY;
-    if (Math.hypot(dx, dy) > DRAG_THRESHOLD) draggedRef.current = true;
+    if (Math.hypot(dx, dy) > DRAG_THRESHOLD) {
+      if (!draggedRef.current) setIsDragging(true);
+      draggedRef.current = true;
+    }
     if (zoomRef.current <= MIN_ZOOM) return;
     const z = zoomRef.current;
     const viewW = VIEW_W / z;
@@ -202,6 +214,7 @@ export function useMapZoomPan(options: { coarse?: boolean } = {}) {
   };
 
   const endPointer = (e: React.PointerEvent<SVGSVGElement>) => {
+    releaseCapture(e);
     pointers.current.delete(e.pointerId);
     if (pointers.current.size < 2) pinchRef.current = null;
     if (dragRef.current?.id === e.pointerId) dragRef.current = null;
