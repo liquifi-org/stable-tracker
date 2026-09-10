@@ -3,7 +3,7 @@ import { Link } from 'react-router';
 import { FileText, Printer, Quote, Check } from 'lucide-react';
 import { SEO, usePageMeta } from '../lib/seo';
 
-const VERSION = '1.2';
+const VERSION = '1.3';
 const PUBLISHED = '10 September 2026';
 const SITE_URL = 'https://stabletracker.org';
 const AUTHORS = [
@@ -255,7 +255,7 @@ export function WhitepaperView() {
           <dl className="space-y-5">
             <Principle
               name="Scale versus the economy"
-              body="The league table is outbound international corridors divided by period GDP. Wallet counts and wallets per 100,000 people stay on the page as a people-scale figure. They are not the rank."
+              body="The league table is outbound international corridors divided by period GDP. Wallet counts stay on the overview table; wallets per 100,000 people stay on the country briefing. Neither is the rank."
             />
             <Principle
               name="International corridors only"
@@ -305,9 +305,10 @@ export function WhitepaperView() {
             Population is the latest figure on the country record. World Bank
             <code>SP.POP.TOTL</code> is first. Where the Bank is silent — Taiwan is the usual case —
             we store CIA World Factbook or Wikipedia demographics, then a pinned last-resort
-            figure. The overview table also shows wallets per 100,000 people
+            figure. Country briefings also show wallets per 100,000 people
             (<em>rate × 100,000</em>). This is a people-scale figure and a reading aid for market
-            classification. It is <strong>not</strong> the country rank.
+            classification. It is <strong>not</strong> the country rank, and it is not a column
+            on the overview table.
           </p>
           <p>
             If population is still missing after those fallbacks, the table shows an em dash rather
@@ -359,11 +360,18 @@ export function WhitepaperView() {
           </p>
           <p>
             Volume is the sum of those USD amounts for the selected period, optionally filtered by
-            token, reference asset, and region. The overview map merges A→B with B→A into an
-            undirected pair so the reader sees a route, then splits the pair to show which side
-            sent more. Sender = receiver (domestic) rows are not displayed. Regional corridors are
-            the same international pairs rolled up by each country’s macro-region, dropping
-            intra-region flows.
+            token, reference asset, and region. Each month is a replace: the sync upserts the new
+            adjusted set, then deletes leftover raw rows for that period. Range backfills use
+            <code>--from=YYYY-MM --to=YYYY-MM</code>.
+          </p>
+          <p>
+            The overview <strong>map</strong> still merges A→B with B→A into an undirected pair so
+            the reader sees a route, then splits the pair to show which side sent more. The
+            overview <strong>table</strong> does the opposite: it lists countries (or macro-regions)
+            as origins, with In and Out as separate columns, and unwraps directed destinations
+            under each origin. Sender = receiver (domestic) rows are not displayed. Regional
+            corridors roll the same international pairs into three buckets — APAC, Americas, and
+            EMEIA — dropping intra-region flows.
           </p>
 
           <h3 className="display text-xl mt-8 mb-2">3.5 Dollarization index</h3>
@@ -371,9 +379,12 @@ export function WhitepaperView() {
             dollarization = USD-referenced stablecoin volume ÷ total corridor volume
           </Formula>
           <p>
-            “USD-referenced” follows Allium’s <code>usdStablecoinVolume</code> field on each corridor
-            snapshot, not a homemade ticker list. Token mix on the overview is volume-weighted from
-            the top coins on each pair; residual volume is labelled Other.
+            “USD-referenced” on the headline dollarization card and on country briefings follows
+            Allium’s <code>usdStablecoinVolume</code> field on each corridor snapshot, not a homemade
+            ticker list. Token mix on the overview is volume-weighted from the top coins on each
+            pair; residual volume is labelled Other. The dollarization hover names non-USD tickers
+            from that top-coin mix (EUR*, XSGD, CADC, and a short list of others) so a reader can
+            see what sits in the residual — that naming list is ours, not Allium’s.
           </p>
 
           <h3 className="display text-xl mt-8 mb-2">3.6 Volume versus official remittances</h3>
@@ -436,10 +447,11 @@ export function WhitepaperView() {
             </table>
           </div>
           <p>
-            Stage is not month-dependent. “Live rules” on the overview is a count of countries at
-            stage 3. Reserve-type permissions (fiat-, crypto-, commodity-, algorithm-backed) and
-            issuer licenses come from the same Stride country record and are shown on the briefing,
-            not mixed into the adoption rank.
+            Stage is not month-dependent. Live frameworks appear on the regulatory view (the
+            usage × rules matrix and the stage map), not as an overview insight card. Reserve-type
+            permissions (fiat-, crypto-, commodity-, algorithm-backed) and issuer licenses come
+            from the same Stride country record and are shown on the briefing, not mixed into the
+            adoption rank.
           </p>
 
           <h3 className="display text-xl mt-8 mb-2">3.8 Market classification</h3>
@@ -524,10 +536,10 @@ export function WhitepaperView() {
           <p>
             Allium queries are asynchronous: a run is submitted, polled, then stored. Wallet and
             corridor jobs default to the previous calendar month and can be backfilled for a named
-            year and month. World Bank pulls request the most recent non-empty observation for every
-            country in one page; regional aggregates that do not resolve to an ISO country are
-            dropped. Stride country, issuer, license, and stablecoin records are synced separately
-            and attached to the same country documents.
+            month or a contiguous <code>--from</code>/<code>--to</code> range. World Bank pulls request
+            the most recent non-empty observation for every country in one page; regional aggregates
+            that do not resolve to an ISO country are dropped. Stride country, issuer, license, and
+            stablecoin records are synced separately and attached to the same country documents.
           </p>
           <p>
             Contributing organizations — EY, Allium, Stride, and FirmShift — appear in the site
@@ -539,27 +551,43 @@ export function WhitepaperView() {
         <Section id="reading" kicker="Section 5" title="How to read the tracker">
           <h3 className="display text-xl mt-2 mb-2">5.1 Overview</h3>
           <p>
-            The landing page has two lenses. <strong>Usage view</strong> is the corridor map, the
-            named-pair list, country or region tables, and the token mix. <strong>Regulatory view</strong>{' '}
-            is the usage × rules matrix plus the stage map. Insight cards at the top are the same
-            four numbers in both lenses: wallets, international corridor volume, corridor volume
-            versus official remittances, and live frameworks. Clicking a card switches the lens; it
-            does not change the month.
+            The landing page has two lenses, switched by a control that sits on the same row as
+            the page title — <strong>Where stablecoins are used</strong> or <strong>Can you
+            operate</strong>. There is no period kicker above the title; the selected month lives
+            in the filter panel and on the insight-card subtitles.
+          </p>
+          <p>
+            Four insight cards sit above the map in both lenses: wallets holding stablecoins,
+            international corridor volume, corridor volume versus official remittances, and
+            dollarization (USD-referenced share of corridor volume). Hovering a card opens a
+            composition popover (top countries, pairs, remittance multiples, or named non-USD
+            tokens). Clicking a card returns you to the usage lens; it does not change the month
+            and it does not open the regulatory view.
+          </p>
+          <p>
+            Usage view is the corridor map, a country (or region) table, and the token mix.
+            The country table is the default list: In, Out, outbound as a share of period GDP
+            with rank, wallet count, and outbound versus official remittances. Rows with outbound
+            destinations unwrap in place. Region mode uses the same pattern for APAC, Americas,
+            and EMEIA, with regional outbound ÷ period GDP. Regulatory view is the usage × rules
+            matrix (median GDP intensity × live vs not-live) plus the stage map.
           </p>
           <p>
             Filters on the right apply to the selected month, reference asset, token, and corridor
-            regions. They do not rewrite rank eligibility or Stride stage. The map’s top pairs are a
-            view, not the database: the table of countries is the full eligible set for that month.
+            regions. They do not rewrite rank eligibility or Stride stage. The map’s undirected pairs
+            are a view, not the database: the table of countries is every geography with wallets or
+            corridor flow in that month.
           </p>
 
           <h3 className="display text-xl mt-8 mb-2">5.2 Country briefing</h3>
           <p>
-            A briefing is the unit of analysis. It stacks scale (GDP intensity, rank, wallets),
-            money (dollarization, inbound and outbound corridors, token mix), and
-            rules (stage, regulator, reserve-type permissions, licenses). Month-over-month badges
-            use the previous closed month as the baseline. Classification labels in §3.8 sit above
-            those blocks so a reader can decide in one glance whether they are looking at a
-            necessity market, a remittance rail, or an infrastructure jurisdiction.
+            A briefing is the unit of analysis. It stacks scale (GDP intensity and rank, wallets
+            per 100k, share of global corridor volume, outbound versus remittances), money
+            (inbound and outbound volume, dollarization, token mix), and rules (stage, regulator,
+            reserve-type permissions, licenses). Month-over-month badges use the previous closed
+            month as the baseline. Classification labels in §3.8 sit above those blocks so a reader
+            can decide in one glance whether they are looking at a necessity market, a remittance
+            rail, or an infrastructure jurisdiction.
           </p>
 
           <h3 className="display text-xl mt-8 mb-2">5.3 What the colours are not</h3>
@@ -651,7 +679,9 @@ export function WhitepaperView() {
             country; chain-level and issuer-level cuts that do not collapse into “Other”; richer
             history so a time slider can replay closed months the way CBDC Tracker replays
             initiative status; and machine-readable downloads of the monthly snapshots the API
-            already serves.
+            already serves. Rank-by-GDP, adjusted corridor volume, remittance and population
+            fallbacks, and nested outbound corridors are already in the product — this paper is
+            the specification for those, not a promise of them.
           </p>
           <p>
             This document will move with the code. When a formula changes, the version number at
@@ -681,7 +711,9 @@ export function WhitepaperView() {
         <Section id="references" kicker="References" title="Sources referred to in the text">
           <ol className="list-decimal pl-5 space-y-3 text-sm">
             <li>
-              Allium. On-chain stablecoin wallet and corridor analytics.{' '}
+              Allium. On-chain stablecoin wallet analytics, and corridor volume from
+              <code>stablecoins.intelligence.enriched_transfers</code> filtered to
+              Visa-methodology <code>is_adjusted_volume</code>.{' '}
               <a href="https://www.allium.so" className="underline decoration-[var(--hairline)] hover:decoration-[var(--brand)]">
                 https://www.allium.so
               </a>
@@ -702,6 +734,21 @@ export function WhitepaperView() {
               World Bank. Personal remittances, paid (current US$) (<code>BM.TRF.PWKR.CD.DT</code>).{' '}
               <a href="https://data.worldbank.org/indicator/BM.TRF.PWKR.CD.DT" className="underline decoration-[var(--hairline)] hover:decoration-[var(--brand)]">
                 https://data.worldbank.org/indicator/BM.TRF.PWKR.CD.DT
+              </a>
+              . Secondary-income fallback: <code>BM.TRF.PRVT.CD</code>.
+            </li>
+            <li>
+              International Monetary Fund. World Economic Outlook database (nominal GDP for
+              economies the World Bank does not publish, notably Taiwan).{' '}
+              <a href="https://www.imf.org/en/Publications/WEO" className="underline decoration-[var(--hairline)] hover:decoration-[var(--brand)]">
+                https://www.imf.org/en/Publications/WEO
+              </a>
+            </li>
+            <li>
+              Central Intelligence Agency. <em>The World Factbook</em> (population and official
+              exchange-rate GDP where the Bank is silent).{' '}
+              <a href="https://www.cia.gov/the-world-factbook/" className="underline decoration-[var(--hairline)] hover:decoration-[var(--brand)]">
+                https://www.cia.gov/the-world-factbook/
               </a>
             </li>
             <li>
