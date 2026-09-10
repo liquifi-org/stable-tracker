@@ -349,16 +349,29 @@ export function OverviewView() {
       .sort((a, b) => b.outboundVolume - a.outboundVolume);
   }, [bidirectionalCorridors, corridorData, numericToAlpha2, alpha2ToNumeric, countryNameByAlpha2, adoptionData]);
 
+  const inboundByCountry = useMemo(() => {
+    const inbound = new Map<string, number>();
+    for (const flow of corridorData) {
+      inbound.set(flow.to, (inbound.get(flow.to) ?? 0) + flow.value.amount);
+    }
+    return inbound;
+  }, [corridorData]);
+
   const adoptionTableData = useMemo(() => {
     const previousRankMap = new Map(previousAdoptionData.map((c) => [c.countryId, c.adoptionRank]));
     const previousWalletsMap = new Map(previousAdoptionData.map((c) => [c.countryId, c.activeWallets]));
     return adoptionData
-      .filter((c) => c.activeWallets > 0 || (c.outboundVolume ?? 0) > 0)
+      .filter((c) =>
+        c.activeWallets > 0
+        || (c.outboundVolume ?? 0) > 0
+        || (inboundByCountry.get(c.countryId) ?? 0) > 0,
+      )
       .map((c) => {
         const previousRank = previousRankMap.get(c.countryId) ?? null;
         const previousWallets = previousWalletsMap.get(c.countryId) ?? null;
         return {
           ...c,
+          inboundVolume: inboundByCountry.get(c.countryId) ?? 0,
           walletsPer100k: c.adoptionRate * 100_000,
           stablecoinPctOfRemittances:
             c.remittancesSent != null && c.remittancesSent > 0
@@ -372,7 +385,7 @@ export function OverviewView() {
               : null,
         };
       });
-  }, [adoptionData, previousAdoptionData]);
+  }, [adoptionData, previousAdoptionData, inboundByCountry]);
 
   const tokenMix = useMemo(() => {
     const map = new Map<string, number>();
@@ -551,6 +564,16 @@ export function OverviewView() {
           {value}
         </button>
       ),
+    },
+    {
+      key: 'inboundVolume',
+      header: 'In',
+      render: (value: number) => (value > 0 ? formatCurrency(value) : '—'),
+    },
+    {
+      key: 'outboundVolume',
+      header: 'Out',
+      render: (value: number) => (value > 0 ? formatCurrency(value) : '—'),
     },
     {
       key: 'gdpIntensity',
