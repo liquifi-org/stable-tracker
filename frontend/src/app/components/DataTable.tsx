@@ -19,6 +19,8 @@ interface DataTableProps {
   paginate?: boolean;
   isExpandable?: (row: any) => boolean;
   renderExpanded?: (row: any) => ReactNode;
+  /** Row keys to expand after resetKey/data changes. */
+  expandKeys?: string[];
 }
 
 export function DataTable({
@@ -32,6 +34,7 @@ export function DataTable({
   paginate = true,
   isExpandable,
   renderExpanded,
+  expandKeys,
 }: DataTableProps) {
   const [currentPage, setCurrentPage] = useState(0);
   const [sortKey, setSortKey] = useState<string | null>(defaultSortKey ?? null);
@@ -39,10 +42,11 @@ export function DataTable({
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(() => new Set());
   const canExpand = Boolean(renderExpanded);
 
+  const expandKeySig = (expandKeys ?? []).join('|');
   useEffect(() => {
     setCurrentPage(0);
-    setExpandedKeys(new Set());
-  }, [resetKey, data.length]);
+    setExpandedKeys(new Set(expandKeys ?? []));
+  }, [resetKey, data.length, expandKeySig]);
 
   const rowKey = (row: any, index: number) =>
     String(row.countryId ?? row.isoAlpha2 ?? row.alpha2 ?? row.region ?? index);

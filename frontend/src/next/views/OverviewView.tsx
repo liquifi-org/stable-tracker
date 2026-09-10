@@ -73,6 +73,7 @@ export function OverviewView() {
   const [focusIso, setFocusIso] = useState<string | null>(null);
   const [focusCountryId, setFocusCountryId] = useState<string | null>(null);
   const [focusNonce, setFocusNonce] = useState(0);
+  const [selectedPlace, setSelectedPlace] = useState<string | null>(null);
   const [corridorData, setCorridorData] = useState<CorridorFlow[]>([]);
   const [corridorLoading, setCorridorLoading] = useState(false);
   const [previousCorridorVolume, setPreviousCorridorVolume] = useState<number | null>(null);
@@ -160,7 +161,10 @@ export function OverviewView() {
       const detail = (e as CustomEvent<MapFocusCountryDetail>).detail;
       if (!detail) return;
       setGeoMode('country');
-      if (detail.isoAlpha2) setFocusIso(detail.isoAlpha2);
+      if (detail.isoAlpha2) {
+        setFocusIso(detail.isoAlpha2);
+        setSelectedPlace(detail.isoAlpha2);
+      }
       setFocusCountryId(detail.countryId);
       setFocusNonce((n) => n + 1);
     };
@@ -746,6 +750,24 @@ export function OverviewView() {
     });
   };
 
+  const displayedAdoption = selectedPlace && geoMode === 'country'
+    ? adoptionTableData.filter((c) => c.isoAlpha2 === selectedPlace)
+    : adoptionTableData;
+  const displayedRegions = selectedPlace && geoMode === 'region'
+    ? regionalData.filter((r) => r.region === selectedPlace)
+    : regionalData;
+  const countryExpandKeys = selectedPlace && geoMode === 'country'
+    ? displayedAdoption.map((c) => c.countryId)
+    : [];
+  const regionExpandKeys = selectedPlace && geoMode === 'region'
+    ? displayedRegions.map((r) => r.region)
+    : [];
+
+  const selectPlaceFromMap = (id: string | null) => {
+    setSelectedPlace(id);
+    if (!id) setFocusIso(null);
+  };
+
   return (
     <div className="space-y-8">
       <div className="flex gap-3 items-center flex-wrap">
@@ -767,7 +789,10 @@ export function OverviewView() {
               layoutId="next-usage-geo"
               size="sm"
               value={geoMode}
-              onChange={setGeoMode}
+              onChange={(mode) => {
+                setGeoMode(mode);
+                setSelectedPlace(null);
+              }}
               options={[
                 { value: 'country', label: 'Country' },
                 { value: 'region', label: 'Region' },
@@ -814,6 +839,7 @@ export function OverviewView() {
                 countrySpokeHover
                 focusPlace={focusIso}
                 focusNonce={focusNonce}
+                onSelectPlace={selectPlaceFromMap}
               />
             )}
             {(adoptionLoading || corridorLoading) && !usageLoading && (
@@ -821,25 +847,27 @@ export function OverviewView() {
             )}
           </div>
 
-          <div className="surface p-5">
+          <div id="overview-geo-table" className="surface p-5">
             <h4 className="display text-xl mb-3">
               {geoMode === 'region'
-                ? `${regionalData.length} regions, ${directedRegionalCorridors.length} corridors`
-                : `${adoptionTableData.length} countries, ${directedCorridors.length} corridors`}
+                ? `${displayedRegions.length} ${displayedRegions.length === 1 ? 'region' : 'regions'}, ${directedRegionalCorridors.length} corridors`
+                : `${displayedAdoption.length} ${displayedAdoption.length === 1 ? 'country' : 'countries'}, ${directedCorridors.length} corridors`}
             </h4>
 
             {geoMode === 'country' && adoptionTableData.length > 0 ? (
               <DataTable
-                data={adoptionTableData}
+                data={displayedAdoption}
                 columns={adoptionColumns}
                 defaultSortKey="gdpIntensity"
                 defaultSortDirection="desc"
                 pageSize={10}
                 paginate={false}
-                resetKey={`${filters.year}-${filters.month}-adoption`}
+                resetKey={`${filters.year}-${filters.month}-adoption-${selectedPlace ?? 'all'}`}
+                expandKeys={countryExpandKeys}
                 isExpandable={(row) => (destsByOriginAlpha.get(row.isoAlpha2)?.length ?? 0) > 0}
                 renderExpanded={(row) => {
                   const dests = destsByOriginAlpha.get(row.isoAlpha2) ?? [];
+                  const maxVolume = dests[0]?.volume ?? 0;
                   return (
                     <div className="space-y-0.5">
                       <p className="text-[11px] text-[var(--muted-ink)] px-1.5 pb-1">
@@ -852,6 +880,7 @@ export function OverviewView() {
                           alpha={dest.toAlpha}
                           volume={dest.volume}
                           tokens={dest.tokens}
+                          barShare={maxVolume > 0 ? dest.volume / maxVolume : 1}
                           formatVolume={formatCurrency}
                           onClick={
                             alpha2ToNumeric.has(dest.toAlpha)
@@ -871,16 +900,18 @@ export function OverviewView() {
               />
             ) : geoMode === 'region' && regionalData.length > 0 ? (
               <DataTable
-                data={regionalData}
+                data={displayedRegions}
                 columns={regionColumns}
                 defaultSortKey="adoptionRate"
                 defaultSortDirection="desc"
                 pageSize={10}
                 paginate={false}
-                resetKey={`${filters.year}-${filters.month}-region`}
+                resetKey={`${filters.year}-${filters.month}-region-${selectedPlace ?? 'all'}`}
+                expandKeys={regionExpandKeys}
                 isExpandable={(row) => (destsByOriginRegion.get(row.region)?.length ?? 0) > 0}
                 renderExpanded={(row) => {
                   const dests = destsByOriginRegion.get(row.region) ?? [];
+                  const maxVolume = dests[0]?.volume ?? 0;
                   return (
                     <div className="space-y-0.5">
                       <p className="text-[11px] text-[var(--muted-ink)] px-1.5 pb-1">
@@ -892,6 +923,7 @@ export function OverviewView() {
                           name={dest.toRegion}
                           volume={dest.volume}
                           tokens={dest.tokens}
+                          barShare={maxVolume > 0 ? dest.volume / maxVolume : 1}
                           formatVolume={formatCurrency}
                         />
                       ))}
