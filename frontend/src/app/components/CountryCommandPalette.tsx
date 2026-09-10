@@ -8,14 +8,16 @@ import {
   CommandItem,
   CommandList,
 } from './ui/command';
-import { api, type CountryRegulationInfo } from '../services/api';
+import { api, type CountryAdoptionMetric } from '../services/api';
 import { CountryFlag } from './CountryFlag';
 import { countryPath } from '../lib/countryRoutes';
+import { useFilters } from '../context/FilterContext';
 
 export function CountryCommandPalette() {
   const [open, setOpen] = useState(false);
-  const [countries, setCountries] = useState<CountryRegulationInfo[]>([]);
+  const [countries, setCountries] = useState<CountryAdoptionMetric[]>([]);
   const navigate = useNavigate();
+  const filters = useFilters();
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -24,28 +26,51 @@ export function CountryCommandPalette() {
         setOpen((v) => !v);
       }
     };
+    const openPalette = () => setOpen(true);
     window.addEventListener('keydown', onKey);
-    const open = () => setOpen(true);
-    window.addEventListener('open-country-search', open);
+    window.addEventListener('open-country-search', openPalette);
     return () => {
       window.removeEventListener('keydown', onKey);
-      window.removeEventListener('open-country-search', open);
+      window.removeEventListener('open-country-search', openPalette);
     };
   }, []);
 
   useEffect(() => {
-    if (!open || countries.length > 0) return;
-    api.getCountriesRegulation()
-      .then((page) => setCountries(page.items))
-      .catch(() => setCountries([]));
-  }, [open, countries.length]);
+    if (!open) return;
+    let cancelled = false;
+    Promise.all([
+      api.getAdoptionAnalytics(filters.year, filters.month),
+      api.getCorridors(filters.year, filters.month),
+    ])
+      .then(([adoption, corridors]) => {
+        if (cancelled) return;
+        const inbound = new Map<string, number>();
+        for (const flow of corridors) {
+          inbound.set(flow.to, (inbound.get(flow.to) ?? 0) + flow.value.amount);
+        }
+        const withData = adoption
+          .filter((c) =>
+            c.activeWallets > 0
+            || (c.outboundVolume ?? 0) > 0
+            || (inbound.get(c.countryId) ?? 0) > 0,
+          )
+          .sort((a, b) => a.name.localeCompare(b.name));
+        setCountries(withData);
+      })
+      .catch(() => {
+        if (!cancelled) setCountries([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, filters.year, filters.month]);
 
   return (
     <CommandDialog
       open={open}
       onOpenChange={setOpen}
       title="Jump to country"
-      description="Search countries by name"
+      description="Search countries with data in this period"
     >
       <CommandInput placeholder="Search countries…" />
       <CommandList>
