@@ -22,6 +22,7 @@ import { TokenMixBar, NamedCorridorDestRow } from '../components/TokenMixBar';
 import { UsageRegulationMatrix, type UsageRuleRow } from '../components/UsageRegulationMatrix';
 import { InsightCards, type InsightBreakdown } from '../components/InsightCards';
 import { countryPath } from '../../app/lib/countryRoutes';
+import { MAP_FOCUS_COUNTRY, type MapFocusCountryDetail } from '../../app/lib/mapEvents';
 
 function isNonUsdTicker(name: string): boolean {
   const n = name.toUpperCase();
@@ -61,6 +62,9 @@ export function OverviewView() {
   const [adoptionLoading, setAdoptionLoading] = useState(false);
   const [regionalData, setRegionalData] = useState<RegionalAdoptionMetric[]>([]);
   const [geoMode, setGeoMode] = useState<GeoMode>('country');
+  const [focusIso, setFocusIso] = useState<string | null>(null);
+  const [focusCountryId, setFocusCountryId] = useState<string | null>(null);
+  const [focusNonce, setFocusNonce] = useState(0);
   const [corridorData, setCorridorData] = useState<CorridorFlow[]>([]);
   const [corridorLoading, setCorridorLoading] = useState(false);
   const [previousCorridorVolume, setPreviousCorridorVolume] = useState<number | null>(null);
@@ -141,6 +145,19 @@ export function OverviewView() {
     api.getCountriesRegulation()
       .then((page) => setRegulation(page.items))
       .catch(() => setRegulation([]));
+  }, []);
+
+  useEffect(() => {
+    const onFocus = (e: Event) => {
+      const detail = (e as CustomEvent<MapFocusCountryDetail>).detail;
+      if (!detail) return;
+      setGeoMode('country');
+      if (detail.isoAlpha2) setFocusIso(detail.isoAlpha2);
+      setFocusCountryId(detail.countryId);
+      setFocusNonce((n) => n + 1);
+    };
+    window.addEventListener(MAP_FOCUS_COUNTRY, onFocus);
+    return () => window.removeEventListener(MAP_FOCUS_COUNTRY, onFocus);
   }, []);
 
   const numericToAlpha2 = useMemo(
@@ -657,26 +674,6 @@ export function OverviewView() {
 
   return (
     <div className="space-y-8">
-      <InsightCards
-        periodLabel={periodLabel}
-        loading={globalInsightsLoading && !globalInsights}
-        corridorLoading={corridorLoading && corridorVolume === 0}
-        wallets={globalInsights?.totalActiveWallets}
-        walletsTrend={walletsTrend}
-        corridorVolume={corridorVolume}
-        corridorTrend={corridorTrend}
-        dollarization={corridorDollarShare}
-        dollarizationTrendPp={dollarizationTrendPp}
-        remittanceRatio={remittanceRatio}
-        remittanceTrendPp={remittanceTrendPp}
-        walletBreakdown={walletBreakdown}
-        corridorBreakdown={corridorBreakdown}
-        remittanceBreakdown={remittanceBreakdown}
-        dollarizationBreakdown={dollarizationBreakdown}
-        onSelectUsage={() => filters.setMapType('adoption')}
-        formatCurrency={formatCurrency}
-      />
-
       <div className="flex gap-3 items-center flex-wrap">
         <SegmentedControl
           layoutId="next-lens-pill"
@@ -710,7 +707,7 @@ export function OverviewView() {
         <div className="space-y-6">
           <div className="relative">
             {usageLoading ? (
-              <Skeleton className="w-full h-[200px] sm:h-[360px] rounded-xl" />
+              <Skeleton className="w-full h-[min(58dvh,22rem)] lg:h-[360px] rounded-xl" />
             ) : (
               <RealCorridorMap
                 corridors={bidirectionalCorridors}
@@ -721,12 +718,34 @@ export function OverviewView() {
                 getCountryName={(alpha2) => countryNameByAlpha2.get(alpha2) ?? alpha2}
                 hideAntarctica
                 countrySpokeHover
+                focusPlace={focusIso}
+                focusNonce={focusNonce}
               />
             )}
             {(adoptionLoading || corridorLoading) && !usageLoading && (
               <div className="absolute inset-0 rounded-xl bg-white/40 dark:bg-neutral-950/40 pointer-events-none" />
             )}
           </div>
+
+          <InsightCards
+            periodLabel={periodLabel}
+            loading={globalInsightsLoading && !globalInsights}
+            corridorLoading={corridorLoading && corridorVolume === 0}
+            wallets={globalInsights?.totalActiveWallets}
+            walletsTrend={walletsTrend}
+            corridorVolume={corridorVolume}
+            corridorTrend={corridorTrend}
+            dollarization={corridorDollarShare}
+            dollarizationTrendPp={dollarizationTrendPp}
+            remittanceRatio={remittanceRatio}
+            remittanceTrendPp={remittanceTrendPp}
+            walletBreakdown={walletBreakdown}
+            corridorBreakdown={corridorBreakdown}
+            remittanceBreakdown={remittanceBreakdown}
+            dollarizationBreakdown={dollarizationBreakdown}
+            onSelectUsage={() => filters.setMapType('adoption')}
+            formatCurrency={formatCurrency}
+          />
 
           <div className="surface p-5">
             <h4 className="display text-xl mb-3">
@@ -821,6 +840,31 @@ export function OverviewView() {
 
       {filters.mapType === 'regulation' && (
         <div className="space-y-6">
+          <RegulationPanel
+            paginate={false}
+            hideAntarctica
+            focusCountryId={focusCountryId}
+            focusNonce={focusNonce}
+          />
+          <InsightCards
+            periodLabel={periodLabel}
+            loading={globalInsightsLoading && !globalInsights}
+            corridorLoading={corridorLoading && corridorVolume === 0}
+            wallets={globalInsights?.totalActiveWallets}
+            walletsTrend={walletsTrend}
+            corridorVolume={corridorVolume}
+            corridorTrend={corridorTrend}
+            dollarization={corridorDollarShare}
+            dollarizationTrendPp={dollarizationTrendPp}
+            remittanceRatio={remittanceRatio}
+            remittanceTrendPp={remittanceTrendPp}
+            walletBreakdown={walletBreakdown}
+            corridorBreakdown={corridorBreakdown}
+            remittanceBreakdown={remittanceBreakdown}
+            dollarizationBreakdown={dollarizationBreakdown}
+            onSelectUsage={() => filters.setMapType('adoption')}
+            formatCurrency={formatCurrency}
+          />
           <div className="surface p-5">
             <h4 className="display text-xl mb-1">Usage × rules</h4>
             <p className="text-sm text-[var(--muted-ink)] mb-4">
@@ -828,7 +872,6 @@ export function OverviewView() {
             </p>
             <UsageRegulationMatrix rows={usageRuleRows} />
           </div>
-          <RegulationPanel paginate={false} hideAntarctica />
         </div>
       )}
     </div>

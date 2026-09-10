@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router';
+import { useLocation, useNavigate } from 'react-router';
+import { focusCountryOnMap } from '../lib/mapEvents';
 import {
   CommandDialog,
   CommandEmpty,
@@ -17,6 +18,7 @@ export function CountryCommandPalette() {
   const [open, setOpen] = useState(false);
   const [countries, setCountries] = useState<CountryAdoptionMetric[]>([]);
   const navigate = useNavigate();
+  const location = useLocation();
   const filters = useFilters();
 
   useEffect(() => {
@@ -82,6 +84,14 @@ export function CountryCommandPalette() {
               value={`${c.name} ${c.isoAlpha2 ?? ''} ${c.countryId}`}
               onSelect={() => {
                 setOpen(false);
+                if (location.pathname === '/') {
+                  focusCountryOnMap({
+                    countryId: c.countryId,
+                    name: c.name,
+                    isoAlpha2: c.isoAlpha2,
+                  });
+                  return;
+                }
                 navigate(countryPath({ countryId: c.countryId, name: c.name, isoAlpha2: c.isoAlpha2 }), {
                   state: { name: c.name, isoAlpha2: c.isoAlpha2 },
                 });

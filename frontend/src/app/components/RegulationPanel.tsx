@@ -1,13 +1,26 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { geoPath } from 'd3-geo';
+import { geoCentroid, geoPath } from 'd3-geo';
 import { feature } from 'topojson-client';
-import { Banknote, Coins, Gem, Cpu, CheckCircle2, XCircle, MinusCircle, Plus, Minus, RotateCcw, ChevronDown } from 'lucide-react';
+import { Banknote, Coins, Gem, Cpu, CheckCircle2, XCircle, MinusCircle, ChevronDown } from 'lucide-react';
 import { useMapZoomPan } from '../hooks/useMapZoomPan';
+import { useCompactMap, useFinePointer } from '../hooks/useMediaQuery';
 import { filterMapFeatures, MAP_VIEW_H, MAP_VIEW_W, worldMapProjection } from '../lib/worldMapProjection';
+import { MAP_FOCUS_COUNTRY, type MapFocusCountryDetail } from '../lib/mapEvents';
+import { nearestPlaces, placeIdFromTarget, resolveMapActivate } from '../lib/mapHitTest';
 import { CountryFlag } from './CountryFlag';
 import { DataTable } from './DataTable';
 import { Skeleton } from './ui/skeleton';
+import {
+  MAP_SVG_CLASS,
+  MAP_SVG_FULLSCREEN_CLASS,
+  MapDisambiguateList,
+  MapFindButton,
+  MapLegendFold,
+  MapStageFrame,
+  MapZoomCluster,
+} from './MapStage';
+import { MapInspectorSheet } from './MapInspectorSheet';
 import { api, type CountryRegulationInfo } from '../services/api';
 import { countryPath } from '../lib/countryRoutes';
 
@@ -41,9 +54,13 @@ function ReserveStatusIcon({ value }: { value: number | undefined }) {
 export function RegulationPanel({
   paginate = true,
   hideAntarctica = false,
+  focusCountryId = null,
+  focusNonce = 0,
 }: {
   paginate?: boolean;
   hideAntarctica?: boolean;
+  focusCountryId?: string | null;
+  focusNonce?: number;
 }) {
   const navigate = useNavigate();
   const [worldData, setWorldData] = useState<any>(null);
@@ -52,11 +69,20 @@ export function RegulationPanel({
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [pinnedId, setPinnedId] = useState<string | null>(null);
   const [seenHover, setSeenHover] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
+  const [disambiguate, setDisambiguate] = useState<{
+    items: { id: string; label: string }[];
+    x: number;
+    y: number;
+  } | null>(null);
   const [reserveTypeFilters, setReserveTypeFilters] = useState<Set<ReserveTypeKey>>(new Set());
+  const compact = useCompactMap();
+  const finePointer = useFinePointer();
+  const hoverEnabled = finePointer;
   const {
-    svgRef, viewBox, zoom, minZoom, maxZoom, zoomIn, zoomOut, resetView,
-    isDragging, draggedRef, handleMouseDown, handleMouseMove: handlePanMove, endDrag,
-  } = useMapZoomPan();
+    svgRef, setSvgRef, viewBox, zoom, minZoom, maxZoom, zoomIn, zoomOut, resetView, flyTo,
+    isDragging, draggedRef, pinchActiveRef, svgListeners,
+  } = useMapZoomPan({ coarse: !finePointer });
   const inspectorRef = useRef<HTMLDivElement>(null);
 
   const scrollToInspector = () => {
@@ -167,6 +193,7 @@ export function RegulationPanel({
   const closePlace = () => {
     setPinnedId(null);
     setHoveredId(null);
+    setDisambiguate(null);
   };
 
   const handleCountryClick = (id: string) => {
@@ -179,20 +206,52 @@ export function RegulationPanel({
     }
     setPinnedId(id);
     setHoveredId(id);
+    setSeenHover(true);
+    setDisambiguate(null);
   };
 
   const handleCountryHover = (_e: React.MouseEvent, id: string) => {
-    if (isDragging || pinnedId) return;
+    if (!hoverEnabled || isDragging || pinnedId) return;
     setSeenHover(true);
     setHoveredId(id);
   };
 
-  const hoveredCountry = !pinnedId && hoveredId ? countryDataMap.get(hoveredId) : null;
+  const hoveredCountry = hoverEnabled && !pinnedId && hoveredId ? countryDataMap.get(hoveredId) : null;
   const pinnedCountry = pinnedId ? countryDataMap.get(pinnedId) : null;
-  const focusId = pinnedId ?? hoveredId;
+  const focusId = pinnedId ?? (hoverEnabled ? hoveredId : null);
+
+  useEffect(() => {
+    const onFocus = (e: Event) => {
+      const id = (e as CustomEvent<MapFocusCountryDetail>).detail?.countryId;
+      if (!id) return;
+      setPinnedId(id);
+      setHoveredId(id);
+      setSeenHover(true);
+      setDisambiguate(null);
+    };
+    window.addEventListener(MAP_FOCUS_COUNTRY, onFocus);
+    return () => window.removeEventListener(MAP_FOCUS_COUNTRY, onFocus);
+  }, []);
+
+  useEffect(() => {
+    if (!focusCountryId) return;
+    setPinnedId(focusCountryId);
+    setHoveredId(focusCountryId);
+    setSeenHover(true);
+    setDisambiguate(null);
+    if (!worldData) return;
+    const geojson = feature(worldData, worldData.objects.countries) as GeoJSON.FeatureCollection;
+    const feats = filterMapFeatures(geojson.features, hideAntarctica);
+    const proj = worldMapProjection({ type: 'FeatureCollection', features: feats }, { hideAntarctica });
+    const geo = feats.find((f) => String(f.id) === focusCountryId);
+    if (!geo) return;
+    const [lon, lat] = geoCentroid(geo as GeoJSON.Feature);
+    const point = Number.isFinite(lon) ? proj([lon, lat]) : null;
+    if (point) flyTo(point[0], point[1], compact ? 3.4 : 2.6);
+  }, [focusCountryId, focusNonce, worldData, hideAntarctica, compact, flyTo]);
 
   if (!worldData || (loading && countries.length === 0)) {
-    return <Skeleton className="w-full h-[200px] sm:h-[360px] rounded-xl" />;
+    return <Skeleton className="w-full h-[min(58dvh,22rem)] lg:h-[360px] rounded-xl" />;
   }
 
   const geojson = feature(worldData, worldData.objects.countries) as GeoJSON.FeatureCollection;
@@ -202,21 +261,112 @@ export function RegulationPanel({
     { hideAntarctica },
   );
   const pathGenerator = geoPath().projection(projection);
+  const selectableIds = new Set(countries.map((c) => c.countryId));
+  const hitPlaces = features.flatMap((geo: { id?: string | number }) => {
+    const id = String(geo.id);
+    if (!selectableIds.has(id)) return [];
+    const [lon, lat] = geoCentroid(geo as GeoJSON.Feature);
+    const point = Number.isFinite(lon) ? projection([lon, lat]) : null;
+    if (!point) return [];
+    return [{ id, x: point[0], y: point[1] }];
+  });
+
+  const activateAt = (clientX: number, clientY: number, target: EventTarget | null) => {
+    if (draggedRef.current || pinchActiveRef.current) return;
+    const svg = svgRef.current;
+    if (!svg) return;
+    const hits = nearestPlaces(svg, clientX, clientY, hitPlaces);
+    const decision = resolveMapActivate({
+      zoom,
+      pathId: placeIdFromTarget(target),
+      hits,
+      selectable: selectableIds,
+    });
+    if (decision.type === 'disambiguate') {
+      const stage = svg.getBoundingClientRect();
+      setDisambiguate({
+        items: decision.ids.map((id) => ({
+          id,
+          label: countryDataMap.get(id)?.name ?? id,
+        })),
+        x: clientX - stage.left,
+        y: clientY - stage.top,
+      });
+      return;
+    }
+    if (decision.type === 'pin') {
+      handleCountryClick(decision.id);
+      return;
+    }
+    closePlace();
+  };
+
+  const inspector = pinnedCountry ? (
+    <>
+      <div className="bg-[var(--brand)]/10 dark:bg-[var(--brand)]/15 px-4 py-2 border-b border-slate-200 dark:border-neutral-700">
+        <h3 className="font-bold text-[var(--brand-700)] dark:text-[var(--brand-300)] text-lg flex items-center gap-2">
+          {pinnedCountry.isoAlpha2 && (
+            <CountryFlag isoAlpha2={pinnedCountry.isoAlpha2} className="w-5 h-5" />
+          )}
+          {pinnedCountry.name}
+        </h3>
+        <p className="text-xs text-slate-500 dark:text-slate-400">{pinnedCountry.region}</p>
+      </div>
+      <div className="px-4 py-3 text-xs space-y-2">
+        <div className="flex justify-between items-center">
+          <span className="text-slate-500 dark:text-slate-400">Stage</span>
+          <span className="text-slate-800 dark:text-slate-100 font-semibold">
+            {pinnedCountry.stage !== undefined ? STAGE_INFO[pinnedCountry.stage]?.label ?? '—' : 'No data'}
+          </span>
+        </div>
+        {RESERVE_TYPE_DEFS.map(({ key, label }) => (
+          <div key={key} className="flex justify-between items-center">
+            <span className="text-slate-500 dark:text-slate-400">{label}</span>
+            <ReserveStatusIcon value={pinnedCountry[key]} />
+          </div>
+        ))}
+      </div>
+      <div className="px-4 py-2 border-t border-slate-200 dark:border-neutral-700 flex items-center gap-2 flex-wrap justify-end">
+        <button
+          type="button"
+          onClick={() => {
+            navigate(countryPath({
+              countryId: pinnedCountry.countryId,
+              name: pinnedCountry.name,
+              isoAlpha2: pinnedCountry.isoAlpha2,
+            }), {
+              state: { name: pinnedCountry.name, isoAlpha2: pinnedCountry.isoAlpha2 },
+            });
+          }}
+          className="px-3 py-1.5 text-xs font-semibold rounded-md text-white bg-[var(--brand)] hover:bg-[var(--brand-700)] transition-colors"
+        >
+          Details
+        </button>
+        <button
+          type="button"
+          onClick={closePlace}
+          className="px-3 py-1.5 text-xs font-semibold rounded-md text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-neutral-700 transition-colors"
+        >
+          Close
+        </button>
+      </div>
+    </>
+  ) : null;
 
   return (
     <div className="space-y-6">
-      <div className="bg-white dark:bg-neutral-800 border border-slate-200/50 dark:border-neutral-700 rounded-lg p-4 shadow-md">
+      <div className="bg-white dark:bg-neutral-800 border border-slate-200/50 dark:border-neutral-700 rounded-lg p-4">
         <div className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">
           Filter by reserve type allowed <span className="text-xs text-slate-400 font-normal">(matches any selected)</span>
         </div>
-        <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex items-center gap-3 flex-wrap overflow-x-auto">
           {RESERVE_TYPE_DEFS.map(({ key, label, Icon }) => {
             const active = reserveTypeFilters.has(key);
             return (
               <button
                 key={key}
                 onClick={() => toggleReserveType(key)}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition-ui ${
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition-ui shrink-0 ${
                   active
                     ? 'text-white border-transparent'
                     : 'bg-white dark:bg-neutral-900 text-slate-600 dark:text-slate-300 border-slate-200/50 dark:border-neutral-700 hover:border-[var(--brand)]'
@@ -232,86 +382,79 @@ export function RegulationPanel({
       </div>
 
       <div className="relative space-y-3">
-        <div className="bg-white dark:bg-neutral-800 rounded-xl border border-slate-200/50 dark:border-neutral-700 overflow-hidden transition-ui">
-          <div className="relative px-5 py-3 bg-[#F7FAFC] dark:bg-neutral-900">
-            {!seenHover && !focusId && (
-              <div className="absolute top-4 left-4 z-20 pointer-events-none text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                Hover a country — click to select
-              </div>
-            )}
-            {!pinnedId && hoveredCountry && (
-              <div className="absolute top-4 left-4 z-20 pointer-events-none max-w-[min(94%,20rem)]">
-                <div className="rounded-lg bg-neutral-950/90 dark:bg-neutral-950/92 border border-white/15 px-3 py-2 text-xs text-white">
-                  <div className="flex items-center gap-2 min-w-0">
-                    {hoveredCountry.isoAlpha2 && (
-                      <CountryFlag isoAlpha2={hoveredCountry.isoAlpha2} className="w-4 h-4 shrink-0" />
-                    )}
-                    <span className="font-semibold truncate">{hoveredCountry.name}</span>
-                  </div>
-                  <div className="mt-1 text-[11px] text-white/70">
-                    {hoveredCountry.stage !== undefined ? STAGE_INFO[hoveredCountry.stage]?.label ?? 'No data' : 'No data'}
-                    {hoveredCountry.region ? ` · ${hoveredCountry.region}` : ''}
+        <MapStageFrame fullscreen={fullscreen}>
+            <div className="absolute top-3 left-3 z-20 flex flex-col gap-1.5 items-start max-w-[min(94%,20rem)]">
+              <MapFindButton />
+              {!seenHover && !focusId && (
+                <div className="pointer-events-none text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                  {hoverEnabled ? 'Hover a country — click to select' : 'Tap a country'}
+                </div>
+              )}
+              {!pinnedId && hoveredCountry && (
+                <div className="pointer-events-none">
+                  <div className="rounded-lg bg-neutral-950/90 dark:bg-neutral-950/92 border border-white/15 px-3 py-2 text-xs text-white">
+                    <div className="flex items-center gap-2 min-w-0">
+                      {hoveredCountry.isoAlpha2 && (
+                        <CountryFlag isoAlpha2={hoveredCountry.isoAlpha2} className="w-4 h-4 shrink-0" />
+                      )}
+                      <span className="font-semibold truncate">{hoveredCountry.name}</span>
+                    </div>
+                    <div className="mt-1 text-[11px] text-white/70">
+                      {hoveredCountry.stage !== undefined ? STAGE_INFO[hoveredCountry.stage]?.label ?? 'No data' : 'No data'}
+                      {hoveredCountry.region ? ` · ${hoveredCountry.region}` : ''}
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
+            </div>
+            {disambiguate && (
+              <MapDisambiguateList
+                items={disambiguate.items}
+                x={disambiguate.x}
+                y={disambiguate.y}
+                onPick={(id) => handleCountryClick(id)}
+                onDismiss={() => setDisambiguate(null)}
+              />
             )}
-            {/* Legend — bottom-left, opposite zoom controls */}
-            <div className="absolute bottom-4 left-4 z-10 bg-white/90 dark:bg-neutral-800/90 backdrop-blur-sm border border-slate-200/60 dark:border-neutral-700 rounded-lg p-2.5 shadow-md">
-              <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1.5 uppercase tracking-wide">Regulatory stage</div>
-              <div className="space-y-1">
-                {[3, 2, 1, 0].map((stage) => (
-                  <div key={stage} className="flex items-center gap-1.5">
-                    <div className="w-3 h-3 rounded-sm shrink-0 border border-slate-200 dark:border-neutral-600" style={{ backgroundColor: STAGE_INFO[stage].color }} />
-                    <span className="text-[11px] text-slate-700 dark:text-slate-300">{STAGE_INFO[stage].label}</span>
+            <div className="absolute bottom-[max(1rem,env(safe-area-inset-bottom))] left-3 sm:left-4 z-10">
+              <MapLegendFold title="Regulatory stage">
+                <div className="space-y-1">
+                  {[3, 2, 1, 0].map((stage) => (
+                    <div key={stage} className="flex items-center gap-1.5">
+                      <div className="w-3 h-3 rounded-sm shrink-0 border border-slate-200 dark:border-neutral-600" style={{ backgroundColor: STAGE_INFO[stage].color }} />
+                      <span className="text-[11px] text-slate-700 dark:text-slate-300">{STAGE_INFO[stage].label}</span>
+                    </div>
+                  ))}
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-3 h-3 rounded-sm shrink-0 border border-slate-200 dark:border-neutral-600" style={{ backgroundColor: NO_DATA_COLOR }} />
+                    <span className="text-[11px] text-slate-700 dark:text-slate-300">No data</span>
                   </div>
-                ))}
-                <div className="flex items-center gap-1.5">
-                  <div className="w-3 h-3 rounded-sm shrink-0 border border-slate-200 dark:border-neutral-600" style={{ backgroundColor: NO_DATA_COLOR }} />
-                  <span className="text-[11px] text-slate-700 dark:text-slate-300">No data</span>
                 </div>
-              </div>
+              </MapLegendFold>
             </div>
 
-            <div className="absolute bottom-4 right-4 flex flex-col gap-1 z-10">
-              <button
-                type="button"
-                onClick={zoomIn}
-                disabled={zoom >= maxZoom}
-                aria-label="Zoom in"
-                className="w-8 h-8 flex items-center justify-center rounded-md bg-white dark:bg-neutral-800 border border-slate-200/50 dark:border-neutral-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-neutral-700 disabled:opacity-40 disabled:cursor-not-allowed transition-ui"
-              >
-                <Plus className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                onClick={zoomOut}
-                disabled={zoom <= minZoom}
-                aria-label="Zoom out"
-                className="w-8 h-8 flex items-center justify-center rounded-md bg-white dark:bg-neutral-800 border border-slate-200/50 dark:border-neutral-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-neutral-700 disabled:opacity-40 disabled:cursor-not-allowed transition-ui"
-              >
-                <Minus className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                onClick={handleReset}
-                disabled={zoom <= minZoom}
-                aria-label="Reset map view"
-                title="Reset map view"
-                className="w-8 h-8 flex items-center justify-center rounded-md bg-white dark:bg-neutral-800 border border-slate-200/50 dark:border-neutral-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-neutral-700 disabled:opacity-40 disabled:cursor-not-allowed transition-ui"
-              >
-                <RotateCcw className="w-4 h-4" />
-              </button>
-            </div>
+            <MapZoomCluster
+              zoom={zoom}
+              minZoom={minZoom}
+              maxZoom={maxZoom}
+              onZoomIn={zoomIn}
+              onZoomOut={zoomOut}
+              onReset={handleReset}
+              fullscreen={fullscreen}
+              onToggleFullscreen={() => setFullscreen((v) => !v)}
+            />
             <svg
-              ref={svgRef}
+              ref={setSvgRef}
               viewBox={viewBox}
-              className={`w-full aspect-[8/3] ${zoom > minZoom ? (isDragging ? 'cursor-grabbing' : 'cursor-grab') : ''}`}
-              onMouseDown={handleMouseDown}
-              onMouseMove={handlePanMove}
-              onMouseUp={endDrag}
+              className={`${fullscreen ? MAP_SVG_FULLSCREEN_CLASS : MAP_SVG_CLASS} ${zoom > minZoom ? (isDragging ? 'cursor-grabbing' : 'cursor-grab') : ''}`}
+              {...svgListeners}
+              onPointerUp={(e) => {
+                svgListeners.onPointerUp(e);
+                if (e.button !== 0 && e.pointerType === 'mouse') return;
+                activateAt(e.clientX, e.clientY, e.target);
+              }}
               onMouseLeave={() => {
-                endDrag();
-                if (!pinnedId) setHoveredId(null);
+                if (hoverEnabled && !pinnedId) setHoveredId(null);
               }}
             >
               <defs>
@@ -328,10 +471,6 @@ export function RegulationPanel({
                 width={MAP_VIEW_W}
                 height={MAP_VIEW_H}
                 className="fill-[#F7FAFC] dark:fill-neutral-900"
-                onClick={() => {
-                  if (draggedRef.current) return;
-                  closePlace();
-                }}
               />
 
               {features.map((geo: any, i: number) => {
@@ -371,22 +510,22 @@ export function RegulationPanel({
                   <path
                     key={i}
                     d={pathData}
+                    data-place={numericId}
                     fill={fillColor}
                     stroke={strokeColor}
                     strokeWidth={strokeWidth}
                     opacity={opacity}
                     onMouseEnter={(e) => handleCountryHover(e, numericId)}
                     onMouseLeave={() => {
-                      if (!pinnedId) setHoveredId(null);
+                      if (hoverEnabled && !pinnedId) setHoveredId(null);
                     }}
-                    onClick={() => handleCountryClick(numericId)}
                     className="cursor-pointer transition-[fill,opacity,stroke-width] duration-150 ease-out"
-                    filter={isFocus ? 'url(#regulation-glow)' : undefined}
+                    filter={isFocus && !compact ? 'url(#regulation-glow)' : undefined}
                   />
                 );
               })}
             </svg>
-            {pinnedId && (
+            {pinnedId && !compact && (
               <button
                 type="button"
                 onClick={scrollToInspector}
@@ -396,62 +535,27 @@ export function RegulationPanel({
                 <ChevronDown className="w-3.5 h-3.5" aria-hidden />
               </button>
             )}
-          </div>
-        </div>
+        </MapStageFrame>
 
-        {pinnedCountry && (
+        {compact ? (
+          <MapInspectorSheet
+            open={Boolean(pinnedCountry)}
+            onOpenChange={(open) => {
+              if (!open) closePlace();
+            }}
+            title={pinnedCountry?.name ?? 'Country'}
+          >
+            {inspector}
+          </MapInspectorSheet>
+        ) : (
+          inspector && (
           <div
             ref={inspectorRef}
             className="bg-white dark:bg-neutral-800 rounded-xl border border-slate-200/50 dark:border-neutral-700 overflow-hidden"
           >
-            <div className="bg-[var(--brand)]/10 dark:bg-[var(--brand)]/15 px-4 py-2 border-b border-slate-200 dark:border-neutral-700">
-              <h3 className="font-bold text-[var(--brand-700)] dark:text-[var(--brand-300)] text-lg flex items-center gap-2">
-                {pinnedCountry.isoAlpha2 && (
-                  <CountryFlag isoAlpha2={pinnedCountry.isoAlpha2} className="w-5 h-5" />
-                )}
-                {pinnedCountry.name}
-              </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400">{pinnedCountry.region}</p>
-            </div>
-            <div className="px-4 py-3 text-xs space-y-2">
-              <div className="flex justify-between items-center">
-                <span className="text-slate-500 dark:text-slate-400">Stage</span>
-                <span className="text-slate-800 dark:text-slate-100 font-semibold">
-                  {pinnedCountry.stage !== undefined ? STAGE_INFO[pinnedCountry.stage]?.label ?? '—' : 'No data'}
-                </span>
-              </div>
-              {RESERVE_TYPE_DEFS.map(({ key, label }) => (
-                <div key={key} className="flex justify-between items-center">
-                  <span className="text-slate-500 dark:text-slate-400">{label}</span>
-                  <ReserveStatusIcon value={pinnedCountry[key]} />
-                </div>
-              ))}
-            </div>
-            <div className="px-4 py-2 border-t border-slate-200 dark:border-neutral-700 flex items-center gap-2 flex-wrap justify-end">
-              <button
-                type="button"
-                onClick={() => {
-                  navigate(countryPath({
-                    countryId: pinnedCountry.countryId,
-                    name: pinnedCountry.name,
-                    isoAlpha2: pinnedCountry.isoAlpha2,
-                  }), {
-                    state: { name: pinnedCountry.name, isoAlpha2: pinnedCountry.isoAlpha2 },
-                  });
-                }}
-                className="px-3 py-1.5 text-xs font-semibold rounded-md text-white bg-[var(--brand)] hover:bg-[var(--brand-700)] transition-colors"
-              >
-                Details
-              </button>
-              <button
-                type="button"
-                onClick={closePlace}
-                className="px-3 py-1.5 text-xs font-semibold rounded-md text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-neutral-700 transition-colors"
-              >
-                Close
-              </button>
-            </div>
+            {inspector}
           </div>
+          )
         )}
       </div>
 
