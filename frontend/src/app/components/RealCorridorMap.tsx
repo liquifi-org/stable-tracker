@@ -2,12 +2,27 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router';
 import { geoCentroid, geoPath } from 'd3-geo';
 import { feature } from 'topojson-client';
-import { Plus, Minus, RotateCcw, ChevronDown } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 import { useMapZoomPan } from '../hooks/useMapZoomPan';
+import { useCompactMap, useFinePointer } from '../hooks/useMediaQuery';
 import { filterMapFeatures, MAP_VIEW_H, MAP_VIEW_W, worldMapProjection } from '../lib/worldMapProjection';
+import { MAP_FOCUS_COUNTRY, type MapFocusCountryDetail } from '../lib/mapEvents';
+import { nearestPlaces, placeIdFromTarget, resolveMapActivate } from '../lib/mapHitTest';
 import { useFilters } from '../context/FilterContext';
 import { useCurrencyFormat } from '../hooks/useCurrencyFormat';
 import { CountryFlag } from './CountryFlag';
+import {
+  MAP_SVG_CLASS,
+  MAP_SVG_FULLSCREEN_CLASS,
+  MapDisambiguateList,
+  MapFindButton,
+  MapLegendFold,
+  MapRegionJumps,
+  MapStageFrame,
+  MapZoomCluster,
+} from './MapStage';
+import { MapInspectorSheet } from './MapInspectorSheet';
+import { UsagePlaceInspector as UsageInspector } from './UsagePlaceInspector';
 import type { CountryAdoptionMetric, RegionalAdoptionMetric } from '../services/api';
 import { countryPath } from '../lib/countryRoutes';
 import { ISO_COUNTRIES } from '../lib/iso3166';
@@ -53,6 +68,8 @@ interface RealCorridorMapProps {
   /** When set, land is colored by adoption and hover also shows rank / wallets. */
   countries?: CountryAdoptionMetric[];
   regionalAdoption?: RegionalAdoptionMetric[];
+  focusPlace?: string | null;
+  focusNonce?: number;
 }
 
 /** Normalized shape both country- and region-mode corridors render against. */
@@ -147,6 +164,8 @@ export function RealCorridorMap({
   countrySpokeHover = false,
   countries = [],
   regionalAdoption = [],
+  focusPlace = null,
+  focusNonce = 0,
 }: RealCorridorMapProps) {
   const { formatCurrency: formatValue } = useCurrencyFormat();
   const [worldData, setWorldData] = useState<any>(null);
@@ -156,10 +175,19 @@ export function RealCorridorMap({
   const [pinnedPlace, setPinnedPlace] = useState<string | null>(null);
   const [showCorridorDetails, setShowCorridorDetails] = useState(false);
   const [seenHover, setSeenHover] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
+  const [disambiguate, setDisambiguate] = useState<{
+    items: { id: string; label: string }[];
+    x: number;
+    y: number;
+  } | null>(null);
+  const compact = useCompactMap();
+  const finePointer = useFinePointer();
+  const hoverEnabled = finePointer;
   const {
-    svgRef, viewBox, zoom, minZoom, maxZoom, zoomIn, zoomOut, resetView,
-    isDragging, draggedRef, handleMouseDown, handleMouseMove: handlePanMove, endDrag,
-  } = useMapZoomPan();
+    svgRef, setSvgRef, viewBox, zoom, minZoom, maxZoom, zoomIn, zoomOut, resetView, flyTo,
+    isDragging, draggedRef, pinchActiveRef, svgListeners,
+  } = useMapZoomPan({ coarse: !finePointer });
   const filters = useFilters();
   const navigate = useNavigate();
   const goToCountry = (ref: { name?: string; isoAlpha2?: string; countryId?: string }) => {
@@ -188,18 +216,20 @@ export function RealCorridorMap({
   };
 
   const enterPlace = (code: string) => {
+    if (!hoverEnabled) return;
     setSeenHover(true);
     if (pinnedPlace) return;
     if (dismissTimeoutRef.current) clearTimeout(dismissTimeoutRef.current);
     setHoveredPlace(code);
   };
   const leavePlace = () => {
-    if (pinnedPlace) return;
+    if (!hoverEnabled || pinnedPlace) return;
     if (dismissTimeoutRef.current) clearTimeout(dismissTimeoutRef.current);
     dismissTimeoutRef.current = setTimeout(() => setHoveredPlace(null), 60);
   };
   const pinPlace = (code: string) => {
     if (dismissTimeoutRef.current) clearTimeout(dismissTimeoutRef.current);
+    setDisambiguate(null);
     if (pinnedPlace === code) {
       closePlace();
       return;
@@ -207,12 +237,14 @@ export function RealCorridorMap({
     setPinnedPlace(code);
     setHoveredPlace(code);
     setShowCorridorDetails(false);
+    setSeenHover(true);
   };
   const closePlace = () => {
     if (dismissTimeoutRef.current) clearTimeout(dismissTimeoutRef.current);
     setPinnedPlace(null);
     setHoveredPlace(null);
     setShowCorridorDetails(false);
+    setDisambiguate(null);
   };
 
   const handleReset = () => {
@@ -263,13 +295,13 @@ export function RealCorridorMap({
   }, [mode, corridors, regionalCorridors]);
 
   const displayItems = allItems;
-  const paintItems = useMemo(
-    () =>
-      displayItems
-        .map((corridor, index) => ({ corridor, index }))
-        .sort((a, b) => a.corridor.totalValue - b.corridor.totalValue),
-    [displayItems],
-  );
+  const paintItems = useMemo(() => {
+    const cap = compact ? 40 : displayItems.length;
+    return displayItems
+      .slice(0, cap)
+      .map((corridor, index) => ({ corridor, index }))
+      .sort((a, b) => a.corridor.totalValue - b.corridor.totalValue);
+  }, [displayItems, compact]);
 
   const spokeIds = useMemo(() => {
     const ids = new Set<string>();
@@ -324,7 +356,7 @@ export function RealCorridorMap({
       ?? adoptionById.get(String(Number(raw)));
   };
 
-  const activePlace = pinnedPlace ?? hoveredPlace;
+  const activePlace = pinnedPlace ?? (hoverEnabled ? hoveredPlace : null);
   const pinned = pinnedPlace != null;
   const hoveredMetric = mode === 'country' && activePlace ? adoptionByAlpha2.get(activePlace) : undefined;
   const hoveredRegion = mode === 'region' && activePlace ? regionalByName.get(activePlace) : undefined;
@@ -394,41 +426,150 @@ export function RealCorridorMap({
   useEffect(() => {
     setPinnedPlace(null);
     setShowCorridorDetails(false);
+    setDisambiguate(null);
   }, [filters.year, filters.month, filters.stablecoin, filters.regionFrom, filters.regionTo, mode]);
 
   useEffect(() => {
-    if (!pinnedPlace) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') closePlace();
+      if (e.key !== 'Escape') return;
+      if (fullscreen) setFullscreen(false);
+      else if (pinnedPlace) closePlace();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [pinnedPlace]);
+  }, [pinnedPlace, fullscreen]);
 
-  if (!worldData) {
+  const features = useMemo(() => {
+    if (!worldData) return [];
+    const geojson = feature(worldData, worldData.objects.countries) as GeoJSON.FeatureCollection;
+    return filterMapFeatures(geojson.features, hideAntarctica);
+  }, [worldData, hideAntarctica]);
+
+  const projection = useMemo(() => {
+    if (!worldData) return null;
+    return worldMapProjection(
+      { type: 'FeatureCollection', features },
+      { scale: projectionScale, hideAntarctica },
+    );
+  }, [worldData, features, projectionScale, hideAntarctica]);
+
+  const flyToPlace = (code: string, nextZoom: number) => {
+    if (!projection) return;
+    const coords = centroids[code] ?? regionCentroids[code];
+    if (!coords) return;
+    const point = projection(coords);
+    if (!point) return;
+    flyTo(point[0], point[1], nextZoom);
+  };
+
+  useEffect(() => {
+    const onFocus = (e: Event) => {
+      const detail = (e as CustomEvent<MapFocusCountryDetail>).detail;
+      const alpha = detail?.isoAlpha2;
+      if (!alpha || mode === 'region') return;
+      setPinnedPlace(alpha);
+      setHoveredPlace(alpha);
+      setShowCorridorDetails(false);
+      setSeenHover(true);
+      setDisambiguate(null);
+      if (!projection) return;
+      const coords = countryCentroidMap[alpha];
+      if (!coords) return;
+      const point = projection(coords);
+      if (point) flyTo(point[0], point[1], compact ? 3.4 : 2.6);
+    };
+    window.addEventListener(MAP_FOCUS_COUNTRY, onFocus);
+    return () => window.removeEventListener(MAP_FOCUS_COUNTRY, onFocus);
+  }, [mode, projection, countryCentroidMap, compact, flyTo]);
+
+  useEffect(() => {
+    if (!focusPlace || mode === 'region' || !projection) return;
+    setPinnedPlace(focusPlace);
+    setHoveredPlace(focusPlace);
+    setShowCorridorDetails(false);
+    setSeenHover(true);
+    setDisambiguate(null);
+    const coords = countryCentroidMap[focusPlace];
+    if (!coords) return;
+    const point = projection(coords);
+    if (point) flyTo(point[0], point[1], compact ? 3.4 : 2.6);
+  }, [focusPlace, focusNonce, mode, projection, countryCentroidMap, compact, flyTo]);
+
+  const selectableIds = useMemo(() => {
+    const ids = new Set<string>();
+    if (mode === 'region') {
+      for (const id of spokeIds) ids.add(id);
+      for (const r of regionalAdoption) ids.add(r.region);
+      return ids;
+    }
+    for (const c of countries) {
+      if (c.isoAlpha2) ids.add(c.isoAlpha2);
+    }
+    for (const id of spokeIds) ids.add(id);
+    return ids;
+  }, [mode, spokeIds, countries, regionalAdoption]);
+
+  const hitPlaces = useMemo(() => {
+    if (!projection) return [];
+    const places: { id: string; x: number; y: number }[] = [];
+    for (const id of selectableIds) {
+      const coords = centroids[id];
+      if (!coords) continue;
+      const point = projection(coords);
+      if (!point) continue;
+      places.push({ id, x: point[0], y: point[1] });
+    }
+    return places;
+  }, [selectableIds, centroids, projection]);
+
+  if (!worldData || !projection) {
     return (
-      <div className="bg-slate-900 rounded-xl border border-slate-700/50 p-8 flex items-center justify-center h-[200px] sm:h-[340px]">
+      <div className="bg-slate-900 rounded-xl border border-slate-700/50 p-8 flex items-center justify-center h-[min(58dvh,22rem)] lg:h-[340px]">
         <div className="text-slate-400">Loading world map...</div>
       </div>
     );
   }
 
-  const geojson = feature(worldData, worldData.objects.countries) as GeoJSON.FeatureCollection;
-  const features = filterMapFeatures(geojson.features, hideAntarctica);
-  const projection = worldMapProjection(
-    { type: 'FeatureCollection', features },
-    { scale: projectionScale, hideAntarctica },
-  );
   const pathGenerator = geoPath().projection(projection);
 
   const handleCorridorHover = (_e: React.MouseEvent, index: number) => {
-    if (isDragging) return;
+    if (isDragging || !hoverEnabled) return;
     setHoveredCorridor(index);
   };
 
   const handleCorridorClick = (index: number) => {
     if (draggedRef.current) return;
     setSelectedCorridor(index);
+  };
+
+  const activateAt = (clientX: number, clientY: number, target: EventTarget | null) => {
+    if (draggedRef.current || pinchActiveRef.current) return;
+    const svg = svgRef.current;
+    if (!svg) return;
+    const hits = nearestPlaces(svg, clientX, clientY, hitPlaces);
+    const decision = resolveMapActivate({
+      zoom,
+      pathId: placeIdFromTarget(target),
+      hits,
+      selectable: selectableIds,
+    });
+    if (decision.type === 'disambiguate') {
+      const stage = svg.getBoundingClientRect();
+      setDisambiguate({
+        items: decision.ids.map((id) => ({
+          id,
+          label: mode === 'country' ? (adoptionByAlpha2.get(id)?.name ?? getLabel(id)) : id,
+        })),
+        x: clientX - stage.left,
+        y: clientY - stage.top,
+      });
+      return;
+    }
+    if (decision.type === 'pin') {
+      pinPlace(decision.id);
+      return;
+    }
+    closePlace();
   };
 
   const hoveredData = hoveredCorridor !== null ? displayItems[hoveredCorridor] : null;
@@ -441,45 +582,81 @@ export function RealCorridorMap({
     { label: 'Peak', width: 5, color: '#f5c14a' },
   ];
 
+  const inspector = countrySpokeHover && pinned && activePlace ? (
+    <UsageInspector
+      mode={mode}
+      activePlace={activePlace}
+      hoveredMetric={hoveredMetric}
+      hoveredRegion={hoveredRegion}
+      corridorCaption={corridorCaption}
+      corridorTotals={corridorTotals}
+      hoveredSpokeCount={hoveredSpokeCount}
+      activeCorridors={activeCorridors}
+      showCorridorDetails={showCorridorDetails}
+      setShowCorridorDetails={setShowCorridorDetails}
+      formatValue={formatValue}
+      getLabel={getLabel}
+      goToCountry={goToCountry}
+      closePlace={closePlace}
+    />
+  ) : null;
+
   return (
     <div className="relative space-y-3">
-      <div className="bg-white dark:bg-neutral-800 rounded-xl border border-slate-200/50 dark:border-neutral-700 overflow-hidden transition-ui">
-        <div className="relative px-5 py-3 bg-[#F7FAFC] dark:bg-neutral-900">
-          {countrySpokeHover && !seenHover && !activePlace && (
-            <div className="absolute top-4 left-4 z-20 pointer-events-none text-[11px] font-medium text-slate-500 dark:text-slate-400">
-              Hover a country — click to select
-            </div>
-          )}
-          {countrySpokeHover && !pinned && activePlace && (
-            <div className="absolute top-4 left-4 z-20 pointer-events-none max-w-[min(94%,22rem)]">
-              <div className="rounded-lg bg-neutral-950/90 dark:bg-neutral-950/92 border border-white/15 px-3 py-2 text-xs text-white">
-                <div className="flex items-center gap-2 min-w-0">
-                  {mode === 'country' && (
-                    <CountryFlag isoAlpha2={hoveredMetric?.isoAlpha2 ?? activePlace} className="w-4 h-4 shrink-0" />
-                  )}
-                  <span className="font-semibold truncate">
-                    {mode === 'country' ? (hoveredMetric?.name ?? getLabel(activePlace)) : activePlace}
-                  </span>
-                </div>
-                <div className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[11px] text-white/70 tabular-nums">
-                  {mode === 'country' && hoveredMetric?.relativeAdoptionIndex != null && (
-                    <span>
-                      #{hoveredMetric.adoptionRank} · {fmtPct(hoveredMetric.gdpIntensity)} of GDP
+      <MapStageFrame fullscreen={fullscreen}>
+          <div className="absolute top-3 left-3 z-20 flex flex-col gap-1.5 items-start max-w-[min(94%,22rem)]">
+            <MapFindButton />
+            {mode === 'country' && (
+              <MapRegionJumps onJump={(id) => flyToPlace(id, compact ? 2.3 : 2)} />
+            )}
+            {countrySpokeHover && !seenHover && !activePlace && (
+              <div className="pointer-events-none text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                {hoverEnabled ? 'Hover a country — click to select' : 'Tap a country'}
+              </div>
+            )}
+            {countrySpokeHover && hoverEnabled && !pinned && activePlace && (
+              <div className="pointer-events-none">
+                <div className="rounded-lg bg-neutral-950/90 dark:bg-neutral-950/92 border border-white/15 px-3 py-2 text-xs text-white">
+                  <div className="flex items-center gap-2 min-w-0">
+                    {mode === 'country' && (
+                      <CountryFlag isoAlpha2={hoveredMetric?.isoAlpha2 ?? activePlace} className="w-4 h-4 shrink-0" />
+                    )}
+                    <span className="font-semibold truncate">
+                      {mode === 'country' ? (hoveredMetric?.name ?? getLabel(activePlace)) : activePlace}
                     </span>
-                  )}
-                  {mode === 'country' && hoveredMetric && hoveredMetric.relativeAdoptionIndex == null && (
-                    <span>Not ranked</span>
-                  )}
-                  {mode === 'region' && hoveredRegion && (
-                    <span>{fmtWallets(hoveredRegion.activeWallets)} wallets</span>
-                  )}
-                  <span>{corridorCaption}</span>
+                  </div>
+                  <div className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[11px] text-white/70 tabular-nums">
+                    {mode === 'country' && hoveredMetric?.relativeAdoptionIndex != null && (
+                      <span>
+                        #{hoveredMetric.adoptionRank} · {fmtPct(hoveredMetric.gdpIntensity)} of GDP
+                      </span>
+                    )}
+                    {mode === 'country' && hoveredMetric && hoveredMetric.relativeAdoptionIndex == null && (
+                      <span>Not ranked</span>
+                    )}
+                    {mode === 'region' && hoveredRegion && (
+                      <span>{fmtWallets(hoveredRegion.activeWallets)} wallets</span>
+                    )}
+                    <span>{corridorCaption}</span>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
+          </div>
+          {disambiguate && (
+            <MapDisambiguateList
+              items={disambiguate.items}
+              x={disambiguate.x}
+              y={disambiguate.y}
+              onPick={(id) => {
+                pinPlace(id);
+                flyToPlace(id, Math.max(zoom, 2.8));
+              }}
+              onDismiss={() => setDisambiguate(null)}
+            />
           )}
-          {/* Legend — bottom-left, opposite zoom controls */}
-          <div className="absolute bottom-4 left-4 z-10 bg-white/90 dark:bg-neutral-800/90 backdrop-blur-sm border border-slate-200/60 dark:border-neutral-700 rounded-lg p-2.5 shadow-md space-y-2.5 max-w-[13.5rem]">
+          <div className="absolute bottom-[max(1rem,env(safe-area-inset-bottom))] left-3 sm:left-4 z-10">
+            <MapLegendFold title={mode === 'region' ? 'GDP intensity' : 'Rank · Volume'}>
             {showAdoption && (
               <div>
                 <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1.5 uppercase tracking-wide">
@@ -522,48 +699,31 @@ export function RealCorridorMap({
                 <span className="text-[10px] text-slate-500 dark:text-slate-400">{formatValue(maxVolume)}</span>
               </div>
             </div>
+            </MapLegendFold>
           </div>
 
-          <div className="absolute bottom-4 right-4 flex flex-col gap-1 z-10">
-            <button
-              type="button"
-              onClick={zoomIn}
-              disabled={zoom >= maxZoom}
-              aria-label="Zoom in"
-              className="w-8 h-8 flex items-center justify-center rounded-md bg-white dark:bg-neutral-800 border border-slate-200/50 dark:border-neutral-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-neutral-700 disabled:opacity-40 disabled:cursor-not-allowed transition-ui"
-            >
-              <Plus className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              onClick={zoomOut}
-              disabled={zoom <= minZoom}
-              aria-label="Zoom out"
-              className="w-8 h-8 flex items-center justify-center rounded-md bg-white dark:bg-neutral-800 border border-slate-200/50 dark:border-neutral-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-neutral-700 disabled:opacity-40 disabled:cursor-not-allowed transition-ui"
-            >
-              <Minus className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              onClick={handleReset}
-              disabled={zoom <= minZoom}
-              aria-label="Reset map view"
-              title="Reset map view"
-              className="w-8 h-8 flex items-center justify-center rounded-md bg-white dark:bg-neutral-800 border border-slate-200/50 dark:border-neutral-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-neutral-700 disabled:opacity-40 disabled:cursor-not-allowed transition-ui"
-            >
-              <RotateCcw className="w-4 h-4" />
-            </button>
-          </div>
+          <MapZoomCluster
+            zoom={zoom}
+            minZoom={minZoom}
+            maxZoom={maxZoom}
+            onZoomIn={zoomIn}
+            onZoomOut={zoomOut}
+            onReset={handleReset}
+            fullscreen={fullscreen}
+            onToggleFullscreen={() => setFullscreen((v) => !v)}
+          />
           <svg
-            ref={svgRef}
+            ref={setSvgRef}
             viewBox={viewBox}
-            className={`w-full aspect-[8/3] ${zoom > minZoom ? (isDragging ? 'cursor-grabbing' : 'cursor-grab') : ''}`}
-            onMouseDown={handleMouseDown}
-            onMouseMove={handlePanMove}
-            onMouseUp={endDrag}
+            className={`${fullscreen ? MAP_SVG_FULLSCREEN_CLASS : MAP_SVG_CLASS} ${zoom > minZoom ? (isDragging ? 'cursor-grabbing' : 'cursor-grab') : ''}`}
+            {...svgListeners}
+            onPointerUp={(e) => {
+              svgListeners.onPointerUp(e);
+              if (e.button !== 0 && e.pointerType === 'mouse') return;
+              activateAt(e.clientX, e.clientY, e.target);
+            }}
             onMouseLeave={() => {
-              endDrag();
-              if (countrySpokeHover && !pinnedPlace) {
+              if (countrySpokeHover && hoverEnabled && !pinnedPlace) {
                 if (dismissTimeoutRef.current) clearTimeout(dismissTimeoutRef.current);
                 setHoveredPlace(null);
               }
@@ -583,10 +743,6 @@ export function RealCorridorMap({
               width={MAP_VIEW_W}
               height={MAP_VIEW_H}
               className="fill-[#F7FAFC] dark:fill-neutral-900"
-              onClick={() => {
-                if (draggedRef.current) return;
-                closePlace();
-              }}
             />
 
             {features.map((geo: any, i: number) => {
@@ -639,6 +795,7 @@ export function RealCorridorMap({
                 <path
                   key={i}
                   d={pathData}
+                  data-place={interactive && hoverKey ? hoverKey : undefined}
                   fill={fill}
                   stroke={stroke}
                   strokeWidth={strokeWidth}
@@ -646,14 +803,6 @@ export function RealCorridorMap({
                   className={interactive ? 'cursor-pointer transition-[fill,opacity,stroke] duration-150' : 'pointer-events-none'}
                   onMouseEnter={interactive && hoverKey ? () => enterPlace(hoverKey) : undefined}
                   onMouseLeave={interactive ? leavePlace : undefined}
-                  onClick={
-                    interactive && hoverKey
-                      ? () => {
-                          if (draggedRef.current) return;
-                          pinPlace(hoverKey);
-                        }
-                      : undefined
-                  }
                 />
               );
             })}
@@ -702,8 +851,8 @@ export function RealCorridorMap({
                   onMouseEnter={countrySpokeHover ? undefined : (e) => handleCorridorHover(e, index)}
                   onMouseLeave={countrySpokeHover ? undefined : scheduleDismiss}
                   onClick={countrySpokeHover ? undefined : () => handleCorridorClick(index)}
-                  className={`${countrySpokeHover ? 'pointer-events-none' : 'cursor-pointer'} animate-map-draw transition-[stroke-width,opacity] duration-150`}
-                  filter={lit ? 'url(#corridor-glow)' : undefined}
+                  className={`${countrySpokeHover ? 'pointer-events-none' : 'cursor-pointer'} ${compact ? '' : 'animate-map-draw'} transition-[stroke-width,opacity] duration-150`}
+                  filter={lit && !compact ? 'url(#corridor-glow)' : undefined}
                   strokeLinecap="round"
                   style={{ strokeDasharray: 1, strokeDashoffset: 1 }}
                 />
@@ -720,16 +869,9 @@ export function RealCorridorMap({
                 return (
                   <g
                     key={code}
+                    data-place={countrySpokeHover && hasSpokes ? code : undefined}
                     onMouseEnter={countrySpokeHover && hasSpokes ? () => enterPlace(code) : undefined}
                     onMouseLeave={countrySpokeHover ? leavePlace : undefined}
-                    onClick={
-                      countrySpokeHover && hasSpokes
-                        ? () => {
-                            if (draggedRef.current) return;
-                            pinPlace(code);
-                          }
-                        : undefined
-                    }
                     className={countrySpokeHover && hasSpokes ? 'cursor-pointer' : undefined}
                   >
                     {countrySpokeHover && hasSpokes && (
@@ -774,7 +916,7 @@ export function RealCorridorMap({
               );
             })}
 
-            {countrySpokeHover && pinned && activePlace && displayItems
+            {countrySpokeHover && pinned && !compact && activePlace && displayItems
               .filter((corridor) => corridor.id1 === activePlace || corridor.id2 === activePlace)
               .sort((a, b) => b.totalValue - a.totalValue)
               .slice(0, 5)
@@ -827,7 +969,7 @@ export function RealCorridorMap({
               );
             })}
           </svg>
-          {countrySpokeHover && pinned && (
+          {countrySpokeHover && pinned && !compact && (
             <button
               type="button"
               onClick={scrollToInspector}
@@ -837,204 +979,27 @@ export function RealCorridorMap({
               <ChevronDown className="w-3.5 h-3.5" aria-hidden />
             </button>
           )}
-        </div>
-      </div>
+      </MapStageFrame>
 
-      {countrySpokeHover && pinned && activePlace && (
+      {compact ? (
+        <MapInspectorSheet
+          open={Boolean(countrySpokeHover && pinned && activePlace)}
+          onOpenChange={(open) => {
+            if (!open) closePlace();
+          }}
+          title={mode === 'country' ? (hoveredMetric?.name ?? (activePlace ? getLabel(activePlace) : 'Country')) : (activePlace ?? 'Region')}
+        >
+          {inspector}
+        </MapInspectorSheet>
+      ) : (
+        inspector && (
         <div
           ref={inspectorRef}
           className="bg-white dark:bg-neutral-800 rounded-xl border border-slate-200/50 dark:border-neutral-700 overflow-hidden"
         >
-          <div className="bg-[var(--brand)]/10 dark:bg-[var(--brand)]/15 px-4 py-2 border-b border-slate-200 dark:border-neutral-700">
-            <h3 className="font-bold text-[var(--brand-700)] dark:text-[var(--brand-300)] text-lg flex items-center gap-2">
-              {mode === 'country' && (
-                <CountryFlag isoAlpha2={hoveredMetric?.isoAlpha2 ?? activePlace} className="w-5 h-5" />
-              )}
-              {mode === 'country' ? (hoveredMetric?.name ?? getLabel(activePlace)) : activePlace}
-            </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              {[
-                mode === 'country' ? hoveredMetric?.region : `${hoveredRegion?.countryCount ?? '—'} countries`,
-                corridorCaption,
-              ]
-                .filter(Boolean)
-                .join(' · ')}
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-slate-200 dark:divide-neutral-700">
-            <div className="px-4 py-3 space-y-4">
-              <div>
-                <div className="text-xs font-semibold text-[var(--brand-700)] dark:text-[var(--brand-300)] italic mb-2">Economic integration</div>
-                <div className="space-y-2 text-xs">
-                  {mode === 'country' && hoveredMetric ? (
-                    <div className="flex justify-between items-center gap-3">
-                      <span className="text-slate-500 dark:text-slate-400">Stablecoin TX value share</span>
-                      <span className="text-slate-800 dark:text-slate-100 font-bold text-base tabular-nums">{fmtPct(hoveredMetric.txValueShare)}</span>
-                    </div>
-                  ) : hoveredRegion ? (
-                    <div className="flex justify-between items-center gap-3">
-                      <span className="text-slate-500 dark:text-slate-400">Stablecoin TX value share</span>
-                      <span className="text-slate-800 dark:text-slate-100 font-bold text-base tabular-nums">{fmtPct(hoveredRegion.txValueShare)}</span>
-                    </div>
-                  ) : null}
-                  {hoveredSpokeCount > 0 && (
-                    <>
-                      <div className="flex justify-between items-center gap-3">
-                        <span className="text-slate-500 dark:text-slate-400">Outbound corridor volume</span>
-                        <span className="text-slate-800 dark:text-slate-100 font-semibold tabular-nums">{formatValue(corridorTotals.outbound)}</span>
-                      </div>
-                      <div className="flex justify-between items-center gap-3">
-                        <span className="text-slate-500 dark:text-slate-400">Inbound corridor volume</span>
-                        <span className="text-slate-800 dark:text-slate-100 font-semibold tabular-nums">{formatValue(corridorTotals.inbound)}</span>
-                      </div>
-                      {corridorTotals.usdShare != null && (
-                        <div className="flex justify-between items-center gap-3">
-                          <span className="text-slate-500 dark:text-slate-400">USD-referenced share</span>
-                          <span className="text-slate-800 dark:text-slate-100 font-semibold tabular-nums">{fmtPct(corridorTotals.usdShare)}</span>
-                        </div>
-                      )}
-                    </>
-                  )}
-                  {mode === 'country' && hoveredMetric?.relativeAdoptionIndex != null && (
-                    <>
-                      <div className="flex justify-between items-center gap-3 pt-1">
-                        <span className="text-slate-500 dark:text-slate-400">GDP intensity (rank)</span>
-                        <span className="text-slate-800 dark:text-slate-100 font-semibold tabular-nums">
-                          #{hoveredMetric.adoptionRank}
-                          <span className="text-slate-500 dark:text-slate-400 text-xs font-normal"> of {hoveredMetric.eligibleCountries}</span>
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center gap-3">
-                        <span className="text-slate-500 dark:text-slate-400">Outbound vs GDP</span>
-                        <span className="text-slate-800 dark:text-slate-100 font-semibold tabular-nums">{fmtPct(hoveredMetric.gdpIntensity)}</span>
-                      </div>
-                      <div className="flex justify-between items-center gap-3">
-                        <span className="text-slate-500 dark:text-slate-400">Wallets holding stablecoins</span>
-                        <span className="text-slate-800 dark:text-slate-100 font-semibold tabular-nums">{fmtWallets(hoveredMetric.activeWallets)}</span>
-                      </div>
-                    </>
-                  )}
-                  {mode === 'region' && hoveredRegion && (
-                    <>
-                      <div className="flex justify-between items-center gap-3 pt-1">
-                        <span className="text-slate-500 dark:text-slate-400">Outbound vs GDP</span>
-                        <span className="text-slate-800 dark:text-slate-100 font-semibold tabular-nums">{fmtPct(hoveredRegion.adoptionRate)}</span>
-                      </div>
-                      <div className="flex justify-between items-center gap-3">
-                        <span className="text-slate-500 dark:text-slate-400">Wallets holding stablecoins</span>
-                        <span className="text-slate-800 dark:text-slate-100 font-semibold tabular-nums">{fmtWallets(hoveredRegion.activeWallets)}</span>
-                      </div>
-                    </>
-                  )}
-                  {mode === 'country' && hoveredMetric && hoveredMetric.relativeAdoptionIndex == null && (
-                    <p className="text-slate-500 dark:text-slate-400 italic">
-                      Not ranked — no outbound corridors in this period, or no GDP
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className="px-4 py-3">
-              <div className="text-xs font-semibold text-[var(--brand-700)] dark:text-[var(--brand-300)] italic mb-2">Corridors</div>
-              {activeCorridors.length === 0 ? (
-                <p className="text-xs text-slate-500 dark:text-slate-400 italic">No international corridors</p>
-              ) : (
-                <div className="max-h-56 overflow-y-auto pr-1">
-                  {activeCorridors.map((row) => (
-                    <div
-                      key={row.partner}
-                      className="flex items-start justify-between gap-3 py-1.5 border-b border-slate-100 dark:border-neutral-700/80 last:border-b-0"
-                    >
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        {mode === 'country' && <CountryFlag isoAlpha2={row.partner} className="w-4 h-3 rounded-sm shrink-0" />}
-                        <span className="text-xs font-medium text-slate-800 dark:text-slate-100 truncate">{getLabel(row.partner)}</span>
-                      </div>
-                      <div className="text-right shrink-0 tabular-nums">
-                        <div className="text-xs font-semibold text-slate-800 dark:text-slate-100">{formatValue(row.totalValue)}</div>
-                        <div className="text-[10px] text-slate-500 dark:text-slate-400">
-                          → {formatValue(row.outbound)} · ← {formatValue(row.inbound)}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {showCorridorDetails && activeCorridors.length > 0 && (
-            <div className="border-t border-slate-200 dark:border-neutral-700 overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="border-b border-slate-200 dark:border-neutral-700 bg-slate-50/80 dark:bg-neutral-900/60 text-slate-500 dark:text-slate-400">
-                    <th className="px-3 py-2 text-left font-medium">Partner</th>
-                    <th className="px-3 py-2 text-right font-medium">Total</th>
-                    <th className="px-3 py-2 text-right font-medium">Outbound</th>
-                    <th className="px-3 py-2 text-right font-medium">Inbound</th>
-                    <th className="px-3 py-2 text-right font-medium">USD share</th>
-                    <th className="px-3 py-2 text-left font-medium">Outbound coins</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {activeCorridors.map((row) => (
-                    <tr key={`detail-${row.partner}`} className="border-b border-slate-100 dark:border-neutral-700/80 last:border-b-0">
-                      <td className="px-3 py-2">
-                        <span className="inline-flex items-center gap-1.5 text-slate-800 dark:text-slate-100 font-medium">
-                          {mode === 'country' && <CountryFlag isoAlpha2={row.partner} className="w-4 h-3 rounded-sm" />}
-                          {getLabel(row.partner)}
-                        </span>
-                      </td>
-                      <td className="px-3 py-2 text-right tabular-nums font-semibold text-slate-800 dark:text-slate-100">{formatValue(row.totalValue)}</td>
-                      <td className="px-3 py-2 text-right tabular-nums text-slate-700 dark:text-slate-200">{formatValue(row.outbound)}</td>
-                      <td className="px-3 py-2 text-right tabular-nums text-slate-700 dark:text-slate-200">{formatValue(row.inbound)}</td>
-                      <td className="px-3 py-2 text-right tabular-nums text-slate-700 dark:text-slate-200">{fmtPct(row.dollarizationIndex)}</td>
-                      <td className="px-3 py-2 text-slate-500 dark:text-slate-400">{coinSummary(row.outboundCoins)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          <div className="px-4 py-2 border-t border-slate-200 dark:border-neutral-700 flex items-center gap-2 flex-wrap justify-end">
-            {mode === 'country' && (
-              <button
-                type="button"
-                onClick={() => {
-                  goToCountry({
-                    countryId: hoveredMetric?.countryId ?? activePlace,
-                    name: hoveredMetric?.name ?? getLabel(activePlace),
-                    isoAlpha2: hoveredMetric?.isoAlpha2 ?? activePlace,
-                  });
-                }}
-                className="px-3 py-1.5 text-xs font-semibold rounded-md text-white bg-[var(--brand)] hover:bg-[var(--brand-700)] transition-colors"
-              >
-                Details
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => setShowCorridorDetails((v) => !v)}
-              disabled={activeCorridors.length === 0}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-md border transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
-                showCorridorDetails
-                  ? 'border-[var(--brand)] text-[var(--brand)] bg-[var(--brand)]/10'
-                  : 'border-slate-300 dark:border-neutral-600 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-neutral-700'
-              }`}
-            >
-              Corridor details
-            </button>
-            <button
-              type="button"
-              onClick={closePlace}
-              className="px-3 py-1.5 text-xs font-semibold rounded-md text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-neutral-700 transition-colors"
-            >
-              Close
-            </button>
-          </div>
+          {inspector}
         </div>
+        )
       )}
 
       {hoveredData && !countrySpokeHover && (

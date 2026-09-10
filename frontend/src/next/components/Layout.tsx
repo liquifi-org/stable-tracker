@@ -3,7 +3,7 @@ import { Link, useLocation, useOutlet } from 'react-router';
 import { AnimatePresence, motion } from 'motion/react';
 import { Moon, Sun, Mail, Home, Github, Search, FileText } from 'lucide-react';
 import { FilterProvider } from '../../app/context/FilterContext';
-import { FilterPanel } from './FilterPanel';
+import { FilterPanel, MobileFilterBar } from './FilterPanel';
 import { Footer } from './Footer';
 import { CountryCommandPalette } from '../../app/components/CountryCommandPalette';
 import { usePrefersReducedMotion } from '../../app/hooks/usePrefersReducedMotion';
@@ -114,11 +114,11 @@ function LayoutBody({ isDark, toggle }: { isDark: boolean; toggle: () => void })
               <button
                 type="button"
                 onClick={() => window.dispatchEvent(new Event('open-country-search'))}
-                className="hidden md:inline-flex items-center gap-2 h-8 px-3 rounded-full border border-white/15 bg-white/5 text-white/80 hover:bg-white/10 hover:text-white text-xs transition-ui"
+                className="inline-flex items-center gap-2 h-8 px-2.5 sm:px-3 rounded-full border border-white/15 bg-white/5 text-white/80 hover:bg-white/10 hover:text-white text-xs transition-ui"
                 aria-label="Search countries"
               >
                 <Search className="h-3.5 w-3.5" />
-                <kbd className="font-sans text-[10px] text-white/50 border border-white/15 rounded px-1">⌘K</kbd>
+                <kbd className="hidden sm:inline font-sans text-[10px] text-white/50 border border-white/15 rounded px-1">⌘K</kbd>
               </button>
               <button
                 type="button"
@@ -131,9 +131,10 @@ function LayoutBody({ isDark, toggle }: { isDark: boolean; toggle: () => void })
             </div>
           </div>
         </header>
+        {showFilters && <MobileFilterBar />}
       </div>
       <div className="flex flex-col lg:flex-row flex-1 w-full min-w-0">
-        <main className="flex-1 px-5 sm:px-8 py-8 min-w-0">
+        <main className="flex-1 px-5 sm:px-8 py-6 sm:py-8 min-w-0">
           <AnimatedOutlet />
         </main>
         {showFilters && <FilterPanel />}

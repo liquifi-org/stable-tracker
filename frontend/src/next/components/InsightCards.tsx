@@ -1,9 +1,11 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Wallet, ArrowLeftRight, Percent, DollarSign } from 'lucide-react';
 import { TrendBadge } from '../../app/components/TrendBadge';
 import { AnimatedNumber } from '../../app/components/AnimatedNumber';
 import { Skeleton } from '../../app/components/ui/skeleton';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '../../app/components/ui/hover-card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../app/components/ui/dialog';
+import { useFinePointer } from '../../app/hooks/useMediaQuery';
 import { fmtPct } from '../lib/format';
 
 export interface InsightBreakdownRow {
@@ -137,10 +139,19 @@ function InsightCard({
   detail: string;
   breakdown: InsightBreakdown | null;
 }) {
+  const fine = useFinePointer();
+  const [open, setOpen] = useState(false);
+
   const card = (
     <button
       type="button"
-      onClick={onClick}
+      onClick={() => {
+        if (!fine && breakdown) {
+          setOpen(true);
+          return;
+        }
+        onClick();
+      }}
       className="surface p-5 text-left w-full transition-ui hover:border-[var(--brand)]/40"
     >
       <div className="flex items-center justify-between gap-2 mb-3">
@@ -160,6 +171,22 @@ function InsightCard({
   );
 
   if (loading || !breakdown) return card;
+
+  if (!fine) {
+    return (
+      <>
+        {card}
+        <Dialog open={open} onOpenChange={setOpen}>
+          <DialogContent className="bg-[var(--paper-raised)] text-[var(--ink-text)] border-[var(--hairline)]">
+            <DialogHeader>
+              <DialogTitle className="text-base">{kicker}</DialogTitle>
+            </DialogHeader>
+            <BreakdownPanel breakdown={breakdown} />
+          </DialogContent>
+        </Dialog>
+      </>
+    );
+  }
 
   return (
     <HoverCard openDelay={250} closeDelay={80}>

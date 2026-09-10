@@ -3,6 +3,7 @@ import { useFilters, MAX_YEAR, maxMonthForYear, MONTHS } from '../../app/context
 import { api } from '../../app/services/api';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { Filter, X } from 'lucide-react';
+import { OPEN_FILTERS, openFilters } from '../../app/lib/mapEvents';
 import { FilterSelect } from '../../app/components/FilterSelect';
 
 /** Matches backend WorldRegion values. */
@@ -43,6 +44,12 @@ export function FilterPanel() {
   const showCorridorFilters = mapType !== 'regulation';
   const [mobileOpen, setMobileOpen] = useState(false);
   const [stablecoinOptions, setStablecoinOptions] = useState<string[]>([]);
+
+  useEffect(() => {
+    const open = () => setMobileOpen(true);
+    window.addEventListener(OPEN_FILTERS, open);
+    return () => window.removeEventListener(OPEN_FILTERS, open);
+  }, []);
 
   useEffect(() => {
     if (!showCorridorFilters) return;
@@ -277,19 +284,6 @@ export function FilterPanel() {
         {filterControls}
       </aside>
 
-      <button
-        type="button"
-        onClick={() => setMobileOpen(true)}
-        aria-label="Open filters"
-        className="lg:hidden fixed bottom-5 left-5 z-40 h-14 w-14 rounded-full shadow-lg flex items-center justify-center text-white transition-ui hover:scale-105"
-        style={{ backgroundColor: 'var(--brand)' }}
-      >
-        <Filter className="w-6 h-6" />
-        {hasNonDefaultFilters && (
-          <span className="absolute top-1.5 right-1.5 w-3 h-3 rounded-full bg-red-500 border-2 border-white dark:border-neutral-900" />
-        )}
-      </button>
-
       <DialogPrimitive.Root open={mobileOpen} onOpenChange={setMobileOpen}>
         <DialogPrimitive.Portal>
           <DialogPrimitive.Overlay className="lg:hidden fixed inset-0 z-50 bg-black/50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
@@ -312,5 +306,97 @@ export function FilterPanel() {
         </DialogPrimitive.Portal>
       </DialogPrimitive.Root>
     </>
+  );
+}
+
+export function MobileFilterBar() {
+  const {
+    year,
+    month,
+    referenceAsset,
+    stablecoin,
+    regionFrom,
+    regionTo,
+    mapType,
+    displayCurrency,
+    setYear,
+    setMonth,
+    setReferenceAsset,
+    setStablecoin,
+    setRegionFrom,
+    setRegionTo,
+    setDisplayCurrency,
+  } = useFilters();
+
+  const showCorridorFilters = mapType !== 'regulation';
+  const chips: { key: string; label: string; onClear: () => void }[] = [];
+  if (year !== MAX_YEAR || month !== maxMonthForYear(MAX_YEAR)) {
+    chips.push({
+      key: 'period',
+      label: `${MONTHS[month - 1]} ${year}`,
+      onClear: () => {
+        setYear(MAX_YEAR);
+        setMonth(maxMonthForYear(MAX_YEAR));
+      },
+    });
+  } else {
+    chips.push({
+      key: 'period-default',
+      label: `${MONTHS[month - 1]} ${year}`,
+      onClear: () => {},
+    });
+  }
+  if (displayCurrency !== 'USD') {
+    chips.push({ key: 'fx', label: displayCurrency, onClear: () => setDisplayCurrency('USD') });
+  }
+  if (showCorridorFilters && referenceAsset !== 'All') {
+    chips.push({ key: 'asset', label: referenceAsset, onClear: () => setReferenceAsset('All') });
+  }
+  if (showCorridorFilters && stablecoin !== 'All') {
+    chips.push({ key: 'coin', label: stablecoin, onClear: () => setStablecoin('All') });
+  }
+  if (showCorridorFilters && regionFrom !== 'All') {
+    chips.push({ key: 'from', label: `From ${regionFrom}`, onClear: () => setRegionFrom('All') });
+  }
+  if (showCorridorFilters && regionTo !== 'All') {
+    chips.push({ key: 'to', label: `To ${regionTo}`, onClear: () => setRegionTo('All') });
+  }
+
+  const hasNonDefault =
+    year !== MAX_YEAR ||
+    month !== maxMonthForYear(MAX_YEAR) ||
+    referenceAsset !== 'All' ||
+    stablecoin !== 'All' ||
+    regionFrom !== 'All' ||
+    regionTo !== 'All' ||
+    displayCurrency !== 'USD';
+
+  return (
+    <div className="lg:hidden border-t border-white/10 bg-[var(--ink)] px-5 sm:px-8 py-2 flex items-center gap-2">
+      <button
+        type="button"
+        onClick={openFilters}
+        className="relative inline-flex items-center gap-1.5 h-8 px-3 rounded-full border border-white/20 bg-white/10 text-white text-xs font-semibold shrink-0"
+      >
+        <Filter className="w-3.5 h-3.5" />
+        Filters
+        {hasNonDefault && (
+          <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-red-500" />
+        )}
+      </button>
+      <div className="flex gap-1.5 overflow-x-auto min-w-0 [scrollbar-width:none]">
+        {chips.map((chip) => (
+          <button
+            key={chip.key}
+            type="button"
+            onClick={chip.key === 'period-default' ? openFilters : chip.onClear}
+            className="inline-flex items-center gap-1 rounded-full bg-white/10 text-white/85 px-2.5 py-1 text-[11px] font-medium shrink-0"
+          >
+            {chip.label}
+            {chip.key !== 'period-default' && <X className="w-3 h-3" />}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
