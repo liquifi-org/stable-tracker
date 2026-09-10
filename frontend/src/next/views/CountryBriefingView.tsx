@@ -405,7 +405,7 @@ export function CountryBriefingView() {
           />
           <MetricCard
             label="Share of global TX value"
-            hint="This country's outbound TX ÷ global TX."
+            hint="This country's outbound corridors ÷ global corridor volume."
             loading={overviewLoading}
             value={overview ? fmtPct(overview.txValueShare) : '—'}
           />
