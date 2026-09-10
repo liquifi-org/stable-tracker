@@ -26,8 +26,6 @@ import { countryPath } from '../../app/lib/countryRoutes';
 type GeoMode = 'country' | 'region';
 type TableKind = 'countries' | 'corridors';
 
-const TOP_NAMED_CORRIDORS = 12;
-
 function pctChange(current: number, previous: number): number | null {
   return previous > 0 ? ((current - previous) / previous) * 100 : null;
 }
@@ -43,11 +41,11 @@ export function OverviewView() {
   const [adoptionLoading, setAdoptionLoading] = useState(false);
   const [regionalData, setRegionalData] = useState<RegionalAdoptionMetric[]>([]);
   const [geoMode, setGeoMode] = useState<GeoMode>('country');
-  const [tableKind, setTableKind] = useState<TableKind>('countries');
-  const [showAllCorridors, setShowAllCorridors] = useState(false);
+  const [tableKind, setTableKind] = useState<TableKind>('corridors');
   const [corridorData, setCorridorData] = useState<CorridorFlow[]>([]);
   const [corridorLoading, setCorridorLoading] = useState(false);
   const [previousCorridorVolume, setPreviousCorridorVolume] = useState<number | null>(null);
+  const [previousCorridorDollarShare, setPreviousCorridorDollarShare] = useState<number | null>(null);
   const [globalInsights, setGlobalInsights] = useState<GlobalInsights | null>(null);
   const [globalInsightsLoading, setGlobalInsightsLoading] = useState(false);
   const [previousGlobalInsights, setPreviousGlobalInsights] = useState<GlobalInsights | null>(null);
@@ -102,18 +100,22 @@ export function OverviewView() {
   }, [filters.year, filters.month, filters.regionFrom, filters.regionTo, filters.stablecoin, filters.referenceAsset]);
 
   useEffect(() => {
-    setShowAllCorridors(false);
-  }, [filters.year, filters.month, filters.regionFrom, filters.regionTo, filters.stablecoin, filters.referenceAsset]);
-
-  useEffect(() => {
     api.getCorridors(previousPeriod.year, previousPeriod.month, {
       regionFrom: filters.regionFrom,
       regionTo: filters.regionTo,
       stablecoinId: filters.stablecoin,
       referenceAsset: filters.referenceAsset,
     })
-      .then((rows) => setPreviousCorridorVolume(rows.reduce((s, f) => s + f.value.amount, 0)))
-      .catch(() => setPreviousCorridorVolume(null));
+      .then((rows) => {
+        const volume = rows.reduce((s, f) => s + f.value.amount, 0);
+        const usd = rows.reduce((s, f) => s + f.value.amount * f.dollarizationIndex, 0);
+        setPreviousCorridorVolume(volume);
+        setPreviousCorridorDollarShare(volume > 0 ? usd / volume : null);
+      })
+      .catch(() => {
+        setPreviousCorridorVolume(null);
+        setPreviousCorridorDollarShare(null);
+      });
   }, [previousPeriod.year, previousPeriod.month, filters.regionFrom, filters.regionTo, filters.stablecoin, filters.referenceAsset]);
 
   useEffect(() => {
@@ -295,9 +297,6 @@ export function OverviewView() {
     return usd / corridorVolume;
   }, [corridorData, corridorVolume]);
 
-  const eligibleCount = adoptionData.find((c) => c.eligibleCountries)?.eligibleCountries
-    ?? adoptionData.filter((c) => c.adoptionRank != null).length;
-
   const remittanceRatio =
     globalInsights && globalInsights.totalRemittancesUsd > 0
       ? corridorVolume / globalInsights.totalRemittancesUsd
@@ -414,6 +413,10 @@ export function OverviewView() {
     remittanceRatio != null && previousRemittanceRatio != null
       ? (remittanceRatio - previousRemittanceRatio) * 100
       : null;
+  const dollarizationTrendPp =
+    corridorDollarShare != null && previousCorridorDollarShare != null
+      ? (corridorDollarShare - previousCorridorDollarShare) * 100
+      : null;
 
   const isUsage = filters.mapType !== 'regulation';
   const usageLoading =
@@ -429,16 +432,12 @@ export function OverviewView() {
         walletsTrend={walletsTrend}
         corridorVolume={corridorVolume}
         corridorTrend={corridorTrend}
-        corridorDollarShare={corridorDollarShare}
+        dollarization={corridorDollarShare}
+        dollarizationTrendPp={dollarizationTrendPp}
         remittanceRatio={remittanceRatio}
         remittanceTrendPp={remittanceTrendPp}
-        liveFrameworks={globalInsights?.liveRegulationCountries}
-        rankedCountries={eligibleCount}
-        activeLens={isUsage ? 'usage' : 'regulation'}
         onSelectUsage={() => filters.setMapType('adoption')}
-        onSelectRegulation={() => filters.setMapType('regulation')}
         formatCurrency={formatCurrency}
-        formatPct={fmtPct}
       />
 
       <div className="flex gap-3 items-center flex-wrap">
@@ -508,9 +507,7 @@ export function OverviewView() {
                   {tableKind === 'corridors'
                     ? geoMode === 'region'
                       ? `${regionalCorridors.length} pairs · domestic not in this data`
-                      : showAllCorridors || bidirectionalCorridors.length <= TOP_NAMED_CORRIDORS
-                        ? `${bidirectionalCorridors.length} pairs · domestic not in this data`
-                        : `Top ${TOP_NAMED_CORRIDORS} of ${bidirectionalCorridors.length} by volume · domestic not in this data`
+                      : `${bidirectionalCorridors.length} pairs · domestic not in this data`
                     : geoMode === 'region'
                       ? `${regionalData.length} regions`
                       : `${adoptionTableData.length} countries · gray on the map is no outbound corridors or no GDP`}
@@ -529,80 +526,66 @@ export function OverviewView() {
             </div>
 
             {tableKind === 'corridors' ? (
-              <>
-              <div
-                className={`divide-y divide-[var(--hairline)]${
-                  showAllCorridors && geoMode === 'country' && bidirectionalCorridors.length > TOP_NAMED_CORRIDORS
-                    ? ' max-h-[28rem] overflow-y-auto pr-1'
-                    : ''
-                }`}
-              >
-                {corridorLoading && bidirectionalCorridors.length === 0 ? (
-                  <Skeleton className="h-40 w-full" />
-                ) : geoMode === 'region' ? (
-                  [...regionalCorridors]
-                    .sort((a, b) => b.totalValue - a.totalValue)
-                    .map((pair) => (
-                      <NamedCorridorRow
-                        key={`${pair.region1}-${pair.region2}`}
-                        left={pair.region1}
-                        right={pair.region2}
-                        volume={pair.totalValue}
-                        leftShare={pair.totalValue > 0 ? pair.valueFromRegion1 / pair.totalValue : 0}
-                        formatVolume={formatCurrency}
-                      />
-                    ))
-                ) : (
-                  (showAllCorridors
-                    ? bidirectionalCorridors
-                    : bidirectionalCorridors.slice(0, TOP_NAMED_CORRIDORS)
-                  ).map((pair) => {
-                    const leftId = alpha2ToNumeric.get(pair.country1);
-                    return (
-                      <NamedCorridorRow
-                        key={`${pair.country1}-${pair.country2}`}
-                        left={countryNameByAlpha2.get(pair.country1) ?? pair.country1}
-                        right={countryNameByAlpha2.get(pair.country2) ?? pair.country2}
-                        leftAlpha={pair.country1}
-                        rightAlpha={pair.country2}
-                        volume={pair.totalValue}
-                        leftShare={pair.totalValue > 0 ? pair.valueFromCountry1 / pair.totalValue : 0}
-                        formatVolume={formatCurrency}
-                        onClick={
-                          leftId
-                            ? () =>
-                                navigate(
-                                  countryPath({
-                                    countryId: leftId,
-                                    name: countryNameByAlpha2.get(pair.country1),
-                                    isoAlpha2: pair.country1,
-                                  }),
-                                  {
-                                    state: {
+              <div className="relative">
+                <div className="named-corridors-scroll max-h-[48rem] overflow-y-auto divide-y divide-[var(--hairline)]">
+                  {corridorLoading && bidirectionalCorridors.length === 0 ? (
+                    <Skeleton className="h-40 w-full" />
+                  ) : geoMode === 'region' ? (
+                    [...regionalCorridors]
+                      .sort((a, b) => b.totalValue - a.totalValue)
+                      .map((pair) => (
+                        <NamedCorridorRow
+                          key={`${pair.region1}-${pair.region2}`}
+                          left={pair.region1}
+                          right={pair.region2}
+                          volume={pair.totalValue}
+                          leftShare={pair.totalValue > 0 ? pair.valueFromRegion1 / pair.totalValue : 0}
+                          formatVolume={formatCurrency}
+                        />
+                      ))
+                  ) : (
+                    bidirectionalCorridors.map((pair) => {
+                      const leftId = alpha2ToNumeric.get(pair.country1);
+                      return (
+                        <NamedCorridorRow
+                          key={`${pair.country1}-${pair.country2}`}
+                          left={countryNameByAlpha2.get(pair.country1) ?? pair.country1}
+                          right={countryNameByAlpha2.get(pair.country2) ?? pair.country2}
+                          leftAlpha={pair.country1}
+                          rightAlpha={pair.country2}
+                          volume={pair.totalValue}
+                          leftShare={pair.totalValue > 0 ? pair.valueFromCountry1 / pair.totalValue : 0}
+                          formatVolume={formatCurrency}
+                          onClick={
+                            leftId
+                              ? () =>
+                                  navigate(
+                                    countryPath({
+                                      countryId: leftId,
                                       name: countryNameByAlpha2.get(pair.country1),
                                       isoAlpha2: pair.country1,
+                                    }),
+                                    {
+                                      state: {
+                                        name: countryNameByAlpha2.get(pair.country1),
+                                        isoAlpha2: pair.country1,
+                                      },
                                     },
-                                  },
-                                )
-                            : undefined
-                        }
-                      />
-                    );
-                  })
+                                  )
+                              : undefined
+                          }
+                        />
+                      );
+                    })
+                  )}
+                </div>
+                {(geoMode === 'region' ? regionalCorridors.length : bidirectionalCorridors.length) > 10 && (
+                  <div
+                    aria-hidden
+                    className="pointer-events-none absolute bottom-0 left-0 right-2.5 h-10 bg-gradient-to-t from-[var(--paper-raised)] to-transparent"
+                  />
                 )}
               </div>
-              {geoMode === 'country' && bidirectionalCorridors.length > TOP_NAMED_CORRIDORS && (
-                <button
-                  type="button"
-                  onClick={() => setShowAllCorridors((open) => !open)}
-                  className="mt-3 text-[13px] font-medium text-[var(--brand-700)] dark:text-[var(--brand-300)] hover:underline"
-                >
-                  {showAllCorridors
-                    ? `Show top ${TOP_NAMED_CORRIDORS}`
-                    : `Show all ${bidirectionalCorridors.length}`}
-                </button>
-              )}
-              </>
             ) : geoMode === 'country' && adoptionTableData.length > 0 ? (
               <DataTable
                 data={adoptionTableData}

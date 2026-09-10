@@ -12,7 +12,7 @@ export const API_KEY = process.env.ALLIUM_API_KEY;
 export const DB_URL = process.env.DB_URL ?? 'mongodb://localhost:27017/sc-tracker';
 
 export const WALLETS_QUERY_ID =
-    process.env.ALLIUM_WALLETS_QUERY_ID ?? 'uxxPD1ol2JLBPnvGoGHZ';
+    process.env.ALLIUM_WALLETS_QUERY_ID ?? 'VsBubvbe7ZyzFNB3xx9Q';
 
 export const CORRIDORS_QUERY_ID =
     process.env.ALLIUM_CORRIDORS_QUERY_ID ?? 'djvIso1YNXUFa34rTjdD';
@@ -23,6 +23,8 @@ export const CORRIDORS_RUN_LIMIT = 100000;
 export const POLL_INTERVAL_MS = 5000;
 /** ~20 min — corridor queries typically finish in 6–10 min. */
 export const MAX_POLLS = 240;
+/** Wallet warehouse runs take ~30 min and previously died at 1800s. */
+export const WALLETS_MAX_POLLS = 720;
 
 export function assertApiKey(): void {
     if (!API_KEY) {
@@ -129,12 +131,13 @@ export async function runAndWait(
     queryId: string,
     parameters: Record<string, unknown> = {},
     limit: number = RUN_LIMIT,
+    maxPolls: number = MAX_POLLS,
 ): Promise<ResultRow[]> {
     console.log(`Triggering Allium query ${queryId}...`);
     const runId = await runQueryAsync(queryId, parameters, limit);
     console.log(`run_id: ${runId}`);
 
-    for (let attempt = 1; attempt <= MAX_POLLS; attempt++) {
+    for (let attempt = 1; attempt <= maxPolls; attempt++) {
         const status = await getRunStatus(runId);
         const lower = status.toLowerCase();
 
@@ -146,10 +149,10 @@ export async function runAndWait(
             throw new Error(`Query run ${runId} ended with status "${status}".`);
         }
 
-        console.log(`status "${status}" (poll ${attempt}/${MAX_POLLS})`);
+        console.log(`status "${status}" (poll ${attempt}/${maxPolls})`);
         await sleep(POLL_INTERVAL_MS);
     }
 
-    throw new Error(`Query run ${runId} did not complete after ${MAX_POLLS} polls.`);
+    throw new Error(`Query run ${runId} did not complete after ${maxPolls} polls.`);
 }
 

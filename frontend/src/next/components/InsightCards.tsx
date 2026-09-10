@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Wallet, ArrowLeftRight, Percent, ShieldCheck } from 'lucide-react';
+import { Wallet, ArrowLeftRight, Percent, DollarSign } from 'lucide-react';
 import { TrendBadge } from '../../app/components/TrendBadge';
 import { AnimatedNumber } from '../../app/components/AnimatedNumber';
 import { Skeleton } from '../../app/components/ui/skeleton';
@@ -12,16 +12,12 @@ export function InsightCards({
   walletsTrend,
   corridorVolume,
   corridorTrend,
-  corridorDollarShare,
+  dollarization,
+  dollarizationTrendPp,
   remittanceRatio,
   remittanceTrendPp,
-  liveFrameworks,
-  rankedCountries,
-  activeLens,
   onSelectUsage,
-  onSelectRegulation,
   formatCurrency,
-  formatPct,
 }: {
   periodLabel: string;
   loading: boolean;
@@ -30,16 +26,12 @@ export function InsightCards({
   walletsTrend: number | null;
   corridorVolume: number;
   corridorTrend: number | null;
-  corridorDollarShare: number | null;
+  dollarization: number | null;
+  dollarizationTrendPp: number | null;
   remittanceRatio: number | null;
   remittanceTrendPp: number | null;
-  liveFrameworks: number | undefined;
-  rankedCountries: number;
-  activeLens: 'usage' | 'regulation';
   onSelectUsage: () => void;
-  onSelectRegulation: () => void;
   formatCurrency: (n: number) => string;
-  formatPct: (n: number) => string;
 }) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
@@ -47,7 +39,6 @@ export function InsightCards({
         kicker="Wallets"
         icon={Wallet}
         loading={loading}
-        active={false}
         onClick={onSelectUsage}
         value={<AnimatedNumber value={wallets} />}
         trend={walletsTrend}
@@ -58,23 +49,17 @@ export function InsightCards({
         kicker="Corridors"
         icon={ArrowLeftRight}
         loading={corridorLoading}
-        active={false}
         onClick={onSelectUsage}
         value={<AnimatedNumber value={corridorLoading ? null : corridorVolume} format={formatCurrency} />}
         trend={corridorTrend}
         trendFormat={(v) => `${v.toFixed(1)}%`}
-        detail={
-          corridorDollarShare != null
-            ? `International pairs · ${formatPct(corridorDollarShare)} USD-referenced`
-            : 'International pairs only · domestic not in this data'
-        }
+        detail={`International pairs only · domestic not in this data`}
       />
       <InsightCard
         kicker="Vs remittances"
         icon={Percent}
         sourceNote="World Bank"
         loading={loading || corridorLoading}
-        active={false}
         onClick={onSelectUsage}
         value={
           <AnimatedNumber
@@ -87,17 +72,20 @@ export function InsightCards({
         detail={`Corridor volume vs official remittances (annual / 12) · ${periodLabel}`}
       />
       <InsightCard
-        kicker="Live rules"
-        icon={ShieldCheck}
-        loading={loading}
-        active={activeLens === 'regulation'}
-        onClick={onSelectRegulation}
-        value={<AnimatedNumber value={liveFrameworks} />}
-        detail={
-          rankedCountries > 0
-            ? `Countries with a live framework · ${rankedCountries} ranked by outbound vs GDP`
-            : 'Stage 3 · not month-dependent'
+        kicker="Dollarization"
+        icon={DollarSign}
+        sourceNote="Allium"
+        loading={corridorLoading}
+        onClick={onSelectUsage}
+        value={
+          <AnimatedNumber
+            value={dollarization != null ? dollarization * 100 : null}
+            format={(n) => `${n.toFixed(1)}%`}
+          />
         }
+        trend={dollarizationTrendPp}
+        trendFormat={(v) => `${v.toFixed(2)}pp`}
+        detail={`USD-referenced share of corridor volume · ${periodLabel}`}
       />
     </div>
   );
@@ -108,7 +96,6 @@ function InsightCard({
   icon: Icon,
   sourceNote,
   loading,
-  active,
   onClick,
   value,
   trend,
@@ -119,7 +106,6 @@ function InsightCard({
   icon: typeof Wallet;
   sourceNote?: string;
   loading: boolean;
-  active: boolean;
   onClick: () => void;
   value: ReactNode;
   trend?: number | null;
@@ -130,10 +116,7 @@ function InsightCard({
     <button
       type="button"
       onClick={onClick}
-      aria-pressed={active}
-      className={`surface p-5 text-left w-full transition-ui hover:border-[var(--brand)]/40 ${
-        active ? 'ring-1 ring-[var(--brand)]/35' : ''
-      }`}
+      className="surface p-5 text-left w-full transition-ui hover:border-[var(--brand)]/40"
     >
       <div className="flex items-center justify-between gap-2 mb-3">
         <span className="kicker inline-flex items-center gap-1.5">
