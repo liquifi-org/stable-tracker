@@ -554,12 +554,7 @@ export function OverviewView() {
     },
     {
       key: 'gdpIntensity',
-      header: (
-        <span className="flex flex-col gap-0.5">
-          Outbound vs GDP
-          <span className="text-[10px] font-normal text-white/60">Corridors ÷ period GDP. Rank if both exist</span>
-        </span>
-      ),
+      header: '% of GDP',
       render: (_: number, row: CountryAdoptionMetric) => (
         <span className="tabular-nums">
           {(row.gdpIntensity ?? 0) > 0 ? fmtPct(row.gdpIntensity) : '—'}
@@ -571,12 +566,7 @@ export function OverviewView() {
     },
     {
       key: 'walletsPer100k',
-      header: (
-        <span className="flex flex-col gap-0.5">
-          Wallets per 100k people
-          <span className="text-[10px] font-normal text-white/60">Wallets ÷ population</span>
-        </span>
-      ),
+      header: 'Wallets per 100k people',
       render: (_: number, row: CountryAdoptionMetric) => (
         <span className="tabular-nums">
           {row.population && row.population > 0 ? fmtPer100k(row.adoptionRate) : '—'}
@@ -603,7 +593,7 @@ export function OverviewView() {
     },
     {
       key: 'stablecoinPctOfRemittances',
-      header: 'Outbound volume vs official remittances',
+      header: '% of official remittances',
       render: (value: number | null) => (value != null ? fmtPct(value) : '—'),
     },
   ];
@@ -618,7 +608,7 @@ export function OverviewView() {
     },
     {
       key: 'adoptionRate',
-      header: 'Outbound vs GDP',
+      header: '% of GDP',
       render: (value: number) => fmtPct(value),
     },
     {
