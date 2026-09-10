@@ -20,7 +20,7 @@ export function ContactView() {
         email: String(data.get('email') ?? ''),
         subject: String(data.get('subject') ?? ''),
         message: String(data.get('message') ?? ''),
-        company: String(data.get('company') ?? ''),
+        hp_website: String(data.get('hp_website') ?? ''),
       });
       setStatus('sent');
       form.reset();
@@ -56,8 +56,16 @@ export function ContactView() {
         ) : (
           <form onSubmit={handleSubmit} className="relative space-y-4">
             <div aria-hidden="true" className="absolute -left-[9999px] h-0 w-0 overflow-hidden">
-              <label htmlFor="company">Company</label>
-              <input id="company" name="company" type="text" tabIndex={-1} autoComplete="off" />
+              <label htmlFor="hp_website">Website</label>
+              <input
+                id="hp_website"
+                name="hp_website"
+                type="text"
+                tabIndex={-1}
+                autoComplete="off"
+                data-lpignore="true"
+                data-1p-ignore="true"
+              />
             </div>
             <div>
               <label htmlFor="name" className="block text-sm text-slate-700 dark:text-slate-300 mb-2 font-medium">
