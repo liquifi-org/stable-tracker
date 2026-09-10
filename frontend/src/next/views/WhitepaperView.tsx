@@ -6,7 +6,12 @@ import { SEO, usePageMeta } from '../lib/seo';
 const VERSION = '1.2';
 const PUBLISHED = '10 September 2026';
 const SITE_URL = 'https://stabletracker.org';
-const CITE = `Stablecoin Tracker. (2026). Whitepaper: measuring stablecoin usage, corridors, and regulation (v${VERSION}). ${SITE_URL}/whitepaper`;
+const AUTHORS = [
+  { name: 'Igor Mikhalev', email: 'im@c20.org' },
+  { name: 'Tatiana Descamps', email: 't.a.descamps@gmail.com' },
+  { name: 'Silke van der Burg', email: 'silkevanderburg@gmail.com' },
+] as const;
+const CITE = `Mikhalev, I., Descamps, T., & van der Burg, S. (2026). Whitepaper: measuring stablecoin usage, corridors, and regulation (v${VERSION}). Stablecoin Tracker. ${SITE_URL}/whitepaper`;
 
 const SECTIONS = [
   { id: 'abstract', label: 'Abstract' },
@@ -82,6 +87,11 @@ export function WhitepaperView() {
       dateModified: '2026-09-10',
       inLanguage: 'en',
       url: `${typeof window !== 'undefined' ? window.location.origin : SITE_URL}/whitepaper`,
+      author: AUTHORS.map((a) => ({
+        '@type': 'Person',
+        name: a.name,
+        email: a.email,
+      })),
       publisher: {
         '@type': 'Organization',
         name: SEO.site,
@@ -126,6 +136,20 @@ export function WhitepaperView() {
             A living methodology for <span className="text-[var(--ink-text)]">stabletracker.org</span>.
             Every headline number on the site is defined here — including what it is not.
           </p>
+          <p className="kicker mt-7 mb-3">Key authors</p>
+          <ul className="space-y-3">
+            {AUTHORS.map((author) => (
+              <li key={author.email}>
+                <p className="font-semibold text-[var(--ink-text)]">{author.name}</p>
+                <a
+                  href={`mailto:${author.email}`}
+                  className="text-sm text-[var(--muted-ink)] hover:text-[var(--brand)] transition-ui"
+                >
+                  {author.email}
+                </a>
+              </li>
+            ))}
+          </ul>
           <div className="whitepaper-chrome mt-6 flex flex-wrap items-center gap-2">
             <button
               type="button"
@@ -641,7 +665,12 @@ export function WhitepaperView() {
             {CITE}
           </blockquote>
           <p className="text-sm text-[var(--muted-ink)]">
-            Contributing organizations: EY, Allium, Stride, FirmShift. Correspondence:{' '}
+            Key authors: {AUTHORS.map((a) => a.name).join(', ')}. Contributing organizations: EY,
+            Allium, Stride, FirmShift. Correspondence:{' '}
+            <a href={`mailto:${AUTHORS[0].email}`} className="underline decoration-[var(--hairline)] hover:decoration-[var(--brand)]">
+              {AUTHORS[0].email}
+            </a>
+            {' · '}
             <Link to="/contact" className="underline decoration-[var(--hairline)] hover:decoration-[var(--brand)]">
               contact
             </Link>
