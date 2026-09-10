@@ -509,6 +509,10 @@ ALLIUM_WALLETS_QUERY_ID=o0VH4UGyeKr55L34qxPG
 
 # Private admin sync endpoints (Plan B). Leave empty to disable (fails closed).
 ADMIN_SYNC_TOKEN=<a-strong-secret>
+
+# Telegram (contact form). Create a bot with @BotFather.
+TELEGRAM_BOT_TOKEN=<bot-token>
+TELEGRAM_CHAT_ID=<chat-id>
 ```
 
 The World Bank API needs no key. `DB_URL` (already used by the app) is reused by the

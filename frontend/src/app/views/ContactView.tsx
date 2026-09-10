@@ -1,8 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router';
 import { ArrowLeft, Send, CheckCircle2, AlertCircle } from 'lucide-react';
-
-const FORM_ACTION = 'https://submit-form.com/e6JiYc0vu';
+import { api } from '../services/api';
 
 type SubmitStatus = 'idle' | 'sending' | 'sent' | 'error';
 
@@ -13,19 +12,18 @@ export function ContactView() {
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const form = e.currentTarget;
+    const data = new FormData(form);
     setStatus('sending');
     try {
-      const response = await fetch(form.action, {
-        method: form.method,
-        body: new FormData(form),
-        headers: { Accept: 'application/json' },
+      await api.submitContact({
+        name: String(data.get('name') ?? ''),
+        email: String(data.get('email') ?? ''),
+        subject: String(data.get('subject') ?? ''),
+        message: String(data.get('message') ?? ''),
+        company: String(data.get('company') ?? ''),
       });
-      if (response.ok) {
-        setStatus('sent');
-        form.reset();
-      } else {
-        setStatus('error');
-      }
+      setStatus('sent');
+      form.reset();
     } catch {
       setStatus('error');
     }
@@ -56,7 +54,11 @@ export function ContactView() {
             <p className="text-sm text-slate-600 dark:text-slate-400">Thanks for reaching out — we'll get back to you soon.</p>
           </div>
         ) : (
-          <form action={FORM_ACTION} method="POST" onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="relative space-y-4">
+            <div aria-hidden="true" className="absolute -left-[9999px] h-0 w-0 overflow-hidden">
+              <label htmlFor="company">Company</label>
+              <input id="company" name="company" type="text" tabIndex={-1} autoComplete="off" />
+            </div>
             <div>
               <label htmlFor="name" className="block text-sm text-slate-700 dark:text-slate-300 mb-2 font-medium">
                 Name

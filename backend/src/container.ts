@@ -33,6 +33,7 @@ import { GetCountryOverviewUseCase } from './application/use-cases/analytics/Get
 import { GetCountryCorridorsUseCase } from './application/use-cases/analytics/GetCountryCorridorsUseCase';
 import { GetGlobalInsightsUseCase } from './application/use-cases/analytics/GetGlobalInsightsUseCase';
 import { GetCorridorStablecoinsUseCase } from './application/use-cases/analytics/GetCorridorStablecoinsUseCase';
+import { SendContactMessageUseCase } from './application/use-cases/contact/SendContactMessageUseCase';
 
 // ---- Controllers ----
 import { CountryController } from './interfaces/http/controllers/CountryController';
@@ -46,6 +47,10 @@ import { WalletController } from './interfaces/http/controllers/WalletController
 import { TransactionController } from './interfaces/http/controllers/TransactionController';
 import { AnalyticsController } from './interfaces/http/controllers/AnalyticsController';
 import { AdminController } from './interfaces/http/controllers/AdminController';
+import { ContactController } from './interfaces/http/controllers/ContactController';
+
+// ---- Infrastructure ----
+import { TelegramNotifier } from './infrastructure/telegram/TelegramNotifier';
 
 // ---- Routers ----
 import { createCountryRouter } from './interfaces/http/routes/countryRoutes';
@@ -59,6 +64,7 @@ import { createWalletRouter } from './interfaces/http/routes/walletRoutes';
 import { createTransactionRouter } from './interfaces/http/routes/transactionRoutes';
 import { createAnalyticsRouter } from './interfaces/http/routes/analyticsRoutes';
 import { createAdminRouter } from './interfaces/http/routes/adminRoutes';
+import { createContactRouter } from './interfaces/http/routes/contactRoutes';
 
 import { Router } from 'express';
 
@@ -129,6 +135,9 @@ export function buildV1Router(): Router {
         getCorridorStablecoins,
     );
     const adminController = new AdminController();
+    const telegramNotifier = new TelegramNotifier();
+    const sendContact = new SendContactMessageUseCase(telegramNotifier);
+    const contactController = new ContactController(sendContact, telegramNotifier);
 
     // Router composition
     const v1 = Router();
@@ -143,6 +152,7 @@ export function buildV1Router(): Router {
     v1.use('/transactions', createTransactionRouter(transactionController));
     v1.use('/analytics', createAnalyticsRouter(analyticsController));
     v1.use('/admin', createAdminRouter(adminController));
+    v1.use('/contact', createContactRouter(contactController));
 
     return v1;
 }
