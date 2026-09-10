@@ -11,6 +11,11 @@ export interface ICountryDoc extends Document {
     remittancesSent?: number;
     remittancesYear?: number;
     remittancesSyncedAt?: Date;
+    /** Nominal GDP, current US$. World Bank first, then CIA / Wikipedia / pinned fallbacks. */
+    gdp?: number;
+    gdpYear?: number;
+    gdpSource?: string;
+    gdpSyncedAt?: Date;
     regulatedIssuerIds: string[];
     regulatedReserveTypes: string[];
     // Stride API fields
@@ -42,6 +47,10 @@ const CountrySchema = new Schema<ICountryDoc>(
         remittancesSent: { type: Number },
         remittancesYear: { type: Number },
         remittancesSyncedAt: { type: Date },
+        gdp: { type: Number },
+        gdpYear: { type: Number },
+        gdpSource: { type: String },
+        gdpSyncedAt: { type: Date },
         regulatedIssuerIds:    { type: [String], default: [] },
         regulatedReserveTypes: { type: [String], default: [] },
         // Stride API fields

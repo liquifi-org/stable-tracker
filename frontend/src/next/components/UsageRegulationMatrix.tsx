@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router';
 import { CountryFlag } from '../../app/components/CountryFlag';
-import { fmtPer100k } from '../lib/format';
+import { fmtPct } from '../lib/format';
 import { stageLabel } from '../lib/marketType';
 import { countryPath } from '../../app/lib/countryRoutes';
 
@@ -8,28 +8,25 @@ export interface UsageRuleRow {
   countryId: string;
   name: string;
   isoAlpha2: string;
-  adoptionRate: number;
-  activeWallets: number;
+  gdpIntensity: number;
   stage?: number;
 }
 
-const ELIGIBLE = 10_000;
-
 export function UsageRegulationMatrix({ rows }: { rows: UsageRuleRow[] }) {
   const navigate = useNavigate();
-  const eligible = rows.filter((r) => r.activeWallets > ELIGIBLE);
+  const eligible = rows.filter((r) => r.gdpIntensity > 0);
   if (eligible.length === 0) {
     return <p className="text-sm text-slate-500">Not enough ranked countries to draw this split.</p>;
   }
 
-  const rates = [...eligible].map((r) => r.adoptionRate).sort((a, b) => a - b);
+  const rates = [...eligible].map((r) => r.gdpIntensity).sort((a, b) => a - b);
   const median = rates[Math.floor(rates.length / 2)] ?? 0;
 
   const buckets = {
-    hotUnruled: eligible.filter((r) => r.adoptionRate >= median && (r.stage == null || r.stage < 3)),
-    hotLive: eligible.filter((r) => r.adoptionRate >= median && r.stage === 3),
-    quietLive: eligible.filter((r) => r.adoptionRate < median && r.stage === 3),
-    quietUnruled: eligible.filter((r) => r.adoptionRate < median && (r.stage == null || r.stage < 3)),
+    hotUnruled: eligible.filter((r) => r.gdpIntensity >= median && (r.stage == null || r.stage < 3)),
+    hotLive: eligible.filter((r) => r.gdpIntensity >= median && r.stage === 3),
+    quietLive: eligible.filter((r) => r.gdpIntensity < median && r.stage === 3),
+    quietUnruled: eligible.filter((r) => r.gdpIntensity < median && (r.stage == null || r.stage < 3)),
   };
 
   const Cell = ({
@@ -46,7 +43,7 @@ export function UsageRegulationMatrix({ rows }: { rows: UsageRuleRow[] }) {
       <div className="text-[11px] text-[var(--muted-ink)] mb-2">{subtitle} · {items.length}</div>
       <div className="flex flex-wrap gap-1.5">
         {items
-          .sort((a, b) => b.adoptionRate - a.adoptionRate)
+          .sort((a, b) => b.gdpIntensity - a.gdpIntensity)
           .slice(0, 8)
           .map((c) => (
             <button
@@ -58,7 +55,7 @@ export function UsageRegulationMatrix({ rows }: { rows: UsageRuleRow[] }) {
                 })
               }
               className="inline-flex items-center gap-1 rounded-full border border-[var(--hairline)] px-2 py-0.5 text-[11px] hover:border-[var(--brand)] transition-ui"
-              title={`${c.name} · ${fmtPer100k(c.adoptionRate)} / 100k · ${stageLabel(c.stage)}`}
+              title={`${c.name} · ${fmtPct(c.gdpIntensity)} of GDP · ${stageLabel(c.stage)}`}
             >
               <CountryFlag isoAlpha2={c.isoAlpha2} className="w-3 h-3" />
               {c.isoAlpha2 || c.name}
@@ -74,7 +71,7 @@ export function UsageRegulationMatrix({ rows }: { rows: UsageRuleRow[] }) {
   return (
     <div className="space-y-2">
       <p className="text-xs text-slate-500 dark:text-slate-400">
-        High usage = at or above median wallets-per-capita among countries with &gt;10k wallets.
+        High usage = at or above median outbound-vs-GDP among countries with corridor volume and GDP.
         Live rules = stage 3 (not month-dependent).
       </p>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

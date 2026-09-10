@@ -109,6 +109,7 @@ export const ISO_COUNTRIES: IsoCountry[] = [
     { numeric: '404', alpha2: 'KE', alpha3: 'KEN', name: 'Kenya' },
     { numeric: '296', alpha2: 'KI', alpha3: 'KIR', name: 'Kiribati' },
     { numeric: '408', alpha2: 'KP', alpha3: 'PRK', name: 'North Korea' },
+    { numeric: '383', alpha2: 'XK', alpha3: 'XKX', name: 'Kosovo' },
     { numeric: '410', alpha2: 'KR', alpha3: 'KOR', name: 'South Korea' },
     { numeric: '414', alpha2: 'KW', alpha3: 'KWT', name: 'Kuwait' },
     { numeric: '417', alpha2: 'KG', alpha3: 'KGZ', name: 'Kyrgyzstan' },
@@ -214,6 +215,7 @@ export const ISO_COUNTRIES: IsoCountry[] = [
     { numeric: '860', alpha2: 'UZ', alpha3: 'UZB', name: 'Uzbekistan' },
     { numeric: '548', alpha2: 'VU', alpha3: 'VUT', name: 'Vanuatu' },
     { numeric: '336', alpha2: 'VA', alpha3: 'VAT', name: 'Vatican City' },
+    { numeric: '732', alpha2: 'EH', alpha3: 'ESH', name: 'Western Sahara' },
     { numeric: '862', alpha2: 'VE', alpha3: 'VEN', name: 'Venezuela' },
     { numeric: '704', alpha2: 'VN', alpha3: 'VNM', name: 'Vietnam' },
     { numeric: '092', alpha2: 'VG', alpha3: 'VGB', name: 'British Virgin Islands' },
@@ -298,6 +300,8 @@ const NAME_ALIASES: Record<string, string> = {
     'vatican': '336',
     'palestinian territories': '275',
     'west bank and gaza': '275',
+    'kosovo': '383',
+    'western sahara': '732',
 };
 
 function normalize(str: string): string {

@@ -3,8 +3,8 @@ import { Link } from 'react-router';
 import { FileText, Printer, Quote, Check } from 'lucide-react';
 import { SEO, usePageMeta } from '../lib/seo';
 
-const VERSION = '1.0';
-const PUBLISHED = '5 September 2026';
+const VERSION = '1.1';
+const PUBLISHED = '10 September 2026';
 const SITE_URL = 'https://stabletracker.org';
 const CITE = `Stablecoin Tracker. (2026). Whitepaper: measuring stablecoin usage, corridors, and regulation (v${VERSION}). ${SITE_URL}/whitepaper`;
 
@@ -79,7 +79,7 @@ export function WhitepaperView() {
       headline: 'Stablecoin Tracker Whitepaper: measuring usage, corridors, and regulation',
       alternativeHeadline: `Version ${VERSION}`,
       datePublished: '2026-09-05',
-      dateModified: '2026-09-05',
+      dateModified: '2026-09-10',
       inLanguage: 'en',
       url: `${typeof window !== 'undefined' ? window.location.origin : SITE_URL}/whitepaper`,
       publisher: {
@@ -181,7 +181,7 @@ export function WhitepaperView() {
             country-level picture of <em>where</em> these instruments are used, <em>which corridors</em>{' '}
             carry the volume, and <em>which jurisdictions</em> have a live rulebook. Stablecoin Tracker
             is an open-source observatory that joins on-chain wallet and corridor observations with
-            official population and remittance series and with a country-level regulatory taxonomy.
+            official population, GDP, and remittance series and with a country-level regulatory taxonomy.
           </p>
           <p>
             This paper is the specification behind stabletracker.org. It defines every headline
@@ -197,7 +197,7 @@ export function WhitepaperView() {
             trading pair:
           </p>
           <ol className="list-decimal pl-5 space-y-2 my-4">
-            <li>Where are they actually used, relative to the people who live there?</li>
+            <li>Where are they actually used, relative to the size of the economy?</li>
             <li>Which international routes carry the value, and in which tokens?</li>
             <li>Can you operate there — is there a live, stablecoin-specific framework?</li>
           </ol>
@@ -230,8 +230,8 @@ export function WhitepaperView() {
         <Section id="principles" kicker="Section 2" title="Design principles">
           <dl className="space-y-5">
             <Principle
-              name="People, not just rank"
-              body="Adoption is wallets holding stablecoins divided by population, then shown per 100,000 people. Rank is a secondary label, and only among countries with enough activity to rank fairly."
+              name="Scale versus the economy"
+              body="The league table is outbound international corridors divided by period GDP. Wallet counts and wallets per 100,000 people stay on the page as a people-scale figure. They are not the rank."
             />
             <Principle
               name="International corridors only"
@@ -239,7 +239,7 @@ export function WhitepaperView() {
             />
             <Principle
               name="Usage × rules"
-              body="A live framework without usage, or heavy usage without a framework, are different operating environments. The regulatory view is not a heat map of friendliness — it is a join of wallets and Stride stage."
+              body="A live framework without usage, or heavy usage without a framework, are different operating environments. The regulatory view is not a heat map of friendliness — it is a join of GDP intensity and Stride stage."
             />
             <Principle
               name="Closed months"
@@ -247,7 +247,7 @@ export function WhitepaperView() {
             />
             <Principle
               name="Named sources"
-              body="On-chain activity is Allium. Population and remittance outflows are World Bank. Regulatory stage, licenses, and reserve-type permissions are Stride. The tracker does not invent a fourth series to paper over gaps."
+              body="On-chain activity is Allium. Population and remittance outflows are World Bank. Nominal GDP is World Bank NY.GDP.MKTP.CD, with IMF WEO, CIA Factbook, and Wikipedia fallbacks where the Bank is silent (Taiwan is the usual case). Regulatory stage, licenses, and reserve-type permissions are Stride."
             />
           </dl>
         </Section>
@@ -273,30 +273,52 @@ export function WhitepaperView() {
             Treat the series as a lower-bound activity signal, not a census.
           </p>
 
-          <h3 className="display text-xl mt-8 mb-2">3.2 Adoption rate</h3>
+          <h3 className="display text-xl mt-8 mb-2">3.2 Wallet penetration</h3>
           <Formula>
-            adoption rate = active wallets ÷ population
+            wallet penetration = active wallets ÷ population
           </Formula>
           <p>
             Population is the latest World Bank <code>SP.POP.TOTL</code> figure on the country
-            record. The rate is a ratio; the overview table also shows wallets per 100,000 people
-            (<em>rate × 100,000</em>) because that is the figure a reader can compare across
-            countries without scientific notation.
+            record. The overview table also shows wallets per 100,000 people
+            (<em>rate × 100,000</em>). This is a people-scale figure and a reading aid for market
+            classification. It is <strong>not</strong> the country rank.
           </p>
           <p>
-            If population is missing, the rate is zero and the country cannot be ranked. This is a
-            known gap for some territories the World Bank does not publish (Taiwan is the usual
-            example).
+            If population is missing, penetration is zero. Taiwan is the usual World Bank gap for
+            this series; GDP for Taiwan is filled from IMF WEO so the country can still be ranked
+            under §3.3.
           </p>
 
-          <h3 className="display text-xl mt-8 mb-2">3.3 Adoption rank</h3>
+          <h3 className="display text-xl mt-8 mb-2">3.3 GDP intensity and adoption rank</h3>
+          <Formula>
+            GDP intensity = outbound corridor volume ÷ (annual GDP × period months / 12)
+          </Formula>
           <p>
-            Rank is dense and 1-based, among countries with <strong>more than 10,000</strong> wallets
-            holding stablecoins in the selected period. Countries below that threshold appear in
-            tables and may appear grey on the map; they do not receive a <em>#N of M</em> label.
-            Two countries that round to the same wallets-per-100k integer share a rank. The
-            eligibility cut is there so a tiny population with a handful of attributed wallets
-            cannot dominate a league table.
+            Outbound volume is the Allium international corridor total for the sender country in
+            the selected period — the same grain as the corridor map. GDP is annual nominal GDP in
+            current US dollars, stored on the country and pro-rated to the month (or to the full
+            year when no month is selected) so a monthly corridor total is not compared with a
+            yearly official figure.
+          </p>
+          <p>
+            The primary source is World Bank <code>NY.GDP.MKTP.CD</code>. Where the Bank is silent,
+            the ingest falls through IMF World Economic Outlook, CIA World Factbook, Wikipedia
+            infobox figures, and a small set of pinned last-resort values. The country record
+            keeps <code>gdpSource</code> and <code>gdpYear</code> so a reader can see which vintage
+            was used.
+          </p>
+          <p>
+            Intensity is a scale label, not a 0–100% finish line. A 3% month means outbound
+            corridors were large relative to one-twelfth of annual GDP, not that 3% of the
+            economy “adopted” stablecoins. Treasury hops, trading, and commercial payments all sit
+            in the numerator.
+          </p>
+          <p>
+            Rank is dense and 1-based, among countries with <strong>positive outbound corridor
+            volume and a GDP figure</strong> in the selected period. Countries without a named
+            outbound corridor or without GDP appear in tables and stay grey on the map; they do
+            not receive a <em>#N of M</em> label. Two countries that match to the same 0.001
+            percentage-point band share a rank. There is no wallet-count floor.
           </p>
 
           <h3 className="display text-xl mt-8 mb-2">3.4 Corridor volume</h3>
@@ -433,6 +455,15 @@ export function WhitepaperView() {
                   <td className="px-3 py-2">ISO alpha-3 → numeric</td>
                 </tr>
                 <tr className="border-t border-[var(--hairline)]">
+                  <td className="px-3 py-2">Nominal GDP</td>
+                  <td className="px-3 py-2">
+                    World Bank Open Data, indicator <code>NY.GDP.MKTP.CD</code>;
+                    IMF WEO / CIA Factbook / Wikipedia where the Bank is silent
+                  </td>
+                  <td className="px-3 py-2">Yearly, pro-rated to the month</td>
+                  <td className="px-3 py-2">ISO alpha-3 → numeric</td>
+                </tr>
+                <tr className="border-t border-[var(--hairline)]">
                   <td className="px-3 py-2">Remittances paid</td>
                   <td className="px-3 py-2">
                     World Bank Open Data, indicator <code>BM.TRF.PWKR.CD.DT</code>
@@ -485,8 +516,8 @@ export function WhitepaperView() {
 
           <h3 className="display text-xl mt-8 mb-2">5.2 Country briefing</h3>
           <p>
-            A briefing is the unit of analysis. It stacks scale (wallets, rank, population
-            penetration), money (dollarization, inbound and outbound corridors, token mix), and
+            A briefing is the unit of analysis. It stacks scale (GDP intensity, rank, wallets),
+            money (dollarization, inbound and outbound corridors, token mix), and
             rules (stage, regulator, reserve-type permissions, licenses). Month-over-month badges
             use the previous closed month as the baseline. Classification labels in §3.8 sit above
             those blocks so a reader can decide in one glance whether they are looking at a
@@ -495,10 +526,10 @@ export function WhitepaperView() {
 
           <h3 className="display text-xl mt-8 mb-2">5.3 What the colours are not</h3>
           <p>
-            Warm colours on the usage map are wallets per capita among countries with enough
-            wallets to rank — not “good.” Stage colours on the regulatory map are a four-state
-            taxonomy — not a recommended jurisdiction list. Grey is “below the rank threshold” or
-            “no data,” never “zero activity in the real world.”
+            Warm colours on the usage map are GDP-intensity rank among countries with outbound
+            corridors and a GDP figure — not “good.” Stage colours on the regulatory map are a
+            four-state taxonomy — not a recommended jurisdiction list. Grey is “no outbound
+            corridor in this period, or no GDP,” never “zero activity in the real world.”
           </p>
         </Section>
 
@@ -532,8 +563,14 @@ export function WhitepaperView() {
               A missing country is not evidence of prohibition or of zero use.
             </li>
             <li>
-              <strong>The 10,000-wallet rank floor hides small, real markets.</strong> That is
-              deliberate, so the league table is not dominated by noise. It is still a floor.
+              <strong>Corridor geography is narrower than the wallet map.</strong> Allium’s
+              corridor query names a subset of sender countries. A country can have wallets and
+              still sit grey on the rank map because no outbound pair was attributed that month.
+            </li>
+            <li>
+              <strong>GDP vintages differ.</strong> Most countries use the latest World Bank
+              year. A few use IMF WEO, Factbook, or Wikipedia. Intensity is comparable in
+              direction, not to the last official decimal.
             </li>
             <li>
               <strong>This is not advice.</strong> Nothing here is a legal opinion, an investment
@@ -604,6 +641,12 @@ export function WhitepaperView() {
               World Bank. Population, total (<code>SP.POP.TOTL</code>). World Bank Open Data.{' '}
               <a href="https://data.worldbank.org/indicator/SP.POP.TOTL" className="underline decoration-[var(--hairline)] hover:decoration-[var(--brand)]">
                 https://data.worldbank.org/indicator/SP.POP.TOTL
+              </a>
+            </li>
+            <li>
+              World Bank. GDP (current US$) (<code>NY.GDP.MKTP.CD</code>). World Bank Open Data.{' '}
+              <a href="https://data.worldbank.org/indicator/NY.GDP.MKTP.CD" className="underline decoration-[var(--hairline)] hover:decoration-[var(--brand)]">
+                https://data.worldbank.org/indicator/NY.GDP.MKTP.CD
               </a>
             </li>
             <li>

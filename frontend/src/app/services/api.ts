@@ -54,6 +54,11 @@ export interface CountryAdoptionMetric {
   txValueShare: number;
   unit?: string;
   remittancesSent?: number;
+  gdp?: number;
+  gdpYear?: number;
+  gdpSource?: string;
+  outboundVolume: number;
+  gdpIntensity: number;
   adoptionRank: number | null;
   eligibleCountries: number;
   relativeAdoptionIndex: number | null;
@@ -107,6 +112,11 @@ export interface CountryOverview {
   activeWallets: number;
   txValueShare: number;
   dollarizationIndex: number;
+  gdp?: number;
+  gdpYear?: number;
+  gdpSource?: string;
+  outboundVolume: number;
+  gdpIntensity: number;
   adoptionRank: number | null;
   eligibleCountries: number;
 }

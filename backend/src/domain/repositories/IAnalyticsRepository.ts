@@ -48,7 +48,15 @@ export interface CountryAdoptionMetric {
     txValueShare: number;
     unit: 'ratio' | 'percent';
     remittancesSent?: number;
-    /** 1-based rank among eligible geographies (> 10k wallets holding stablecoins), by adoptionRate desc. Null when not eligible. */
+    /** Annual nominal GDP, current USD. Null when no source could fill it (EU aggregate). */
+    gdp?: number;
+    gdpYear?: number;
+    gdpSource?: string;
+    /** International outbound corridor volume for the selected period. */
+    outboundVolume: number;
+    /** Outbound corridors ÷ period GDP (annual GDP × period months / 12). */
+    gdpIntensity: number;
+    /** 1-based rank among countries with outbound corridors and GDP, by gdpIntensity desc. */
     adoptionRank: number | null;
     /** Size of the eligible geography set used for ranking. */
     eligibleCountries: number;
@@ -62,6 +70,7 @@ export interface RegionalAdoptionMetric {
     countryCount: number;
     activeWallets: number;
     population: number;
+    /** Regional outbound corridors ÷ regional period GDP. */
     adoptionRate: number;
     txValueShare: number;
     unit: 'ratio' | 'percent';
@@ -101,7 +110,12 @@ export interface CountryOverview {
     activeWallets: number;
     txValueShare: number;
     dollarizationIndex: number;
-    /** 1-based rank among eligible geographies (> 10k wallets holding stablecoins), by adoptionRate desc. Null when not eligible. */
+    gdp?: number;
+    gdpYear?: number;
+    gdpSource?: string;
+    outboundVolume: number;
+    gdpIntensity: number;
+    /** 1-based rank among countries with outbound corridors and GDP, by gdpIntensity desc. */
     adoptionRank: number | null;
     /** Size of the eligible geography set used for ranking. */
     eligibleCountries: number;

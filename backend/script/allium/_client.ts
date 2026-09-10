@@ -15,11 +15,14 @@ export const WALLETS_QUERY_ID =
     process.env.ALLIUM_WALLETS_QUERY_ID ?? 'uxxPD1ol2JLBPnvGoGHZ';
 
 export const CORRIDORS_QUERY_ID =
-    process.env.ALLIUM_CORRIDORS_QUERY_ID ?? 'MxaKAhHTsM0QohPMPqne';
+    process.env.ALLIUM_CORRIDORS_QUERY_ID ?? 'djvIso1YNXUFa34rTjdD';
 
 export const RUN_LIMIT = 10000;
+/** Token-grain corridor months can exceed 10k rows; Allium allows up to 250k. */
+export const CORRIDORS_RUN_LIMIT = 100000;
 export const POLL_INTERVAL_MS = 5000;
-export const MAX_POLLS = 120;
+/** ~20 min — corridor queries typically finish in 6–10 min. */
+export const MAX_POLLS = 240;
 
 export function assertApiKey(): void {
     if (!API_KEY) {
@@ -101,12 +104,15 @@ interface ResultsResponse {
     meta?: unknown;
 }
 
-export async function getRunResults(runId: string): Promise<ResultRow[]> {
+export async function getRunResults(
+    runId: string,
+    limit: number = RUN_LIMIT,
+): Promise<ResultRow[]> {
     const url = `${BASE_URL}/explorer/query-runs/${runId}/results`;
     const response = await fetch(url, {
         method: 'POST',
         headers: authHeaders({ 'Content-Type': 'application/json' }),
-        body: JSON.stringify({ config: { limit: RUN_LIMIT } }),
+        body: JSON.stringify({ config: { limit } }),
     });
 
     if (!response.ok) {
@@ -134,7 +140,7 @@ export async function runAndWait(
 
         if (lower === 'success') {
             console.log('Query run completed.');
-            return getRunResults(runId);
+            return getRunResults(runId, limit);
         }
         if (lower === 'failed' || lower === 'canceled') {
             throw new Error(`Query run ${runId} ended with status "${status}".`);

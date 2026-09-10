@@ -611,6 +611,36 @@ paths:
         default:
           $ref: '#/components/responses/Error'
 
+  /admin/sync/gdp:
+    post:
+      tags: [Admin]
+      summary: Sync country GDP (World Bank + fallbacks)
+      description: |
+        Private maintenance endpoint. Writes nominal GDP (current US$) onto each
+        country. World Bank `NY.GDP.MKTP.CD` first; CIA Factbook and Wikipedia
+        economy infoboxes fill territories the Bank does not publish (Taiwan,
+        North Korea, Vatican, Niue, BVI, Saint Pierre and Miquelon). The EU
+        aggregate (`999`) is skipped.
+
+        Requires the secret admin token (env `ADMIN_SYNC_TOKEN`) sent in the
+        `x-admin-token` header.
+      operationId: adminSyncGdp
+      security:
+        - adminToken: []
+      responses:
+        '200':
+          description: GDP sync completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminSyncResult'
+        '401':
+          $ref: '#/components/responses/AdminUnauthorized'
+        '403':
+          $ref: '#/components/responses/AdminDisabled'
+        default:
+          $ref: '#/components/responses/Error'
+
 components:
   securitySchemes:
     bearerAuth:
@@ -977,8 +1007,8 @@ components:
     # --- Analytics DTOs ----------------------------------------------------
     CountryAdoptionMetric:
       type: object
-      required: [countryId, name, region, adoptionRate, activeWallets, txValueShare]
-      description: One row of the adoption heatmap.
+      required: [countryId, name, region, adoptionRate, activeWallets, txValueShare, outboundVolume, gdpIntensity]
+      description: One row of the adoption heatmap. Rank is by gdpIntensity.
       properties:
         countryId: { $ref: '#/components/schemas/CountryCode' }
         name: { type: string }
@@ -986,7 +1016,7 @@ components:
         adoptionRate:
           type: number
           format: double
-          description: Share of population using stablecoins (0..1 or %, see `unit`).
+          description: Wallet penetration — wallets holding stablecoins ÷ population. Not the rank.
         activeWallets:
           type: integer
           description: Number of active wallets holding stablecoins.
@@ -998,6 +1028,34 @@ components:
           type: string
           enum: [ratio, percent]
           default: percent
+        gdp:
+          type: number
+          format: double
+          description: Annual nominal GDP in current US dollars.
+        gdpYear: { type: integer }
+        gdpSource:
+          type: string
+          description: world-bank | cia-factbook | wikipedia | imf-weo | bank-of-korea
+        outboundVolume:
+          type: number
+          format: double
+          description: International outbound corridor volume for the period, current USD.
+        gdpIntensity:
+          type: number
+          format: double
+          description: Outbound corridors ÷ period GDP (annual GDP × period months / 12).
+        adoptionRank:
+          type: integer
+          nullable: true
+          description: 1-based dense rank by gdpIntensity among countries with outbound volume and GDP.
+        eligibleCountries:
+          type: integer
+          description: Size of the ranked set.
+        relativeAdoptionIndex:
+          type: number
+          format: double
+          nullable: true
+          description: Rank stretched to [0,1] for map colour. Null when unranked.
 
     CorridorFlow:
       type: object
@@ -1047,15 +1105,22 @@ components:
       type: object
       required:
         [countryId, name, adoptionRate, activeWallets, txValueShare, dollarizationIndex,
-         compliantIssuers, licenses, reserveTypes]
+         outboundVolume, gdpIntensity, compliantIssuers, licenses, reserveTypes]
       properties:
         countryId: { $ref: '#/components/schemas/CountryCode' }
         name: { type: string }
         region: { type: string }
-        adoptionRate: { type: number, format: double }
+        adoptionRate: { type: number, format: double, description: Wallet penetration (not the rank) }
         activeWallets: { type: integer, description: Wallets holding stablecoins (latest monthly Allium snapshot) }
         txValueShare: { type: number, format: double }
         dollarizationIndex: { type: number, format: double, minimum: 0, maximum: 1 }
+        gdp: { type: number, format: double }
+        gdpYear: { type: integer }
+        gdpSource: { type: string }
+        outboundVolume: { type: number, format: double }
+        gdpIntensity: { type: number, format: double, description: Outbound corridors ÷ period GDP }
+        adoptionRank: { type: integer, nullable: true }
+        eligibleCountries: { type: integer }
         compliantIssuers:
           type: array
           items: { $ref: '#/components/schemas/Issuer' }
