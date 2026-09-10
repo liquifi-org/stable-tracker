@@ -265,6 +265,52 @@ export function OverviewView() {
     return Array.from(flows.values()).sort((a, b) => b.volume - a.volume);
   }, [corridorData, numericToMacroRegion]);
 
+  const corridorsGroupedByOrigin = useMemo(() => {
+    const groups = new Map<
+      string,
+      { fromAlpha: string; total: number; dests: { toAlpha: string; volume: number }[] }
+    >();
+    for (const flow of directedCorridors) {
+      const existing = groups.get(flow.fromAlpha);
+      if (existing) {
+        existing.total += flow.volume;
+        existing.dests.push({ toAlpha: flow.toAlpha, volume: flow.volume });
+      } else {
+        groups.set(flow.fromAlpha, {
+          fromAlpha: flow.fromAlpha,
+          total: flow.volume,
+          dests: [{ toAlpha: flow.toAlpha, volume: flow.volume }],
+        });
+      }
+    }
+    return Array.from(groups.values())
+      .map((g) => ({ ...g, dests: [...g.dests].sort((a, b) => b.volume - a.volume) }))
+      .sort((a, b) => b.total - a.total);
+  }, [directedCorridors]);
+
+  const regionalCorridorsGroupedByOrigin = useMemo(() => {
+    const groups = new Map<
+      string,
+      { fromRegion: string; total: number; dests: { toRegion: string; volume: number }[] }
+    >();
+    for (const flow of directedRegionalCorridors) {
+      const existing = groups.get(flow.fromRegion);
+      if (existing) {
+        existing.total += flow.volume;
+        existing.dests.push({ toRegion: flow.toRegion, volume: flow.volume });
+      } else {
+        groups.set(flow.fromRegion, {
+          fromRegion: flow.fromRegion,
+          total: flow.volume,
+          dests: [{ toRegion: flow.toRegion, volume: flow.volume }],
+        });
+      }
+    }
+    return Array.from(groups.values())
+      .map((g) => ({ ...g, dests: [...g.dests].sort((a, b) => b.volume - a.volume) }))
+      .sort((a, b) => b.total - a.total);
+  }, [directedRegionalCorridors]);
+
   const corridorsByCountry = useMemo(() => {
     const outboundMap = new Map<string, number>();
     for (const pair of bidirectionalCorridors) {
@@ -587,6 +633,15 @@ export function OverviewView() {
   const usageLoading =
     (adoptionLoading && adoptionData.length === 0) || (corridorLoading && corridorData.length === 0);
 
+  const openCountry = (alpha2: string) => {
+    const countryId = alpha2ToNumeric.get(alpha2);
+    if (!countryId) return;
+    const name = countryNameByAlpha2.get(alpha2);
+    navigate(countryPath({ countryId, name, isoAlpha2: alpha2 }), {
+      state: { name, isoAlpha2: alpha2 },
+    });
+  };
+
   return (
     <div className="space-y-8">
       <InsightCards
@@ -675,8 +730,8 @@ export function OverviewView() {
                 <span className="text-xs text-[var(--muted-ink)]">
                   {tableKind === 'corridors'
                     ? geoMode === 'region'
-                      ? `${directedRegionalCorridors.length} corridors`
-                      : `${directedCorridors.length} corridors`
+                      ? `${directedRegionalCorridors.length} corridors · grouped by origin`
+                      : `${directedCorridors.length} corridors · grouped by origin`
                     : geoMode === 'region'
                       ? `${regionalData.length} regions`
                       : `${adoptionTableData.length} countries · gray on the map is no outbound corridors or no GDP`}
@@ -696,52 +751,59 @@ export function OverviewView() {
 
             {tableKind === 'corridors' ? (
               <div className="relative">
-                <div className="named-corridors-scroll max-h-[48rem] overflow-y-auto divide-y divide-[var(--hairline)]">
+                <div className="named-corridors-scroll max-h-[48rem] overflow-y-auto">
                   {corridorLoading && directedCorridors.length === 0 ? (
                     <Skeleton className="h-40 w-full" />
                   ) : geoMode === 'region' ? (
-                    directedRegionalCorridors.map((flow) => (
-                      <NamedCorridorRow
-                        key={`${flow.fromRegion}-${flow.toRegion}`}
-                        left={flow.fromRegion}
-                        right={flow.toRegion}
-                        volume={flow.volume}
-                        formatVolume={formatCurrency}
-                      />
+                    regionalCorridorsGroupedByOrigin.map((group) => (
+                      <div key={group.fromRegion} className="border-b border-[var(--hairline)] last:border-b-0">
+                        <NamedCorridorOriginHeader
+                          name={group.fromRegion}
+                          volume={group.total}
+                          destCount={group.dests.length}
+                          formatVolume={formatCurrency}
+                        />
+                        {group.dests.map((dest) => (
+                          <NamedCorridorDestRow
+                            key={`${group.fromRegion}-${dest.toRegion}`}
+                            name={dest.toRegion}
+                            volume={dest.volume}
+                            formatVolume={formatCurrency}
+                          />
+                        ))}
+                      </div>
                     ))
                   ) : (
-                    directedCorridors.map((flow) => {
-                      const fromId = alpha2ToNumeric.get(flow.fromAlpha);
-                      return (
-                        <NamedCorridorRow
-                          key={`${flow.fromAlpha}-${flow.toAlpha}`}
-                          left={countryNameByAlpha2.get(flow.fromAlpha) ?? flow.fromAlpha}
-                          right={countryNameByAlpha2.get(flow.toAlpha) ?? flow.toAlpha}
-                          leftAlpha={flow.fromAlpha}
-                          rightAlpha={flow.toAlpha}
-                          volume={flow.volume}
+                    corridorsGroupedByOrigin.map((group) => (
+                      <div key={group.fromAlpha} className="border-b border-[var(--hairline)] last:border-b-0">
+                        <NamedCorridorOriginHeader
+                          name={countryNameByAlpha2.get(group.fromAlpha) ?? group.fromAlpha}
+                          alpha={group.fromAlpha}
+                          volume={group.total}
+                          destCount={group.dests.length}
                           formatVolume={formatCurrency}
                           onClick={
-                            fromId
-                              ? () =>
-                                  navigate(
-                                    countryPath({
-                                      countryId: fromId,
-                                      name: countryNameByAlpha2.get(flow.fromAlpha),
-                                      isoAlpha2: flow.fromAlpha,
-                                    }),
-                                    {
-                                      state: {
-                                        name: countryNameByAlpha2.get(flow.fromAlpha),
-                                        isoAlpha2: flow.fromAlpha,
-                                      },
-                                    },
-                                  )
+                            alpha2ToNumeric.has(group.fromAlpha)
+                              ? () => openCountry(group.fromAlpha)
                               : undefined
                           }
                         />
-                      );
-                    })
+                        {group.dests.map((dest) => (
+                          <NamedCorridorDestRow
+                            key={`${group.fromAlpha}-${dest.toAlpha}`}
+                            name={countryNameByAlpha2.get(dest.toAlpha) ?? dest.toAlpha}
+                            alpha={dest.toAlpha}
+                            volume={dest.volume}
+                            formatVolume={formatCurrency}
+                            onClick={
+                              alpha2ToNumeric.has(dest.toAlpha)
+                                ? () => openCountry(dest.toAlpha)
+                                : undefined
+                            }
+                          />
+                        ))}
+                      </div>
+                    ))
                   )}
                 </div>
                 {(geoMode === 'region' ? directedRegionalCorridors.length : directedCorridors.length) > 10 && (

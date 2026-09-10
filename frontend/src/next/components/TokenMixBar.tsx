@@ -54,19 +54,51 @@ function tokenColor(name: string): string {
   return '#6f9aed';
 }
 
-export function NamedCorridorRow({
-  left,
-  right,
-  leftAlpha,
-  rightAlpha,
+export function NamedCorridorOriginHeader({
+  name,
+  alpha,
+  volume,
+  destCount,
+  formatVolume,
+  onClick,
+}: {
+  name: string;
+  alpha?: string;
+  volume: number;
+  destCount: number;
+  formatVolume: (n: number) => string;
+  onClick?: () => void;
+}) {
+  const cls = onClick
+    ? 'w-full text-left hover:bg-[var(--paper)] cursor-pointer'
+    : 'w-full text-left';
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`${cls} sticky top-0 z-[1] flex items-center gap-3 py-2.5 px-1.5 bg-[var(--paper-raised)] border-b border-[var(--hairline)]`}
+    >
+      <div className="flex items-center gap-2 min-w-0 flex-1">
+        {alpha && <CountryFlag isoAlpha2={alpha} className="w-5 h-5" />}
+        <span className="truncate text-sm font-semibold text-[var(--ink-text)]">{name}</span>
+        <span className="text-[11px] text-[var(--muted-ink)] shrink-0 tabular-nums">
+          {destCount} {destCount === 1 ? 'corridor' : 'corridors'}
+        </span>
+      </div>
+      <div className="text-sm tabular-nums font-semibold shrink-0">{formatVolume(volume)}</div>
+    </button>
+  );
+}
+
+export function NamedCorridorDestRow({
+  name,
+  alpha,
   volume,
   formatVolume,
   onClick,
 }: {
-  left: string;
-  right: string;
-  leftAlpha?: string;
-  rightAlpha?: string;
+  name: string;
+  alpha?: string;
   volume: number;
   formatVolume: (n: number) => string;
   onClick?: () => void;
@@ -75,15 +107,13 @@ export function NamedCorridorRow({
     ? 'w-full text-left hover:bg-[var(--paper)] cursor-pointer'
     : 'w-full text-left';
   return (
-    <button type="button" onClick={onClick} className={`${cls} flex items-center gap-3 py-2.5 px-1.5 rounded-lg transition-ui`}>
+    <button type="button" onClick={onClick} className={`${cls} flex items-center gap-3 py-2 pl-8 pr-1.5 rounded-lg transition-ui`}>
       <div className="flex items-center gap-1.5 min-w-0 flex-1">
-        {leftAlpha && <CountryFlag isoAlpha2={leftAlpha} className="w-4 h-4" />}
-        <span className="truncate text-sm font-medium text-[var(--ink-text)]">{left}</span>
         <span className="text-[var(--muted-ink)] shrink-0">→</span>
-        {rightAlpha && <CountryFlag isoAlpha2={rightAlpha} className="w-4 h-4" />}
-        <span className="truncate text-sm font-medium text-[var(--ink-text)]">{right}</span>
+        {alpha && <CountryFlag isoAlpha2={alpha} className="w-4 h-4" />}
+        <span className="truncate text-sm text-[var(--ink-text)]">{name}</span>
       </div>
-      <div className="text-sm tabular-nums font-medium shrink-0">{formatVolume(volume)}</div>
+      <div className="text-sm tabular-nums text-[var(--ink-text)] shrink-0">{formatVolume(volume)}</div>
     </button>
   );
 }
