@@ -14,7 +14,8 @@ export class ContactController {
         try {
             const body = ContactMessageSchema.parse(req.body);
 
-            if (body.company?.trim()) {
+            if (body.hp_website?.trim()) {
+                logger.info('CONTACT_HONEYPOT_DROPPED', { meta: { email: body.email } });
                 res.status(200).json({ ok: true });
                 return;
             }

@@ -271,7 +271,7 @@ export const api = {
     email: string;
     subject?: string;
     message: string;
-    company?: string;
+    hp_website?: string;
   }): Promise<void> => {
     const response = await fetch(`${BASE_URL}/contact`, {
       method: 'POST',
