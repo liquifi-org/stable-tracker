@@ -166,6 +166,14 @@ html.next-ia .tabular-nums {
   font-variant-numeric: tabular-nums;
 }
 
+html.next-ia .insight-hover {
+  background: var(--paper-raised);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  color: var(--ink-text);
+  box-shadow: none;
+}
+
 /* Named corridors list: keep the scrollbar visible so overflow is obvious. */
 html.next-ia .named-corridors-scroll {
   scrollbar-gutter: stable;

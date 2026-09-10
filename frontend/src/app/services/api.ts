@@ -1,8 +1,6 @@
 import { prettyCountryName, resolveCountryNumericId, shortCountryName } from '../lib/countryRoutes';
 
-const BASE_URL =
-    import.meta.env.VITE_API_BASE_URL ||
-    (import.meta.env.DEV ? 'http://localhost:3003/v1' : '/v1');
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/v1';
 
 export interface ApiCountry {
   id: number;
