@@ -159,7 +159,9 @@ export class MongoAnalyticsRepository implements IAnalyticsRepository {
                 c.population && c.population > 0 ? activeWallets / c.population : 0;
             const txValueShare = globalTotal > 0 ? txValue / globalTotal : 0;
             const remittancesSent =
-                c.remittancesSent !== undefined ? (c.remittancesSent * periodMonths) / 12 : undefined;
+                c.remittancesSent && c.remittancesSent > 0
+                    ? (c.remittancesSent * periodMonths) / 12
+                    : undefined;
             const periodGdp =
                 c.gdp && c.gdp > 0 ? (c.gdp * periodMonths) / 12 : 0;
             const gdpIntensity = periodGdp > 0 ? txValue / periodGdp : 0;

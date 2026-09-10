@@ -360,7 +360,10 @@ export function WhitepaperView() {
             Remittances are World Bank <code>BM.TRF.PWKR.CD.DT</code> — personal remittances paid,
             current USD, the latest non-empty year, stored on the country and pro-rated to the
             selected month so a monthly corridor total is not compared with a yearly official
-            figure. The ratio is a comparison, not an identity: even after the adjusted-volume
+            figure. Where that series is unpublished, we store World Bank
+            <code>BM.TRF.PRVT.CD</code> (private secondary-income payments; Singapore) or a
+            national last-resort figure (Taiwan CBC secondary-income payments). Iran has no
+            current official outflow series. The ratio is a comparison, not an identity: even after the adjusted-volume
             gate, corridors still include organic P2P, commercial, and some treasury payments that
             are not remittances, and official remittances include channels that are not stablecoins.
             A high ratio means “this rail is large relative to the recorded remittance outflows,”
@@ -476,7 +479,8 @@ export function WhitepaperView() {
                 <tr className="border-t border-[var(--hairline)]">
                   <td className="px-3 py-2">Remittances paid</td>
                   <td className="px-3 py-2">
-                    World Bank Open Data, indicator <code>BM.TRF.PWKR.CD.DT</code>
+                    World Bank <code>BM.TRF.PWKR.CD.DT</code>;
+                    <code>BM.TRF.PRVT.CD</code> or national BOP where personal remittances are unpublished
                   </td>
                   <td className="px-3 py-2">Yearly, pro-rated to the month</td>
                   <td className="px-3 py-2">ISO alpha-3 → numeric</td>

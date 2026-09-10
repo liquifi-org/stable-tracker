@@ -18,7 +18,7 @@ import {
   type CountryRegulationInfo,
 } from '../../app/services/api';
 import { fmtPct, fmtPer100k } from '../lib/format';
-import { TokenMixBar, NamedCorridorRow } from '../components/TokenMixBar';
+import { TokenMixBar, NamedCorridorOriginHeader, NamedCorridorDestRow } from '../components/TokenMixBar';
 import { UsageRegulationMatrix, type UsageRuleRow } from '../components/UsageRegulationMatrix';
 import { InsightCards, type InsightBreakdown } from '../components/InsightCards';
 import { countryPath } from '../../app/lib/countryRoutes';
@@ -62,7 +62,7 @@ export function OverviewView() {
   const [adoptionLoading, setAdoptionLoading] = useState(false);
   const [regionalData, setRegionalData] = useState<RegionalAdoptionMetric[]>([]);
   const [geoMode, setGeoMode] = useState<GeoMode>('country');
-  const [tableKind, setTableKind] = useState<TableKind>('countries');
+  const [tableKind, setTableKind] = useState<TableKind>('corridors');
   const [corridorData, setCorridorData] = useState<CorridorFlow[]>([]);
   const [corridorLoading, setCorridorLoading] = useState(false);
   const [previousCorridorVolume, setPreviousCorridorVolume] = useState<number | null>(null);
@@ -297,7 +297,6 @@ export function OverviewView() {
   }, [bidirectionalCorridors, corridorData, numericToAlpha2, alpha2ToNumeric, countryNameByAlpha2, adoptionData]);
 
   const adoptionTableData = useMemo(() => {
-    const pctMap = new Map(corridorsByCountry.map((c) => [c.alpha2, c.stablecoinPctOfRemittances]));
     const previousRankMap = new Map(previousAdoptionData.map((c) => [c.countryId, c.adoptionRank]));
     const previousWalletsMap = new Map(previousAdoptionData.map((c) => [c.countryId, c.activeWallets]));
     return adoptionData
@@ -308,7 +307,10 @@ export function OverviewView() {
         return {
           ...c,
           walletsPer100k: c.adoptionRate * 100_000,
-          stablecoinPctOfRemittances: pctMap.get(c.isoAlpha2) ?? null,
+          stablecoinPctOfRemittances:
+            c.remittancesSent != null && c.remittancesSent > 0
+              ? (c.outboundVolume ?? 0) / c.remittancesSent
+              : null,
           rankDelta:
             c.adoptionRank != null && previousRank != null ? previousRank - c.adoptionRank : null,
           walletsChangePct:
@@ -317,7 +319,7 @@ export function OverviewView() {
               : null,
         };
       });
-  }, [adoptionData, corridorsByCountry, previousAdoptionData]);
+  }, [adoptionData, previousAdoptionData]);
 
   const tokenMix = useMemo(() => {
     const map = new Map<string, number>();
