@@ -372,7 +372,6 @@ export function OverviewView() {
         return {
           ...c,
           inboundVolume: inboundByCountry.get(c.countryId) ?? 0,
-          walletsPer100k: c.adoptionRate * 100_000,
           stablecoinPctOfRemittances:
             c.remittancesSent != null && c.remittancesSent > 0
               ? (c.outboundVolume ?? 0) / c.remittancesSent
@@ -584,15 +583,6 @@ export function OverviewView() {
           {row.adoptionRank != null && (
             <span className="ml-2 text-xs text-slate-500 dark:text-slate-400">#{row.adoptionRank}</span>
           )}
-        </span>
-      ),
-    },
-    {
-      key: 'walletsPer100k',
-      header: 'Wallets per 100k people',
-      render: (_: number, row: CountryAdoptionMetric) => (
-        <span className="tabular-nums">
-          {row.population && row.population > 0 ? fmtPer100k(row.adoptionRate) : '—'}
         </span>
       ),
     },
