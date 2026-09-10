@@ -18,5 +18,12 @@ export default defineConfig({
     host: '127.0.0.1',
     port: 5173,
     strictPort: true,
+    proxy: {
+      '/v1': {
+        target: 'https://stabletracker.org',
+        changeOrigin: true,
+        secure: true,
+      },
+    },
   },
 })

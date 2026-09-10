@@ -20,8 +20,29 @@ import {
 import { fmtPct, fmtPer100k } from '../lib/format';
 import { TokenMixBar, NamedCorridorRow } from '../components/TokenMixBar';
 import { UsageRegulationMatrix, type UsageRuleRow } from '../components/UsageRegulationMatrix';
-import { InsightCards } from '../components/InsightCards';
+import { InsightCards, type InsightBreakdown } from '../components/InsightCards';
 import { countryPath } from '../../app/lib/countryRoutes';
+
+function isNonUsdTicker(name: string): boolean {
+  const n = name.toUpperCase();
+  return (
+    n.startsWith('EUR') ||
+    n === 'XSGD' ||
+    n === 'CADC' ||
+    n === 'TRYB' ||
+    n === 'JPYC' ||
+    n === 'TGBP' ||
+    n === 'AXCNH' ||
+    n === 'EUROC' ||
+    n === 'EURT'
+  );
+}
+
+function formatMultiple(ratio: number): string {
+  if (ratio >= 10) return `${ratio.toFixed(0)}×`;
+  if (ratio >= 1) return `${ratio.toFixed(1)}×`;
+  return fmtPct(ratio);
+}
 
 type GeoMode = 'country' | 'region';
 type TableKind = 'countries' | 'corridors';
@@ -297,6 +318,68 @@ export function OverviewView() {
     return usd / corridorVolume;
   }, [corridorData, corridorVolume]);
 
+  const walletBreakdown = useMemo((): InsightBreakdown | null => {
+    const ranked = [...adoptionData]
+      .filter((c) => c.activeWallets > 0)
+      .sort((a, b) => b.activeWallets - a.activeWallets);
+    const total = ranked.reduce((sum, c) => sum + c.activeWallets, 0);
+    if (total <= 0) return null;
+    const top = ranked.slice(0, 5);
+    const topSum = top.reduce((sum, c) => sum + c.activeWallets, 0);
+    const densest = ranked
+      .filter((c) => c.adoptionRate > 0)
+      .sort((a, b) => b.adoptionRate - a.adoptionRate)[0];
+    const rows = top.map((c) => ({
+      label: c.name,
+      value: c.activeWallets.toLocaleString(),
+      share: c.activeWallets / total,
+    }));
+    if (ranked.length > 5) {
+      rows.push({
+        label: `Other ${ranked.length - 5} countries`,
+        value: (total - topSum).toLocaleString(),
+        share: (total - topSum) / total,
+      });
+    }
+    return {
+      caption: 'Share of wallets holding stablecoins',
+      bar: top.map((c) => ({ key: c.countryId, share: c.activeWallets / total })),
+      rows,
+      note: densest
+        ? `Densest per 100k: ${densest.name} (${fmtPer100k(densest.adoptionRate)})`
+        : undefined,
+    };
+  }, [adoptionData]);
+
+  const corridorBreakdown = useMemo((): InsightBreakdown | null => {
+    if (bidirectionalCorridors.length === 0) return null;
+    const total = bidirectionalCorridors.reduce((sum, p) => sum + p.totalValue, 0);
+    if (total <= 0) return null;
+    const top = bidirectionalCorridors.slice(0, 5);
+    const topSum = top.reduce((sum, p) => sum + p.totalValue, 0);
+    const nameOf = (alpha: string) => countryNameByAlpha2.get(alpha) ?? alpha;
+    const rows = top.map((p) => ({
+      label: `${nameOf(p.country1)} – ${nameOf(p.country2)}`,
+      value: formatCurrency(p.totalValue),
+      share: p.totalValue / total,
+    }));
+    if (bidirectionalCorridors.length > 5) {
+      rows.push({
+        label: `Other ${bidirectionalCorridors.length - 5} pairs`,
+        value: formatCurrency(total - topSum),
+        share: (total - topSum) / total,
+      });
+    }
+    return {
+      caption: `${bidirectionalCorridors.length} pairs · domestic not in this data`,
+      bar: top.map((p) => ({
+        key: `${p.country1}-${p.country2}`,
+        share: p.totalValue / total,
+      })),
+      rows,
+    };
+  }, [bidirectionalCorridors, countryNameByAlpha2, formatCurrency]);
+
   const remittanceRatio =
     globalInsights && globalInsights.totalRemittancesUsd > 0
       ? corridorVolume / globalInsights.totalRemittancesUsd
@@ -305,6 +388,55 @@ export function OverviewView() {
     previousGlobalInsights && previousGlobalInsights.totalRemittancesUsd > 0 && previousCorridorVolume != null
       ? previousCorridorVolume / previousGlobalInsights.totalRemittancesUsd
       : null;
+
+  const remittanceBreakdown = useMemo((): InsightBreakdown | null => {
+    if (remittanceRatio == null || !globalInsights || globalInsights.totalRemittancesUsd <= 0) {
+      return null;
+    }
+    const multiples = corridorsByCountry
+      .filter((c) => c.stablecoinPctOfRemittances != null && c.stablecoinPctOfRemittances >= 1)
+      .sort((a, b) => (b.stablecoinPctOfRemittances ?? 0) - (a.stablecoinPctOfRemittances ?? 0))
+      .slice(0, 5)
+      .map((c) => ({
+        label: c.name,
+        value: `${formatCurrency(c.outboundVolume)} · ${formatMultiple(c.stablecoinPctOfRemittances ?? 0)}`,
+      }));
+    return {
+      caption: `${formatCurrency(corridorVolume)} corridors vs ${formatCurrency(globalInsights.totalRemittancesUsd)} official remittances (annual / 12)`,
+      bar: [{ key: 'corridors', share: remittanceRatio }],
+      rows: multiples,
+      note: 'A comparison of unlike series, not the share of remittances on-chain.',
+    };
+  }, [remittanceRatio, globalInsights, corridorsByCountry, corridorVolume, formatCurrency]);
+
+  const dollarizationBreakdown = useMemo((): InsightBreakdown | null => {
+    if (corridorVolume <= 0 || corridorDollarShare == null) return null;
+    const usdVolume = corridorVolume * corridorDollarShare;
+    const nonUsdVolume = corridorVolume - usdVolume;
+    const tokenVol = new Map<string, number>();
+    for (const item of tokenMix) {
+      if (isNonUsdTicker(item.name)) tokenVol.set(item.name, item.volume);
+    }
+    const named = [...tokenVol.entries()].sort((a, b) => b[1] - a[1]);
+    const rows = named.slice(0, 5).map(([name, volume]) => ({
+      label: name,
+      value: formatCurrency(volume),
+      share: volume / corridorVolume,
+    }));
+    if (named.length === 0 && nonUsdVolume > 0) {
+      rows.push({
+        label: 'Not USD-referenced',
+        value: formatCurrency(nonUsdVolume),
+        share: nonUsdVolume / corridorVolume,
+      });
+    }
+    return {
+      caption: `${formatCurrency(usdVolume)} USD-referenced · ${formatCurrency(nonUsdVolume)} not USD`,
+      bar: [{ key: 'usd', share: corridorDollarShare }],
+      rows,
+      note: 'Named non-USD tokens from corridor top coins. USDT / USDC mix is below.',
+    };
+  }, [corridorVolume, corridorDollarShare, tokenMix, formatCurrency]);
 
   const usageRuleRows: UsageRuleRow[] = useMemo(() => {
     const stageMap = new Map(regulation.map((r) => [r.countryId, r.stage]));
@@ -436,6 +568,10 @@ export function OverviewView() {
         dollarizationTrendPp={dollarizationTrendPp}
         remittanceRatio={remittanceRatio}
         remittanceTrendPp={remittanceTrendPp}
+        walletBreakdown={walletBreakdown}
+        corridorBreakdown={corridorBreakdown}
+        remittanceBreakdown={remittanceBreakdown}
+        dollarizationBreakdown={dollarizationBreakdown}
         onSelectUsage={() => filters.setMapType('adoption')}
         formatCurrency={formatCurrency}
       />

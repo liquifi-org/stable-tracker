@@ -3,6 +3,21 @@ import { Wallet, ArrowLeftRight, Percent, DollarSign } from 'lucide-react';
 import { TrendBadge } from '../../app/components/TrendBadge';
 import { AnimatedNumber } from '../../app/components/AnimatedNumber';
 import { Skeleton } from '../../app/components/ui/skeleton';
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '../../app/components/ui/hover-card';
+import { fmtPct } from '../lib/format';
+
+export interface InsightBreakdownRow {
+  label: string;
+  value: string;
+  share?: number;
+}
+
+export interface InsightBreakdown {
+  bar?: { key: string; share: number }[];
+  caption?: string;
+  rows: InsightBreakdownRow[];
+  note?: string;
+}
 
 export function InsightCards({
   periodLabel,
@@ -10,12 +25,16 @@ export function InsightCards({
   corridorLoading,
   wallets,
   walletsTrend,
+  walletBreakdown,
   corridorVolume,
   corridorTrend,
+  corridorBreakdown,
   dollarization,
   dollarizationTrendPp,
+  dollarizationBreakdown,
   remittanceRatio,
   remittanceTrendPp,
+  remittanceBreakdown,
   onSelectUsage,
   formatCurrency,
 }: {
@@ -24,12 +43,16 @@ export function InsightCards({
   corridorLoading: boolean;
   wallets: number | undefined;
   walletsTrend: number | null;
+  walletBreakdown: InsightBreakdown | null;
   corridorVolume: number;
   corridorTrend: number | null;
+  corridorBreakdown: InsightBreakdown | null;
   dollarization: number | null;
   dollarizationTrendPp: number | null;
+  dollarizationBreakdown: InsightBreakdown | null;
   remittanceRatio: number | null;
   remittanceTrendPp: number | null;
+  remittanceBreakdown: InsightBreakdown | null;
   onSelectUsage: () => void;
   formatCurrency: (n: number) => string;
 }) {
@@ -44,6 +67,7 @@ export function InsightCards({
         trend={walletsTrend}
         trendFormat={(v) => `${v.toFixed(1)}%`}
         detail={`Holding stablecoins · ${periodLabel}`}
+        breakdown={walletBreakdown}
       />
       <InsightCard
         kicker="Corridors"
@@ -54,6 +78,7 @@ export function InsightCards({
         trend={corridorTrend}
         trendFormat={(v) => `${v.toFixed(1)}%`}
         detail={`International pairs only · domestic not in this data`}
+        breakdown={corridorBreakdown}
       />
       <InsightCard
         kicker="Vs remittances"
@@ -70,6 +95,7 @@ export function InsightCards({
         trend={remittanceTrendPp}
         trendFormat={(v) => `${v.toFixed(1)}pp`}
         detail={`Corridor volume vs official remittances (annual / 12) · ${periodLabel}`}
+        breakdown={remittanceBreakdown}
       />
       <InsightCard
         kicker="Dollarization"
@@ -86,6 +112,7 @@ export function InsightCards({
         trend={dollarizationTrendPp}
         trendFormat={(v) => `${v.toFixed(2)}pp`}
         detail={`USD-referenced share of corridor volume · ${periodLabel}`}
+        breakdown={dollarizationBreakdown}
       />
     </div>
   );
@@ -101,6 +128,7 @@ function InsightCard({
   trend,
   trendFormat,
   detail,
+  breakdown,
 }: {
   kicker: string;
   icon: typeof Wallet;
@@ -111,8 +139,9 @@ function InsightCard({
   trend?: number | null;
   trendFormat?: (v: number) => string;
   detail: string;
+  breakdown: InsightBreakdown | null;
 }) {
-  return (
+  const card = (
     <button
       type="button"
       onClick={onClick}
@@ -137,5 +166,67 @@ function InsightCard({
       </div>
       <p className="text-xs text-[var(--muted-ink)] mt-2 leading-relaxed">{detail}</p>
     </button>
+  );
+
+  if (loading || !breakdown) return card;
+
+  return (
+    <HoverCard openDelay={250} closeDelay={80}>
+      <HoverCardTrigger asChild>{card}</HoverCardTrigger>
+      <HoverCardContent
+        align="start"
+        side="bottom"
+        sideOffset={8}
+        collisionPadding={16}
+        className="insight-hover w-[min(22rem,calc(100vw-2rem))] p-4 shadow-none bg-[var(--paper-raised)] text-[var(--ink-text)] border-[var(--hairline)]"
+      >
+        <BreakdownPanel breakdown={breakdown} />
+      </HoverCardContent>
+    </HoverCard>
+  );
+}
+
+function BreakdownPanel({ breakdown }: { breakdown: InsightBreakdown }) {
+  return (
+    <div className="space-y-3">
+      {breakdown.caption ? (
+        <p className="text-[11px] leading-snug text-[var(--muted-ink)]">{breakdown.caption}</p>
+      ) : null}
+      {breakdown.bar && breakdown.bar.length > 0 ? <ShareBar segments={breakdown.bar} /> : null}
+      <ul className="space-y-1.5">
+        {breakdown.rows.map((row) => (
+          <li key={row.label} className="flex items-baseline justify-between gap-3 text-xs">
+            <span className="min-w-0 truncate text-[var(--ink-text)]">{row.label}</span>
+            <span className="shrink-0 tabular-nums text-[var(--muted-ink)]">
+              {row.value}
+              {row.share != null ? ` · ${fmtPct(row.share)}` : ''}
+            </span>
+          </li>
+        ))}
+      </ul>
+      {breakdown.note ? (
+        <p className="text-[11px] leading-snug text-[var(--muted-ink)]">{breakdown.note}</p>
+      ) : null}
+    </div>
+  );
+}
+
+function ShareBar({ segments }: { segments: { key: string; share: number }[] }) {
+  return (
+    <div className="flex h-1.5 overflow-hidden rounded-full bg-[color-mix(in_oklab,var(--ink-text)_10%,transparent)]">
+      {segments.map((segment, index) => (
+        <div
+          key={segment.key}
+          className="h-full"
+          style={{
+            width: `${Math.max(0, segment.share) * 100}%`,
+            backgroundColor:
+              index === 0
+                ? 'var(--brand)'
+                : `color-mix(in oklab, var(--brand) ${Math.max(25, 85 - index * 18)}%, var(--muted-ink))`,
+          }}
+        />
+      ))}
+    </div>
   );
 }
