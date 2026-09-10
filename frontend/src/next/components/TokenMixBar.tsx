@@ -60,7 +60,6 @@ export function NamedCorridorRow({
   leftAlpha,
   rightAlpha,
   volume,
-  leftShare,
   formatVolume,
   onClick,
 }: {
@@ -69,7 +68,6 @@ export function NamedCorridorRow({
   leftAlpha?: string;
   rightAlpha?: string;
   volume: number;
-  leftShare: number;
   formatVolume: (n: number) => string;
   onClick?: () => void;
 }) {
@@ -85,10 +83,7 @@ export function NamedCorridorRow({
         {rightAlpha && <CountryFlag isoAlpha2={rightAlpha} className="w-4 h-4" />}
         <span className="truncate text-sm font-medium text-[var(--ink-text)]">{right}</span>
       </div>
-      <div className="text-right shrink-0">
-        <div className="text-sm tabular-nums font-medium">{formatVolume(volume)}</div>
-        <div className="text-[10px] text-[var(--muted-ink)]">{(leftShare * 100).toFixed(0)}% from {leftAlpha ?? left}</div>
-      </div>
+      <div className="text-sm tabular-nums font-medium shrink-0">{formatVolume(volume)}</div>
     </button>
   );
 }

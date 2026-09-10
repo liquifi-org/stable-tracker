@@ -237,6 +237,34 @@ export function OverviewView() {
     return Array.from(pairMap.values());
   }, [corridorData, numericToMacroRegion]);
 
+  const directedCorridors = useMemo(() => {
+    const flows = new Map<string, { fromAlpha: string; toAlpha: string; volume: number }>();
+    for (const flow of corridorData) {
+      const fromAlpha = numericToAlpha2.get(flow.from);
+      const toAlpha = numericToAlpha2.get(flow.to);
+      if (!fromAlpha || !toAlpha || fromAlpha === toAlpha) continue;
+      const key = `${fromAlpha}->${toAlpha}`;
+      const existing = flows.get(key);
+      if (existing) existing.volume += flow.value.amount;
+      else flows.set(key, { fromAlpha, toAlpha, volume: flow.value.amount });
+    }
+    return Array.from(flows.values()).sort((a, b) => b.volume - a.volume);
+  }, [corridorData, numericToAlpha2]);
+
+  const directedRegionalCorridors = useMemo(() => {
+    const flows = new Map<string, { fromRegion: string; toRegion: string; volume: number }>();
+    for (const flow of corridorData) {
+      const fromRegion = numericToMacroRegion.get(flow.from);
+      const toRegion = numericToMacroRegion.get(flow.to);
+      if (!fromRegion || !toRegion || fromRegion === toRegion) continue;
+      const key = `${fromRegion}->${toRegion}`;
+      const existing = flows.get(key);
+      if (existing) existing.volume += flow.value.amount;
+      else flows.set(key, { fromRegion, toRegion, volume: flow.value.amount });
+    }
+    return Array.from(flows.values()).sort((a, b) => b.volume - a.volume);
+  }, [corridorData, numericToMacroRegion]);
+
   const corridorsByCountry = useMemo(() => {
     const outboundMap = new Map<string, number>();
     for (const pair of bidirectionalCorridors) {
@@ -642,8 +670,8 @@ export function OverviewView() {
                 <span className="text-xs text-[var(--muted-ink)]">
                   {tableKind === 'corridors'
                     ? geoMode === 'region'
-                      ? `${regionalCorridors.length} pairs · domestic not in this data`
-                      : `${bidirectionalCorridors.length} pairs · domestic not in this data`
+                      ? `${directedRegionalCorridors.length} corridors`
+                      : `${directedCorridors.length} corridors`}
                     : geoMode === 'region'
                       ? `${regionalData.length} regions`
                       : `${adoptionTableData.length} countries · gray on the map is no outbound corridors or no GDP`}
@@ -664,47 +692,43 @@ export function OverviewView() {
             {tableKind === 'corridors' ? (
               <div className="relative">
                 <div className="named-corridors-scroll max-h-[48rem] overflow-y-auto divide-y divide-[var(--hairline)]">
-                  {corridorLoading && bidirectionalCorridors.length === 0 ? (
+                  {corridorLoading && directedCorridors.length === 0 ? (
                     <Skeleton className="h-40 w-full" />
                   ) : geoMode === 'region' ? (
-                    [...regionalCorridors]
-                      .sort((a, b) => b.totalValue - a.totalValue)
-                      .map((pair) => (
-                        <NamedCorridorRow
-                          key={`${pair.region1}-${pair.region2}`}
-                          left={pair.region1}
-                          right={pair.region2}
-                          volume={pair.totalValue}
-                          leftShare={pair.totalValue > 0 ? pair.valueFromRegion1 / pair.totalValue : 0}
-                          formatVolume={formatCurrency}
-                        />
-                      ))
+                    directedRegionalCorridors.map((flow) => (
+                      <NamedCorridorRow
+                        key={`${flow.fromRegion}-${flow.toRegion}`}
+                        left={flow.fromRegion}
+                        right={flow.toRegion}
+                        volume={flow.volume}
+                        formatVolume={formatCurrency}
+                      />
+                    ))
                   ) : (
-                    bidirectionalCorridors.map((pair) => {
-                      const leftId = alpha2ToNumeric.get(pair.country1);
+                    directedCorridors.map((flow) => {
+                      const fromId = alpha2ToNumeric.get(flow.fromAlpha);
                       return (
                         <NamedCorridorRow
-                          key={`${pair.country1}-${pair.country2}`}
-                          left={countryNameByAlpha2.get(pair.country1) ?? pair.country1}
-                          right={countryNameByAlpha2.get(pair.country2) ?? pair.country2}
-                          leftAlpha={pair.country1}
-                          rightAlpha={pair.country2}
-                          volume={pair.totalValue}
-                          leftShare={pair.totalValue > 0 ? pair.valueFromCountry1 / pair.totalValue : 0}
+                          key={`${flow.fromAlpha}-${flow.toAlpha}`}
+                          left={countryNameByAlpha2.get(flow.fromAlpha) ?? flow.fromAlpha}
+                          right={countryNameByAlpha2.get(flow.toAlpha) ?? flow.toAlpha}
+                          leftAlpha={flow.fromAlpha}
+                          rightAlpha={flow.toAlpha}
+                          volume={flow.volume}
                           formatVolume={formatCurrency}
                           onClick={
-                            leftId
+                            fromId
                               ? () =>
                                   navigate(
                                     countryPath({
-                                      countryId: leftId,
-                                      name: countryNameByAlpha2.get(pair.country1),
-                                      isoAlpha2: pair.country1,
+                                      countryId: fromId,
+                                      name: countryNameByAlpha2.get(flow.fromAlpha),
+                                      isoAlpha2: flow.fromAlpha,
                                     }),
                                     {
                                       state: {
-                                        name: countryNameByAlpha2.get(pair.country1),
-                                        isoAlpha2: pair.country1,
+                                        name: countryNameByAlpha2.get(flow.fromAlpha),
+                                        isoAlpha2: flow.fromAlpha,
                                       },
                                     },
                                   )
@@ -715,7 +739,7 @@ export function OverviewView() {
                     })
                   )}
                 </div>
-                {(geoMode === 'region' ? regionalCorridors.length : bidirectionalCorridors.length) > 10 && (
+                {(geoMode === 'region' ? directedRegionalCorridors.length : directedCorridors.length) > 10 && (
                   <div
                     aria-hidden
                     className="pointer-events-none absolute bottom-0 left-0 right-2.5 h-10 bg-gradient-to-t from-[var(--paper-raised)] to-transparent"
