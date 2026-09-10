@@ -62,7 +62,7 @@ export function OverviewView() {
   const [adoptionLoading, setAdoptionLoading] = useState(false);
   const [regionalData, setRegionalData] = useState<RegionalAdoptionMetric[]>([]);
   const [geoMode, setGeoMode] = useState<GeoMode>('country');
-  const [tableKind, setTableKind] = useState<TableKind>('corridors');
+  const [tableKind, setTableKind] = useState<TableKind>('countries');
   const [corridorData, setCorridorData] = useState<CorridorFlow[]>([]);
   const [corridorLoading, setCorridorLoading] = useState(false);
   const [previousCorridorVolume, setPreviousCorridorVolume] = useState<number | null>(null);
