@@ -77,7 +77,7 @@ export function InsightCards({
         value={<AnimatedNumber value={corridorLoading ? null : corridorVolume} format={formatCurrency} />}
         trend={corridorTrend}
         trendFormat={(v) => `${v.toFixed(1)}%`}
-        detail={`International pairs only · domestic not in this data`}
+        detail="International pairs only"
         breakdown={corridorBreakdown}
       />
       <InsightCard
@@ -93,7 +93,7 @@ export function InsightCards({
         }
         trend={remittanceTrendPp}
         trendFormat={(v) => `${v.toFixed(1)}pp`}
-        detail={`Corridor volume vs official remittances (annual / 12) · ${periodLabel}`}
+        detail="Corridor volume vs official remittances"
         breakdown={remittanceBreakdown}
       />
       <InsightCard
