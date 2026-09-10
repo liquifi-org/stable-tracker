@@ -450,16 +450,10 @@ export class MongoAnalyticsRepository implements IAnalyticsRepository {
     // ------------------------------------------------------------------
     async getCountryOverview(params: CountryOverviewParams): Promise<CountryOverview | null> {
         const { countryId, year, month, referenceAsset } = params;
-        const { start, end } = periodBoundaries(year, month);
+        const { end } = periodBoundaries(year, month);
 
         const countryDoc = await CountryModel.findOne({ countryId }).lean();
         if (!countryDoc) return null;
-
-        let stablecoinIds: string[] | null = null;
-        if (referenceAsset) {
-            const coins = await StablecoinModel.find({ referenceAsset }).lean();
-            stablecoinIds = coins.map((c) => c.stablecoinId);
-        }
 
         // Active wallets — prefer the latest monthly snapshot, fall back to
         // live WalletModel counts when no snapshot exists yet.
@@ -474,29 +468,6 @@ export class MongoAnalyticsRepository implements IAnalyticsRepository {
                 dateOpened: { $lte: end },
                 $or: [{ dateClosed: null }, { dateClosed: { $gt: end } }],
             }));
-
-        // Transaction value share (corridor snapshots excluded — they are aggregate monthly data)
-        const txFilter: Record<string, unknown> = {
-            type: { $ne: 'corridor' },
-            date: { $gte: start, $lte: end },
-        };
-        if (stablecoinIds) txFilter['stablecoinId'] = { $in: stablecoinIds };
-
-        interface TxAgg { totalValue: number }
-        const [countryTxAgg, globalTxAgg] = await Promise.all([
-            TransactionModel.aggregate<TxAgg>([
-                { $match: { ...txFilter, senderCountryId: countryId } },
-                { $group: { _id: null, totalValue: { $sum: '$value.amount' } } },
-            ]),
-            TransactionModel.aggregate<TxAgg>([
-                { $match: txFilter },
-                { $group: { _id: null, totalValue: { $sum: '$value.amount' } } },
-            ]),
-        ]);
-
-        const countryTxValue = countryTxAgg[0]?.totalValue ?? 0;
-        const globalTxValue = globalTxAgg[0]?.totalValue ?? 0;
-        const txValueShare = globalTxValue > 0 ? countryTxValue / globalTxValue : 0;
 
         // Dollarization index — from Allium corridor snapshots for the period:
         // usdStablecoinVolume / totalUsdVolume across all outbound corridors.
@@ -569,7 +540,7 @@ export class MongoAnalyticsRepository implements IAnalyticsRepository {
             population: countryDoc.population && countryDoc.population > 0
                 ? countryDoc.population
                 : undefined,
-            txValueShare: parseFloat(txValueShare.toFixed(6)),
+            txValueShare: parseFloat((adoptionRow?.txValueShare ?? 0).toFixed(6)),
             dollarizationIndex: parseFloat(dollarizationIndex.toFixed(6)),
             gdp: adoptionRow?.gdp,
             gdpYear: adoptionRow?.gdpYear,
