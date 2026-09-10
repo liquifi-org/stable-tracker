@@ -83,7 +83,6 @@ export function InsightCards({
       <InsightCard
         kicker="Vs remittances"
         icon={Percent}
-        sourceNote="World Bank"
         loading={loading || corridorLoading}
         onClick={onSelectUsage}
         value={
@@ -100,7 +99,6 @@ export function InsightCards({
       <InsightCard
         kicker="Dollarization"
         icon={DollarSign}
-        sourceNote="Allium"
         loading={corridorLoading}
         onClick={onSelectUsage}
         value={
@@ -121,7 +119,6 @@ export function InsightCards({
 function InsightCard({
   kicker,
   icon: Icon,
-  sourceNote,
   loading,
   onClick,
   value,
@@ -132,7 +129,6 @@ function InsightCard({
 }: {
   kicker: string;
   icon: typeof Wallet;
-  sourceNote?: string;
   loading: boolean;
   onClick: () => void;
   value: ReactNode;
@@ -152,11 +148,6 @@ function InsightCard({
           <Icon className="w-3.5 h-3.5" aria-hidden />
           {kicker}
         </span>
-        {sourceNote ? (
-          <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--muted-ink)]">
-            {sourceNote}
-          </span>
-        ) : null}
       </div>
       <div className="flex items-baseline gap-2 flex-wrap">
         <div className="display text-[1.85rem] sm:text-[2rem] tracking-tight text-[var(--ink-text)]">
