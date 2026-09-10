@@ -21,6 +21,7 @@ import {
     assertApiKey,
     DB_URL,
     WALLETS_QUERY_ID,
+    WALLETS_MAX_POLLS,
     runAndWait,
     type ResultRow,
 } from './_client';
@@ -103,10 +104,14 @@ function startOfMonth(year: number, month: number): string {
     return `${year}-${String(month).padStart(2, '0')}-01`;
 }
 
-/** "YYYY-MM-DD" for the last day of the given year/month. */
-function endOfMonth(year: number, month: number): string {
-    const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
-    return `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+/**
+ * Exclusive end date for Allium: first day of the month after `year`/`month`.
+ * SQL is `block_timestamp >= start_date AND block_timestamp < end_date`, so
+ * August must use end_date 2026-09-01 (not 2026-08-31, which drops the last day).
+ */
+function startOfNextMonth(year: number, month: number): string {
+    const next = new Date(Date.UTC(year, month, 1));
+    return `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, '0')}-01`;
 }
 
 export async function run(year?: number, month?: number): Promise<void> {
@@ -118,16 +123,21 @@ export async function run(year?: number, month?: number): Promise<void> {
     const period = `${targetYear}-${String(targetMonth).padStart(2, '0')}`;
     const periodDate = new Date(`${period}-01T00:00:00.000Z`);
     const startDate = startOfMonth(targetYear, targetMonth);
-    const endDate = endOfMonth(targetYear, targetMonth);
+    const endDate = startOfNextMonth(targetYear, targetMonth);
 
     console.log(`Fetching wallet counts from Allium for ${startDate} → ${endDate}...`);
 
     // Allium interpolates these raw into SQL, so the parameter value itself
     // must carry the surrounding quotes (e.g. "'2026-04-01'").
-    const rows = await runAndWait(WALLETS_QUERY_ID, {
-        start_date: `'${startDate}'`,
-        end_date: `'${endDate}'`,
-    });
+    const rows = await runAndWait(
+        WALLETS_QUERY_ID,
+        {
+            start_date: `'${startDate}'`,
+            end_date: `'${endDate}'`,
+        },
+        undefined,
+        WALLETS_MAX_POLLS,
+    );
     console.log(`Received ${rows.length} row(s) from Allium.`);
 
     if (rows.length === 0) {
