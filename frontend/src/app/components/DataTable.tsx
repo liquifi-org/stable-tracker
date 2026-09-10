@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useState, type ReactNode } from 'react';
-import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ChevronUp, ChevronDown } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ChevronUp, ChevronDown, Plus, Minus } from 'lucide-react';
 
 interface Column {
   key: string;
@@ -143,11 +143,11 @@ export function DataTable({
                               event.stopPropagation();
                               toggleExpanded(key);
                             }}
-                            className="p-1 rounded text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-neutral-700 transition-ui"
+                            className="inline-flex items-center justify-center w-5 h-5 rounded border border-slate-300 dark:border-neutral-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-neutral-700 transition-ui"
                           >
                             {expanded
-                              ? <ChevronDown className="w-4 h-4" />
-                              : <ChevronRight className="w-4 h-4" />}
+                              ? <Minus className="w-3 h-3" strokeWidth={2.5} />
+                              : <Plus className="w-3 h-3" strokeWidth={2.5} />}
                           </button>
                         ) : null}
                       </td>
