@@ -14,8 +14,12 @@ export const DB_URL = process.env.DB_URL ?? 'mongodb://localhost:27017/sc-tracke
 export const WALLETS_QUERY_ID =
     process.env.ALLIUM_WALLETS_QUERY_ID ?? 'VsBubvbe7ZyzFNB3xx9Q';
 
+/** Raw (unadjusted) archive — `release1-corridors` on stablecoins.core.transfers. */
+export const RAW_CORRIDORS_QUERY_ID = 'djvIso1YNXUFa34rTjdD';
+
+/** Visa-methodology adjusted corridors — `release2-corridors-adjusted`. */
 export const CORRIDORS_QUERY_ID =
-    process.env.ALLIUM_CORRIDORS_QUERY_ID ?? 'djvIso1YNXUFa34rTjdD';
+    process.env.ALLIUM_CORRIDORS_QUERY_ID ?? '8YuhvYmP5xLFOqLuuHCZ';
 
 export const RUN_LIMIT = 10000;
 /** Token-grain corridor months can exceed 10k rows; Allium allows up to 250k. */

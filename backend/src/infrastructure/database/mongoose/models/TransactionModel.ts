@@ -16,6 +16,8 @@ export interface ITransactionDoc extends Document {
     pctUsdStablecoins?: number;
     period?: string;
     source?: string;
+    /** `adjusted` = Allium is_adjusted_volume; omitted on legacy raw rows. */
+    volumeKind?: string;
 }
 
 const TransactionSchema = new Schema<ITransactionDoc>(
@@ -40,6 +42,7 @@ const TransactionSchema = new Schema<ITransactionDoc>(
         pctUsdStablecoins: { type: Number },
         period: { type: String, index: true },
         source: { type: String },
+        volumeKind: { type: String },
     },
     { timestamps: true },
 );

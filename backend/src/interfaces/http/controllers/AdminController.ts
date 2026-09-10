@@ -4,6 +4,7 @@ import logger from '../../../util/logger';
 import { CountryModel } from '../../../infrastructure/database/mongoose/models/CountryModel';
 import { COUNTRIES_SEED } from '../../../../migrations/data/countries.seed';
 import { run as runWalletSync } from '../../../../script/allium/sync-wallets';
+import { run as runCorridorSync } from '../../../../script/allium/sync-corridors';
 import { run as runPopulationSync } from '../../../../script/general/sync-population';
 import { run as runGdpSync } from '../../../../script/general/sync-gdp';
 import { run as runStrideCountries } from '../../../../script/stride/sync-countries';
@@ -46,6 +47,23 @@ export class AdminController {
             await runPopulationSync();
             logger.info('ADMIN_SYNC_POPULATION_COMPLETED');
             httpResponse(req, res, 200, 'Population sync completed.');
+        } catch (error) {
+            next(error);
+        }
+    };
+
+    syncCorridors = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            if (!process.env.ALLIUM_API_KEY) {
+                httpResponse(req, res, 503, 'ALLIUM_API_KEY is not configured on the server.');
+                return;
+            }
+            const year = typeof req.body?.year === 'number' ? req.body.year : undefined;
+            const month = typeof req.body?.month === 'number' ? req.body.month : undefined;
+            logger.info('ADMIN_SYNC_CORRIDORS_STARTED', { year, month });
+            await runCorridorSync(year, month);
+            logger.info('ADMIN_SYNC_CORRIDORS_COMPLETED', { year, month });
+            httpResponse(req, res, 200, 'Allium adjusted corridor sync completed.');
         } catch (error) {
             next(error);
         }
