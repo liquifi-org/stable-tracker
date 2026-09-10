@@ -23,6 +23,7 @@ import { UsageRegulationMatrix, type UsageRuleRow } from '../components/UsageReg
 import { InsightCards, type InsightBreakdown } from '../components/InsightCards';
 import { countryPath } from '../../app/lib/countryRoutes';
 import { MAP_FOCUS_COUNTRY, type MapFocusCountryDetail } from '../../app/lib/mapEvents';
+import { isDisplayableCorridorVolume, isDisplayableWalletCount } from '../../app/lib/displayFloors';
 
 function isNonUsdTicker(name: string): boolean {
   const n = name.toUpperCase();
@@ -183,6 +184,10 @@ export function OverviewView() {
     () => new Map(adoptionData.map((c) => [c.countryId, c.macroRegion])),
     [adoptionData],
   );
+  const displayableAlphas = useMemo(
+    () => new Set(adoptionData.filter((c) => isDisplayableWalletCount(c.activeWallets)).map((c) => c.isoAlpha2)),
+    [adoptionData],
+  );
 
   const bidirectionalCorridors = useMemo(() => {
     const pairMap = new Map<string, {
@@ -223,8 +228,14 @@ export function OverviewView() {
       }
       pair.totalValue = pair.valueFromCountry1 + pair.valueFromCountry2;
     }
-    return Array.from(pairMap.values()).sort((a, b) => b.totalValue - a.totalValue);
-  }, [corridorData, numericToAlpha2]);
+    return Array.from(pairMap.values())
+      .filter((p) =>
+        isDisplayableCorridorVolume(p.totalValue)
+        && displayableAlphas.has(p.country1)
+        && displayableAlphas.has(p.country2),
+      )
+      .sort((a, b) => b.totalValue - a.totalValue);
+  }, [corridorData, numericToAlpha2, displayableAlphas]);
 
   const regionalCorridors = useMemo(() => {
     const pairMap = new Map<string, {
@@ -256,7 +267,7 @@ export function OverviewView() {
       else pair.valueFromRegion2 += flow.value.amount;
       pair.totalValue = pair.valueFromRegion1 + pair.valueFromRegion2;
     }
-    return Array.from(pairMap.values());
+    return Array.from(pairMap.values()).filter((p) => isDisplayableCorridorVolume(p.totalValue));
   }, [corridorData, numericToMacroRegion]);
 
   const directedCorridors = useMemo(() => {
@@ -290,8 +301,13 @@ export function OverviewView() {
         volume: f.volume,
         tokens: tokensWithResidual(f.volume, f.tokens),
       }))
+      .filter((f) =>
+        isDisplayableCorridorVolume(f.volume)
+        && displayableAlphas.has(f.fromAlpha)
+        && displayableAlphas.has(f.toAlpha),
+      )
       .sort((a, b) => b.volume - a.volume);
-  }, [corridorData, numericToAlpha2]);
+  }, [corridorData, numericToAlpha2, displayableAlphas]);
 
   const directedRegionalCorridors = useMemo(() => {
     const flows = new Map<string, {
@@ -324,6 +340,7 @@ export function OverviewView() {
         volume: f.volume,
         tokens: tokensWithResidual(f.volume, f.tokens),
       }))
+      .filter((f) => isDisplayableCorridorVolume(f.volume))
       .sort((a, b) => b.volume - a.volume);
   }, [corridorData, numericToMacroRegion]);
 
@@ -427,11 +444,7 @@ export function OverviewView() {
     const previousRankMap = new Map(previousAdoptionData.map((c) => [c.countryId, c.adoptionRank]));
     const previousWalletsMap = new Map(previousAdoptionData.map((c) => [c.countryId, c.activeWallets]));
     return adoptionData
-      .filter((c) =>
-        c.activeWallets > 0
-        || (c.outboundVolume ?? 0) > 0
-        || (inboundByCountry.get(c.countryId) ?? 0) > 0,
-      )
+      .filter((c) => isDisplayableWalletCount(c.activeWallets))
       .map((c) => {
         const previousRank = previousRankMap.get(c.countryId) ?? null;
         const previousWallets = previousWalletsMap.get(c.countryId) ?? null;
@@ -503,7 +516,7 @@ export function OverviewView() {
       });
     }
     return {
-      caption: 'Share of wallets holding stablecoins',
+      caption: 'Share of attributed wallets holding stablecoins',
       bar: top.map((c) => ({ key: c.countryId, share: c.activeWallets / total })),
       rows,
       note: densest
@@ -613,13 +626,15 @@ export function OverviewView() {
 
   const usageRuleRows: UsageRuleRow[] = useMemo(() => {
     const stageMap = new Map(regulation.map((r) => [r.countryId, r.stage]));
-    return adoptionData.map((c) => ({
-      countryId: c.countryId,
-      name: c.name,
-      isoAlpha2: c.isoAlpha2,
-      gdpIntensity: c.gdpIntensity,
-      stage: stageMap.get(c.countryId),
-    }));
+    return adoptionData
+      .filter((c) => isDisplayableWalletCount(c.activeWallets))
+      .map((c) => ({
+        countryId: c.countryId,
+        name: c.name,
+        isoAlpha2: c.isoAlpha2,
+        gdpIntensity: c.gdpIntensity,
+        stage: stageMap.get(c.countryId),
+      }));
   }, [adoptionData, regulation]);
 
   const adoptionColumns = [
@@ -666,9 +681,7 @@ export function OverviewView() {
     },
     {
       key: 'activeWallets',
-      header: (
-        <span>Wallets</span>
-      ),
+      header: 'Attributed wallets',
       render: (value: number, row: { walletsChangePct: number | null }) => (
         <span className="inline-flex items-center gap-2">
           {value.toLocaleString()}
@@ -688,7 +701,7 @@ export function OverviewView() {
     { key: 'countryCount', header: 'Countries' },
     {
       key: 'activeWallets',
-      header: 'Wallets',
+      header: 'Attributed wallets',
       render: (value: number) => value.toLocaleString(),
     },
     {
@@ -773,7 +786,7 @@ export function OverviewView() {
               <RealCorridorMap
                 corridors={bidirectionalCorridors}
                 regionalCorridors={regionalCorridors}
-                countries={adoptionData}
+                countries={adoptionData.filter((c) => isDisplayableWalletCount(c.activeWallets))}
                 regionalAdoption={regionalData}
                 mode={geoMode}
                 getCountryName={(alpha2) => countryNameByAlpha2.get(alpha2) ?? alpha2}

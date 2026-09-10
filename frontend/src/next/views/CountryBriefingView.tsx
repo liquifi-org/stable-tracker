@@ -28,6 +28,7 @@ import { fmtPct, fmtPer100k } from '../lib/format';
 import { TokenMixBar } from '../components/TokenMixBar';
 import { canonicalCountrySlug, countryDisplayName, prettyCountryName } from '../../app/lib/countryRoutes';
 import { SEO, usePageMeta } from '../lib/seo';
+import { isDisplayableCorridorVolume } from '../../app/lib/displayFloors';
 
 const ISSUER_DOMAINS: Record<string, string> = {
   tether: 'tether.to',
@@ -323,14 +324,18 @@ export function CountryBriefingView() {
       render: (v: number) => formatCurrency(v),
     },
   ];
-  const outflows = (corridors?.outflows ?? []).map((f) => ({
-    partner: f.toName ?? f.to,
-    amount: f.value.amount,
-  }));
-  const inflows = (corridors?.inflows ?? []).map((f) => ({
-    partner: f.fromName ?? f.from,
-    amount: f.value.amount,
-  }));
+  const outflows = (corridors?.outflows ?? [])
+    .filter((f) => isDisplayableCorridorVolume(f.value.amount))
+    .map((f) => ({
+      partner: f.toName ?? f.to,
+      amount: f.value.amount,
+    }));
+  const inflows = (corridors?.inflows ?? [])
+    .filter((f) => isDisplayableCorridorVolume(f.value.amount))
+    .map((f) => ({
+      partner: f.fromName ?? f.from,
+      amount: f.value.amount,
+    }));
 
   return (
     <div className="space-y-8">

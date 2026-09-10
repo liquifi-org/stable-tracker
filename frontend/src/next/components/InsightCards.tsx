@@ -61,7 +61,7 @@ export function InsightCards({
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
       <InsightCard
-        kicker="Wallets"
+        kicker="Attributed wallets"
         icon={Wallet}
         loading={loading}
         onClick={onSelectUsage}
