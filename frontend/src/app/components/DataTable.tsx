@@ -21,6 +21,8 @@ interface DataTableProps {
   renderExpanded?: (row: any) => ReactNode;
   /** Row keys to expand after resetKey/data changes. */
   expandKeys?: string[];
+  /** User expanded a collapsed row (plus control or row click). Not fired for collapse or expandKeys. */
+  onExpand?: (row: any) => void;
 }
 
 export function DataTable({
@@ -35,6 +37,7 @@ export function DataTable({
   isExpandable,
   renderExpanded,
   expandKeys,
+  onExpand,
 }: DataTableProps) {
   const [currentPage, setCurrentPage] = useState(0);
   const [sortKey, setSortKey] = useState<string | null>(defaultSortKey ?? null);
@@ -58,6 +61,12 @@ export function DataTable({
       else next.add(key);
       return next;
     });
+  };
+
+  const expandFromUser = (row: any, key: string) => {
+    const willExpand = !expandedKeys.has(key);
+    toggleExpanded(key);
+    if (willExpand) onExpand?.(row);
   };
 
   const handleSort = (key: string) => {
@@ -127,7 +136,7 @@ export function DataTable({
                   <tr
                     onClick={() => {
                       if (expandable) {
-                        toggleExpanded(key);
+                        expandFromUser(row, key);
                         return;
                       }
                       onRowClick?.(row);
@@ -145,7 +154,7 @@ export function DataTable({
                             aria-label={expanded ? 'Collapse row' : 'Expand row'}
                             onClick={(event) => {
                               event.stopPropagation();
-                              toggleExpanded(key);
+                              expandFromUser(row, key);
                             }}
                             className="inline-flex items-center justify-center w-5 h-5 rounded border border-slate-300 dark:border-neutral-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-neutral-700 transition-ui"
                           >

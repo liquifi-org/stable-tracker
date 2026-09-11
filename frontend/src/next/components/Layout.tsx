@@ -8,6 +8,7 @@ import { Footer } from './Footer';
 import { CountryCommandPalette } from '../../app/components/CountryCommandPalette';
 import { usePrefersReducedMotion } from '../../app/hooks/usePrefersReducedMotion';
 import { SEO, usePageMeta } from '../lib/seo';
+import { useGoogleAnalytics } from '../lib/analytics';
 import logo from '../../assets/logos/logo_white.png';
 
 const GITHUB_URL = 'https://github.com/liquifi-org/stable-tracker';
@@ -66,6 +67,7 @@ function LayoutBody({ isDark, toggle }: { isDark: boolean; toggle: () => void })
             ? null
             : { ...SEO.overview, path: '/' };
   usePageMeta(pageMeta);
+  useGoogleAnalytics();
 
   const isWhitepaper = location.pathname === '/whitepaper';
   const isOverview = location.pathname === '/' || location.pathname.startsWith('/country/');

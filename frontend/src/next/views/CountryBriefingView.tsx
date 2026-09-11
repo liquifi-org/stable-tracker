@@ -26,8 +26,9 @@ import { Tooltip, TooltipTrigger, TooltipContent } from '../../app/components/ui
 import { classifyMarket, stageLabel } from '../lib/marketType';
 import { fmtPct, fmtPer100k } from '../lib/format';
 import { TokenMixBar } from '../components/TokenMixBar';
-import { canonicalCountrySlug, countryDisplayName, prettyCountryName } from '../../app/lib/countryRoutes';
+import { canonicalCountrySlug, countryAlpha2, countryDisplayName, prettyCountryName } from '../../app/lib/countryRoutes';
 import { SEO, usePageMeta } from '../lib/seo';
+import { trackCountryPage } from '../lib/analytics';
 import { isDisplayableCorridorVolume } from '../../app/lib/displayFloors';
 
 const ISSUER_DOMAINS: Record<string, string> = {
@@ -271,6 +272,15 @@ export function CountryBriefingView() {
   });
 
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
+  useEffect(() => {
+    if (!numericId || !param) return;
+    trackCountryPage({
+      name: prettyCountryName({ countryId: numericId, name: countryDisplayName(numericId) ?? param }) || param,
+      iso: countryAlpha2(numericId),
+      slug: canonicalCountrySlug({ countryId: numericId }) ?? param,
+    });
+  }, [param, numericId]);
+
   usePageMeta(
     numericId
       ? {

@@ -106,6 +106,11 @@ export function countryDisplayName(numericId: number | string): string | null {
   return ISO_COUNTRIES.find((c) => c.numeric === padded)?.name ?? null;
 }
 
+export function countryAlpha2(numericId: number | string): string | null {
+  const padded = String(numericId).trim().padStart(3, '0');
+  return ISO_COUNTRIES.find((c) => c.numeric === padded)?.alpha2 ?? null;
+}
+
 /** ISO short name when we can resolve the country; otherwise strip parentheticals. */
 export function prettyCountryName(ref: CountryRef): string {
   if (ref.isoAlpha2) {

@@ -22,6 +22,7 @@ import { TokenMixBar, NamedCorridorDestRow, type TokenShare } from '../component
 import { UsageRegulationMatrix, type UsageRuleRow } from '../components/UsageRegulationMatrix';
 import { InsightCards, type InsightBreakdown } from '../components/InsightCards';
 import { countryPath } from '../../app/lib/countryRoutes';
+import { trackExpandCountryCorridors } from '../lib/analytics';
 import { MAP_FOCUS_COUNTRY, type MapFocusCountryDetail } from '../../app/lib/mapEvents';
 import { isDisplayableCorridorVolume, isDisplayableWalletCount } from '../../app/lib/displayFloors';
 
@@ -868,6 +869,13 @@ export function OverviewView() {
                 resetKey={`${filters.year}-${filters.month}-adoption-${selectedPlace ?? 'all'}`}
                 expandKeys={countryExpandKeys}
                 isExpandable={(row) => (destsByOriginAlpha.get(row.isoAlpha2)?.length ?? 0) > 0}
+                onExpand={(row) =>
+                  trackExpandCountryCorridors({
+                    name: row.name,
+                    iso: row.isoAlpha2,
+                    corridor_count: destsByOriginAlpha.get(row.isoAlpha2)?.length ?? 0,
+                  })
+                }
                 renderExpanded={(row) => {
                   const dests = destsByOriginAlpha.get(row.isoAlpha2) ?? [];
                   const maxVolume = dests[0]?.volume ?? 0;
