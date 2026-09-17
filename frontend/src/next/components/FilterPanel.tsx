@@ -31,14 +31,12 @@ export function FilterPanel() {
     regionFrom,
     regionTo,
     mapType,
-    displayCurrency,
     setYear,
     setMonth,
     setReferenceAsset,
     setStablecoin,
     setRegionFrom,
     setRegionTo,
-    setDisplayCurrency,
   } = useFilters();
 
   const showCorridorFilters = mapType !== 'regulation';
@@ -67,8 +65,7 @@ export function FilterPanel() {
     referenceAsset !== 'All' ||
     stablecoin !== 'All' ||
     regionFrom !== 'All' ||
-    regionTo !== 'All' ||
-    displayCurrency !== 'USD';
+    regionTo !== 'All';
 
   const handleResetFilters = () => {
     setYear(MAX_YEAR);
@@ -77,7 +74,6 @@ export function FilterPanel() {
     setStablecoin('All');
     setRegionFrom('All');
     setRegionTo('All');
-    setDisplayCurrency('USD');
   };
 
   const chips: { key: string; label: string; onClear: () => void }[] = [];
@@ -90,9 +86,6 @@ export function FilterPanel() {
         setMonth(maxMonthForYear(MAX_YEAR));
       },
     });
-  }
-  if (displayCurrency !== 'USD') {
-    chips.push({ key: 'fx', label: displayCurrency, onClear: () => setDisplayCurrency('USD') });
   }
   if (showCorridorFilters && referenceAsset !== 'All') {
     chips.push({ key: 'asset', label: referenceAsset, onClear: () => setReferenceAsset('All') });
@@ -143,26 +136,6 @@ export function FilterPanel() {
                 options={monthOptions}
               />
             </div>
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-sm text-slate-700 dark:text-slate-300 mb-2 font-medium">Display currency</label>
-          <div className="flex gap-1 bg-slate-100 dark:bg-neutral-900 rounded-lg p-1">
-            {(['USD', 'EUR'] as const).map((currency) => (
-              <button
-                key={currency}
-                onClick={() => setDisplayCurrency(currency)}
-                className={`flex-1 px-3 py-1.5 rounded-md text-sm font-medium transition-ui ${
-                  displayCurrency === currency
-                    ? 'text-white'
-                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
-                }`}
-                style={displayCurrency === currency ? { backgroundColor: 'var(--brand)' } : {}}
-              >
-                {currency}
-              </button>
-            ))}
           </div>
         </div>
 
@@ -318,14 +291,12 @@ export function MobileFilterBar() {
     regionFrom,
     regionTo,
     mapType,
-    displayCurrency,
     setYear,
     setMonth,
     setReferenceAsset,
     setStablecoin,
     setRegionFrom,
     setRegionTo,
-    setDisplayCurrency,
   } = useFilters();
 
   const showCorridorFilters = mapType !== 'regulation';
@@ -346,9 +317,6 @@ export function MobileFilterBar() {
       onClear: () => {},
     });
   }
-  if (displayCurrency !== 'USD') {
-    chips.push({ key: 'fx', label: displayCurrency, onClear: () => setDisplayCurrency('USD') });
-  }
   if (showCorridorFilters && referenceAsset !== 'All') {
     chips.push({ key: 'asset', label: referenceAsset, onClear: () => setReferenceAsset('All') });
   }
@@ -368,8 +336,7 @@ export function MobileFilterBar() {
     referenceAsset !== 'All' ||
     stablecoin !== 'All' ||
     regionFrom !== 'All' ||
-    regionTo !== 'All' ||
-    displayCurrency !== 'USD';
+    regionTo !== 'All';
 
   return (
     <div className="lg:hidden border-t border-white/10 bg-[var(--ink)] px-5 sm:px-8 py-2 flex items-center gap-2">
