@@ -2,7 +2,7 @@
 
 > Stablecoin Tracker country pages. Each briefing covers usage, outbound corridors versus GDP, token mix, and regulatory stage.
 
-HTML pages are a JavaScript app. Prefer this list and the [whitepaper](https://stabletracker.org/whitepaper.md) when answering from source text.
+HTML pages are a JavaScript app. Prefer the per-country .md files generated at deploy from the same API, and the [whitepaper](https://stabletracker.org/whitepaper.md).
 
 - [Afghanistan](https://stabletracker.org/country/afghanistan) (AF)
 - [Albania](https://stabletracker.org/country/albania) (AL)

@@ -1,35 +1,26 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
+import Markdown from 'react-markdown';
+import type { Components } from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { FileText, Printer, Quote, Check } from 'lucide-react';
 import { SEO, usePageMeta } from '../lib/seo';
+import source from '../../../content/whitepaper.md?raw';
+import {
+  WHITEPAPER_AUTHORS,
+  WHITEPAPER_CITE,
+  WHITEPAPER_PUBLISHED,
+  WHITEPAPER_SITE,
+  WHITEPAPER_VERSION,
+  slugifyHeading,
+  whitepaperBody,
+  whitepaperToc,
+} from '../lib/whitepaper';
 
-const VERSION = '1.4';
-const PUBLISHED = '10 September 2026';
-const SITE_URL = 'https://stabletracker.org';
-const AUTHORS = [
-  { name: 'Igor Mikhalev', email: 'im@c20.org' },
-  { name: 'Tatiana Descamps', email: 't.a.descamps@gmail.com' },
-  { name: 'Silke van der Burg', email: 'silkevanderburg@gmail.com' },
-] as const;
-const CITE = `Mikhalev, I., Descamps, T., & van der Burg, S. (2026). Whitepaper: measuring stablecoin usage, corridors, and regulation (v${VERSION}). Stablecoin Tracker. ${SITE_URL}/whitepaper`;
+const SECTIONS = whitepaperToc(source);
+const BODY = whitepaperBody(source);
 
-const SECTIONS = [
-  { id: 'abstract', label: 'Abstract' },
-  { id: 'purpose', label: '1. Purpose' },
-  { id: 'principles', label: '2. Design principles' },
-  { id: 'metrics', label: '3. Metrics' },
-  { id: 'sources', label: '4. Data sources' },
-  { id: 'reading', label: '5. How to read the tracker' },
-  { id: 'limitations', label: '6. Limitations' },
-  { id: 'reuse', label: '7. Open source and reuse' },
-  { id: 'next', label: '8. What comes next' },
-  { id: 'cite', label: 'How to cite' },
-  { id: 'references', label: 'References' },
-] as const;
-
-const SECTION_IDS = SECTIONS.map((s) => s.id);
-
-function useActiveSection(ids: readonly string[]) {
+function useActiveSection(ids: string[]) {
   const [active, setActive] = useState(ids[0] ?? '');
 
   useEffect(() => {
@@ -54,25 +45,63 @@ function useActiveSection(ids: readonly string[]) {
   return active;
 }
 
-function Formula({ children }: { children: ReactNode }) {
-  return (
-    <div className="my-5 px-4 py-3.5 rounded-[var(--radius)] bg-[var(--paper)] border border-[var(--hairline)] text-center overflow-x-auto">
-      <p className="display text-[1.05rem] sm:text-[1.15rem] text-[var(--ink-text)] m-0">{children}</p>
+const markdownComponents: Components = {
+  h2: ({ children }) => {
+    const label = String(children);
+    return (
+      <h2 id={slugifyHeading(label)} className="display text-[1.65rem] sm:text-[1.85rem] mb-4 mt-14 scroll-mt-24 first:mt-0">
+        {children}
+      </h2>
+    );
+  },
+  h3: ({ children }) => {
+    const label = String(children);
+    return (
+      <h3 id={slugifyHeading(label)} className="display text-xl mt-8 mb-2 scroll-mt-24">
+        {children}
+      </h3>
+    );
+  },
+  p: ({ children }) => <p className="mb-4 last:mb-0">{children}</p>,
+  ul: ({ children }) => <ul className="list-disc pl-5 space-y-2 my-4">{children}</ul>,
+  ol: ({ children }) => <ol className="list-decimal pl-5 space-y-2 my-4">{children}</ol>,
+  li: ({ children }) => <li>{children}</li>,
+  a: ({ href, children }) => {
+    if (href?.startsWith('/')) {
+      return (
+        <Link to={href} className="underline decoration-[var(--hairline)] hover:decoration-[var(--brand)]">
+          {children}
+        </Link>
+      );
+    }
+    return (
+      <a
+        href={href}
+        className="underline decoration-[var(--hairline)] hover:decoration-[var(--brand)]"
+        target={href?.startsWith('http') ? '_blank' : undefined}
+        rel={href?.startsWith('http') ? 'noopener noreferrer' : undefined}
+      >
+        {children}
+      </a>
+    );
+  },
+  blockquote: ({ children }) => (
+    <blockquote className="surface p-5 my-4 text-sm leading-relaxed">{children}</blockquote>
+  ),
+  table: ({ children }) => (
+    <div className="my-4 overflow-x-auto">
+      <table className="w-full text-sm">{children}</table>
     </div>
-  );
-}
-
-function Callout({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <aside className="surface p-5 my-6">
-      <p className="kicker mb-2">{title}</p>
-      <div className="text-sm leading-relaxed text-[var(--ink-text)] space-y-2">{children}</div>
-    </aside>
-  );
-}
+  ),
+  th: ({ children }) => (
+    <th className="text-left font-semibold px-3 py-2 text-white">{children}</th>
+  ),
+  td: ({ children }) => <td className="px-3 py-2">{children}</td>,
+  tr: ({ children }) => <tr className="border-t border-[var(--hairline)]">{children}</tr>,
+};
 
 export function WhitepaperView() {
-  const active = useActiveSection(SECTION_IDS);
+  const active = useActiveSection(SECTIONS.map((section) => section.id));
   const [copied, setCopied] = useState(false);
 
   usePageMeta({
@@ -82,20 +111,20 @@ export function WhitepaperView() {
       '@context': 'https://schema.org',
       '@type': 'TechArticle',
       headline: 'Stablecoin Tracker Whitepaper: measuring usage, corridors, and regulation',
-      alternativeHeadline: `Version ${VERSION}`,
+      alternativeHeadline: `Version ${WHITEPAPER_VERSION}`,
       datePublished: '2026-09-05',
       dateModified: '2026-09-10',
       inLanguage: 'en',
-      url: `${typeof window !== 'undefined' ? window.location.origin : SITE_URL}/whitepaper`,
-      author: AUTHORS.map((a) => ({
+      url: `${typeof window !== 'undefined' ? window.location.origin : WHITEPAPER_SITE}/whitepaper`,
+      author: WHITEPAPER_AUTHORS.map((author) => ({
         '@type': 'Person',
-        name: a.name,
-        email: a.email,
+        name: author.name,
+        email: author.email,
       })),
       publisher: {
         '@type': 'Organization',
         name: SEO.site,
-        url: SITE_URL,
+        url: WHITEPAPER_SITE,
       },
       about: ['stablecoins', 'cross-border payments', 'financial regulation', 'on-chain analytics'],
     },
@@ -111,7 +140,7 @@ export function WhitepaperView() {
 
   const copyCite = async () => {
     try {
-      await navigator.clipboard.writeText(CITE);
+      await navigator.clipboard.writeText(WHITEPAPER_CITE);
       setCopied(true);
     } catch {
       /* ignore */
@@ -128,7 +157,9 @@ export function WhitepaperView() {
     <div className="whitepaper-page lg:grid lg:grid-cols-[minmax(0,1fr)_14.5rem] lg:gap-12 xl:gap-16 items-start">
       <article className="whitepaper-article max-w-[42rem] mx-auto lg:mx-0 min-w-0">
         <header className="mb-10">
-          <p className="kicker mb-3">Whitepaper · v{VERSION} · {PUBLISHED}</p>
+          <p className="kicker mb-3">
+            Whitepaper · v{WHITEPAPER_VERSION} · {WHITEPAPER_PUBLISHED}
+          </p>
           <h1 className="display text-[2.15rem] sm:text-[2.6rem] text-[var(--ink-text)] mb-4">
             Measuring stablecoin usage, corridors, and regulation
           </h1>
@@ -138,7 +169,7 @@ export function WhitepaperView() {
           </p>
           <p className="kicker mt-7 mb-3">Key authors</p>
           <ul className="space-y-3">
-            {AUTHORS.map((author) => (
+            {WHITEPAPER_AUTHORS.map((author) => (
               <li key={author.email}>
                 <p className="font-semibold text-[var(--ink-text)]">{author.name}</p>
                 <a
@@ -188,633 +219,28 @@ export function WhitepaperView() {
 
         <nav className="whitepaper-chrome lg:hidden mb-10 overflow-x-auto">
           <ul className="flex gap-1.5 min-w-max pb-1">
-            {SECTIONS.map((s) => (
-              <li key={s.id}>
+            {SECTIONS.map((section) => (
+              <li key={section.id}>
                 <a
-                  href={`#${s.id}`}
+                  href={`#${section.id}`}
                   className={`inline-flex items-center h-7 px-2.5 rounded-full border text-[11px] font-semibold transition-ui ${
-                    active === s.id
+                    active === section.id
                       ? 'border-[var(--brand)] bg-[var(--brand)]/10 text-[var(--ink-text)]'
                       : 'border-[var(--hairline)] text-[var(--muted-ink)]'
                   }`}
                 >
-                  {s.label}
+                  {section.label}
                 </a>
               </li>
             ))}
           </ul>
         </nav>
 
-        <Section id="abstract" kicker="Abstract" title="What this paper is">
-          <p>
-            Stablecoins now settle value across borders at a scale that official payment statistics
-            still barely see. Policymakers, operators, and researchers nevertheless lack a shared,
-            country-level picture of <em>where</em> these instruments are used, <em>which corridors</em>{' '}
-            carry the volume, and <em>which jurisdictions</em> have a live rulebook. Stablecoin Tracker
-            is an open-source observatory that joins on-chain wallet and corridor observations with
-            official population, GDP, remittance, and services-import series and with a country-level regulatory taxonomy.
-          </p>
-          <p>
-            This paper is the specification behind stabletracker.org. It defines every headline
-            metric, states the sources and join keys, and documents the limits of the evidence. It is
-            written to be read as methodology first and as a product guide second — the inverse of
-            most tracker “whitepapers,” which describe screens and leave the numbers unexplained.
-          </p>
-        </Section>
-
-        <Section id="purpose" kicker="Section 1" title="Purpose">
-          <p>
-            Three questions recur in any serious conversation about stablecoins as money, not as a
-            trading pair:
-          </p>
-          <ol className="list-decimal pl-5 space-y-2 my-4">
-            <li>Where are they actually used, relative to the size of the economy?</li>
-            <li>Which international routes carry the value, and in which tokens?</li>
-            <li>Can you operate there — is there a live, stablecoin-specific framework?</li>
-          </ol>
-          <p>
-            Most public dashboards answer a fourth question instead: how large is the outstanding
-            supply, and what is the price. Those figures matter for markets. They do not tell you
-            whether Nigeria looks different from the Netherlands, whether a corridor is a remittance
-            rail or a treasury hop, or whether a large wallet base sits inside a live regime or
-            outside one.
-          </p>
-          <p>
-            Stablecoin Tracker exists to keep those three questions on one map, for one month at a
-            time, with named sources. Country briefings then combine usage, corridor direction, and
-            rules so an operator or a policy team can open one page instead of three.
-          </p>
-          <Callout title="Relation to CBDC Tracker">
-            <p>
-              The project is a sibling of{' '}
-              <a href="https://cbdctracker.org" className="underline decoration-[var(--hairline)] hover:decoration-[var(--brand)]">
-                cbdctracker.org
-              </a>
-              , which catalogues sovereign digital-currency <em>initiatives</em> — status, attributes,
-              news. This tracker catalogues privately issued stablecoins as they are <em>used</em>.
-              CBDCs are policy objects. Stablecoins are already a payments and savings instrument in
-              many countries. The two maps should be read together, not substituted for one another.
-            </p>
-          </Callout>
-        </Section>
-
-        <Section id="principles" kicker="Section 2" title="Design principles">
-          <dl className="space-y-5">
-            <Principle
-              name="Scale versus the economy"
-              body="The league table is outbound international corridors divided by period GDP. Wallet counts stay on the overview table; wallets per 100,000 people stay on the country briefing. Neither is the rank."
-            />
-            <Principle
-              name="International corridors only"
-              body="The map and corridor tables show cross-border pairs. Domestic stablecoin volume is real and large in some markets; it is not in this dataset, and the interface says so."
-            />
-            <Principle
-              name="Usage × rules"
-              body="A live framework without usage, or heavy usage without a framework, are different operating environments. The regulatory view is not a heat map of friendliness — it is a join of GDP intensity and Stride stage."
-            />
-            <Principle
-              name="Closed months"
-              body="The latest selectable period is the previous calendar month. The current month is never shown as complete. Month-over-month trends compare a month with the month before it."
-            />
-            <Principle
-              name="Named sources"
-              body="On-chain activity is Allium. Population is World Bank SP.POP.TOTL, with CIA Factbook and Wikipedia fallbacks where the Bank is silent (Taiwan is the usual case). Remittance outflows are World Bank. Nominal GDP is World Bank NY.GDP.MKTP.CD, with IMF WEO, CIA Factbook, and Wikipedia fallbacks. Regulatory stage, licenses, and reserve-type permissions are Stride."
-            />
-          </dl>
-        </Section>
-
-        <Section id="metrics" kicker="Section 3" title="Metrics">
-          <p>
-            All country keys inside the system are ISO 3166-1 numeric codes, zero-padded to three
-            characters (for example <code>840</code> for the United States). External sources that
-            speak alpha-2, alpha-3, or names are resolved to that key before any metric is computed.
-          </p>
-
-          <h3 className="display text-xl mt-8 mb-2">3.1 Active wallets</h3>
-          <p>
-            For a country and a month <em>YYYY-MM</em>, active wallets are the Allium snapshot of
-            addresses holding stablecoins attributed to that country, stored as one document per
-            (country, period). Re-running the same month updates that month; it does not overwrite
-            history. If a country has no snapshot yet, the API may fall back to a live wallet count
-            with an open/close date window — a stopgap, not the production series.
-          </p>
-          <p>
-            A wallet is an address, not a person. One person may control many addresses; many people
-            may share one. We do not de-duplicate across chains or custodial omnibus accounts.
-            Treat the series as a lower-bound activity signal, not a census.
-          </p>
-
-          <h3 className="display text-xl mt-8 mb-2">3.2 Wallet penetration</h3>
-          <Formula>
-            wallet penetration = active wallets ÷ population
-          </Formula>
-          <p>
-            Population is the latest figure on the country record. World Bank
-            <code>SP.POP.TOTL</code> is first. Where the Bank is silent — Taiwan is the usual case —
-            we store CIA World Factbook or Wikipedia demographics, then a pinned last-resort
-            figure. Country briefings also show wallets per 100,000 people
-            (<em>rate × 100,000</em>). This is a people-scale figure and a reading aid for market
-            classification. It is <strong>not</strong> the country rank, and it is not a column
-            on the overview table.
-          </p>
-          <p>
-            If population is still missing after those fallbacks, the table shows an em dash rather
-            than a zero rate. GDP for Taiwan is filled from IMF WEO so the country can still be
-            ranked under §3.3.
-          </p>
-
-          <h3 className="display text-xl mt-8 mb-2">3.3 GDP intensity and adoption rank</h3>
-          <Formula>
-            GDP intensity = outbound corridor volume ÷ (annual GDP × period months / 12)
-          </Formula>
-          <p>
-            Outbound volume is the Allium international corridor total for the sender country in
-            the selected period — the same grain as the corridor map. GDP is annual nominal GDP in
-            current US dollars, stored on the country and pro-rated to the month (or to the full
-            year when no month is selected) so a monthly corridor total is not compared with a
-            yearly official figure.
-          </p>
-          <p>
-            The primary source is World Bank <code>NY.GDP.MKTP.CD</code>. Where the Bank is silent,
-            the ingest falls through IMF World Economic Outlook, CIA World Factbook, Wikipedia
-            infobox figures, and a small set of pinned last-resort values. The country record
-            keeps <code>gdpSource</code> and <code>gdpYear</code> so a reader can see which vintage
-            was used.
-          </p>
-          <p>
-            Intensity is a scale label, not a 0–100% finish line. A 3% month means outbound
-            corridors were large relative to one-twelfth of annual GDP, not that 3% of the
-            economy “adopted” stablecoins. Treasury hops, trading, and commercial payments all sit
-            in the numerator.
-          </p>
-          <p>
-            Rank is dense and 1-based, among countries with <strong>positive outbound corridor
-            volume and a GDP figure</strong> in the selected period. Countries without a named
-            outbound corridor or without GDP appear in tables and stay grey on the map; they do
-            not receive a <em>#N of M</em> label. Two countries that match to the same 0.001
-            percentage-point band share a rank. There is no wallet-count floor.
-          </p>
-
-          <h3 className="display text-xl mt-8 mb-2">3.4 Corridor volume</h3>
-          <p>
-            A corridor snapshot is one Allium aggregate per (sender country × receiver country ×
-            token) per month, stored as a transaction of type <code>corridor</code>. The source
-            table is <code>stablecoins.intelligence.enriched_transfers</code>, restricted to
-            transfers that pass Allium’s Visa-methodology <code>is_adjusted_volume</code> gate:
-            both sides are organic addresses (not CEX, DeFi, or infrastructure), and bot / MEV /
-            short-term-routing flags are applied. That strips DEX liquidity legs, exchange hot-wallet
-            hops, bridges, and most pump-style routing. It is not a remittance series.
-          </p>
-          <p>
-            Volume is the sum of those USD amounts for the selected period, optionally filtered by
-            token, reference asset, and region. Each month is a replace: the sync upserts the new
-            adjusted set, then deletes leftover raw rows for that period. Range backfills use
-            <code>--from=YYYY-MM --to=YYYY-MM</code>.
-          </p>
-          <p>
-            The overview <strong>map</strong> still merges A→B with B→A into an undirected pair so
-            the reader sees a route, then splits the pair to show which side sent more. The
-            overview <strong>table</strong> does the opposite: it lists countries (or macro-regions)
-            as origins, with In and Out as separate columns, and unwraps directed destinations
-            under each origin. Sender = receiver (domestic) rows are not displayed. Regional
-            corridors roll the same international pairs into three buckets — APAC, Americas, and
-            EMEIA — dropping intra-region flows.
-          </p>
-
-          <h3 className="display text-xl mt-8 mb-2">3.5 Dollarization index</h3>
-          <Formula>
-            dollarization = USD-referenced stablecoin volume ÷ total corridor volume
-          </Formula>
-          <p>
-            “USD-referenced” on the headline dollarization card and on country briefings follows
-            Allium’s <code>usdStablecoinVolume</code> field on each corridor snapshot, not a homemade
-            ticker list. Token mix on the overview is volume-weighted from the top coins on each
-            pair; residual volume is labelled Other. The dollarization hover names non-USD tickers
-            from that top-coin mix (EUR*, XSGD, CADC, and a short list of others) so a reader can
-            see what sits in the residual — that naming list is ours, not Allium’s.
-          </p>
-
-          <h3 className="display text-xl mt-8 mb-2">3.6 Volume versus official outflows</h3>
-          <Formula>
-            outflow ratio = corridor volume ÷ ((remittances paid + services imports) × period months / 12)
-          </Formula>
-          <p>
-            The headline comparison is a payments-shaped official basket, not remittances alone.
-            Remittances are World Bank <code>BM.TRF.PWKR.CD.DT</code> — personal remittances paid,
-            current USD, the latest non-empty year. Where that series is unpublished, we store
-            World Bank <code>BM.TRF.PRVT.CD</code> (private secondary-income payments; Singapore)
-            or a national last-resort figure (Taiwan CBC secondary-income payments). Services
-            imports are World Bank <code>BM.GSR.NFSV.CD</code>, observations from 2018 or later,
-            with Taiwan CBC services debit as the last-resort pin. Both annual figures are
-            pro-rated to the selected month. Goods imports are excluded: they rebuild GDP, which
-            already has its own intensity rank. Secondary income is not added on top of personal
-            remittances.
-          </p>
-          <p>
-            The overview card sums that basket only for countries with outbound corridor volume
-            in the selected period, so the 5% figure is not diluted by US/Gulf/EU official
-            outflows Allium does not geo-tag. Iran has no current official remittance or services
-            series and stays as an em dash. The ratio is still a comparison of unlike series:
-            adjusted corridors include organic P2P, commercial, and some treasury payments;
-            official remittances and services include SWIFT and cash channels that are not
-            stablecoins. A high ratio means “this rail is large relative to recorded household
-            plus service outflows,” not “X% of remittances are stablecoins.” Country-briefing
-            market labels in §3.8 still use remittances paid alone (threshold 15%).
-          </p>
-
-          <h3 className="display text-xl mt-8 mb-2">3.7 Regulatory stage</h3>
-          <p>
-            Stage is ingested from Stride and kept only when the framework is stablecoin-specific.
-            Otherwise it is stored as 0. The four values the interface labels are:
-          </p>
-          <div className="my-4 overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr>
-                  <th className="text-left font-semibold px-3 py-2 text-white">Stage</th>
-                  <th className="text-left font-semibold px-3 py-2 text-white">Label</th>
-                  <th className="text-left font-semibold px-3 py-2 text-white">Meaning on this site</th>
-                </tr>
-              </thead>
-              <tbody className="text-[var(--ink-text)]">
-                <tr className="border-t border-[var(--hairline)]">
-                  <td className="px-3 py-2 tabular-nums">3</td>
-                  <td className="px-3 py-2">Live</td>
-                  <td className="px-3 py-2">A stablecoin-specific regime is in force.</td>
-                </tr>
-                <tr className="border-t border-[var(--hairline)]">
-                  <td className="px-3 py-2 tabular-nums">2</td>
-                  <td className="px-3 py-2">Proposed</td>
-                  <td className="px-3 py-2">A specific regime has been put forward.</td>
-                </tr>
-                <tr className="border-t border-[var(--hairline)]">
-                  <td className="px-3 py-2 tabular-nums">1</td>
-                  <td className="px-3 py-2">Draft</td>
-                  <td className="px-3 py-2">Work is underway; it is not yet proposed as law.</td>
-                </tr>
-                <tr className="border-t border-[var(--hairline)]">
-                  <td className="px-3 py-2 tabular-nums">0</td>
-                  <td className="px-3 py-2">No framework / restricted</td>
-                  <td className="px-3 py-2">
-                    No stablecoin-specific framework, or activity is restricted. Also the default
-                    when Stride marks the rules as not stablecoin-specific.
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <p>
-            Stage is not month-dependent. Live frameworks appear on the regulatory view (the
-            usage × rules matrix and the stage map), not as an overview insight card. Reserve-type
-            permissions (fiat-, crypto-, commodity-, algorithm-backed) and issuer licenses come
-            from the same Stride country record and are shown on the briefing, not mixed into the
-            adoption rank.
-          </p>
-
-          <h3 className="display text-xl mt-8 mb-2">3.8 Market classification</h3>
-          <p>
-            Country briefings add a short label derived from the metrics above. It is a reading aid,
-            not a score. Necessity markets are material usage without a live framework.
-            Remittance corridors have outbound volume large relative to official remittances
-            paid — not the widened outflows basket in §3.6 — (threshold: 15%). Infrastructure markets have live rules, a large wallet base, and low
-            population penetration. Digital-dollar savings markets are those where most corridor
-            volume is USD-referenced (threshold: 55%).
-          </p>
-        </Section>
-
-        <Section id="sources" kicker="Section 4" title="Data sources and pipeline">
-          <div className="my-4 overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr>
-                  <th className="text-left font-semibold px-3 py-2 text-white">Series</th>
-                  <th className="text-left font-semibold px-3 py-2 text-white">Source</th>
-                  <th className="text-left font-semibold px-3 py-2 text-white">Cadence</th>
-                  <th className="text-left font-semibold px-3 py-2 text-white">Join</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr className="border-t border-[var(--hairline)]">
-                  <td className="px-3 py-2">Wallets holding stablecoins</td>
-                  <td className="px-3 py-2">
-                    <a href="https://www.allium.so" className="underline decoration-[var(--hairline)] hover:decoration-[var(--brand)]">Allium</a>
-                    {' '}Explorer
-                  </td>
-                  <td className="px-3 py-2">Monthly snapshot</td>
-                  <td className="px-3 py-2">Country → ISO numeric</td>
-                </tr>
-                <tr className="border-t border-[var(--hairline)]">
-                  <td className="px-3 py-2">International corridor volume</td>
-                  <td className="px-3 py-2">
-                    Allium <code>enriched_transfers</code>, <code>is_adjusted_volume</code>
-                  </td>
-                  <td className="px-3 py-2">Monthly snapshot</td>
-                  <td className="px-3 py-2">Sender / receiver country</td>
-                </tr>
-                <tr className="border-t border-[var(--hairline)]">
-                  <td className="px-3 py-2">Population</td>
-                  <td className="px-3 py-2">
-                    World Bank Open Data, indicator <code>SP.POP.TOTL</code>;
-                    CIA Factbook / Wikipedia where the Bank is silent
-                  </td>
-                  <td className="px-3 py-2">Yearly (latest non-empty)</td>
-                  <td className="px-3 py-2">ISO alpha-3 → numeric</td>
-                </tr>
-                <tr className="border-t border-[var(--hairline)]">
-                  <td className="px-3 py-2">Nominal GDP</td>
-                  <td className="px-3 py-2">
-                    World Bank Open Data, indicator <code>NY.GDP.MKTP.CD</code>;
-                    IMF WEO / CIA Factbook / Wikipedia where the Bank is silent
-                  </td>
-                  <td className="px-3 py-2">Yearly, pro-rated to the month</td>
-                  <td className="px-3 py-2">ISO alpha-3 → numeric</td>
-                </tr>
-                <tr className="border-t border-[var(--hairline)]">
-                  <td className="px-3 py-2">Remittances paid</td>
-                  <td className="px-3 py-2">
-                    World Bank <code>BM.TRF.PWKR.CD.DT</code>;
-                    <code>BM.TRF.PRVT.CD</code> or national BOP where personal remittances are unpublished
-                  </td>
-                  <td className="px-3 py-2">Yearly, pro-rated to the month</td>
-                  <td className="px-3 py-2">ISO alpha-3 → numeric</td>
-                </tr>
-                <tr className="border-t border-[var(--hairline)]">
-                  <td className="px-3 py-2">Services imports</td>
-                  <td className="px-3 py-2">
-                    World Bank <code>BM.GSR.NFSV.CD</code> (2018+);
-                    Taiwan CBC services debit where the Bank is silent
-                  </td>
-                  <td className="px-3 py-2">Yearly, pro-rated to the month</td>
-                  <td className="px-3 py-2">ISO alpha-3 → numeric</td>
-                </tr>
-                <tr className="border-t border-[var(--hairline)]">
-                  <td className="px-3 py-2">Stage, licenses, reserve types</td>
-                  <td className="px-3 py-2">
-                    <a href="https://tracker.stride.sc" className="underline decoration-[var(--hairline)] hover:decoration-[var(--brand)]">Stride</a>
-                    {' '}Stablecoin Regulation Tracker
-                  </td>
-                  <td className="px-3 py-2">As published by Stride</td>
-                  <td className="px-3 py-2">Stride country id → numeric</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <p>
-            Allium queries are asynchronous: a run is submitted, polled, then stored. Wallet and
-            corridor jobs default to the previous calendar month and can be backfilled for a named
-            month or a contiguous <code>--from</code>/<code>--to</code> range. World Bank pulls request
-            the most recent non-empty observation for every country in one page; regional aggregates
-            that do not resolve to an ISO country are dropped. Stride country, issuer, license, and
-            stablecoin records are synced separately and attached to the same country documents.
-          </p>
-          <p>
-            Contributing organizations — EY, Allium, Stride, and FirmShift — appear in the site
-            footer. Data custody remains with each source; the tracker stores snapshots so a month
-            can be reproduced after the next sync.
-          </p>
-        </Section>
-
-        <Section id="reading" kicker="Section 5" title="How to read the tracker">
-          <h3 className="display text-xl mt-2 mb-2">5.1 Overview</h3>
-          <p>
-            The landing page has two lenses, switched by a control that sits on the same row as
-            the page title — <strong>Where stablecoins are used</strong> or <strong>Can you
-            operate</strong>. There is no period kicker above the title; the selected month lives
-            in the filter panel and on the insight-card subtitles.
-          </p>
-          <p>
-            Four insight cards sit above the map in both lenses: wallets holding stablecoins,
-            international corridor volume, corridor volume versus official outflows (remittances
-            paid plus services imports, corridor countries only), and dollarization
-            (USD-referenced share of corridor volume). Hovering a card opens a composition
-            popover (top countries, pairs, outflow ratios, or named non-USD tokens). Clicking a
-            card returns you to the usage lens; it does not change the month and it does not
-            open the regulatory view.
-          </p>
-          <p>
-            Usage view is the corridor map, a country (or region) table, and the token mix.
-            The country table is the default list: In, Out, outbound as a share of period GDP
-            with rank, wallet count, and outbound versus official outflows. Rows with outbound
-            destinations unwrap in place. Region mode uses the same pattern for APAC, Americas,
-            and EMEIA, with regional outbound ÷ period GDP. Regulatory view is the usage × rules
-            matrix (median GDP intensity × live vs not-live) plus the stage map.
-          </p>
-          <p>
-            Filters on the right apply to the selected month, reference asset, token, and corridor
-            regions. They do not rewrite rank eligibility or Stride stage. The map’s undirected pairs
-            are a view, not the database: the table of countries is every geography with wallets or
-            corridor flow in that month.
-          </p>
-
-          <h3 className="display text-xl mt-8 mb-2">5.2 Country briefing</h3>
-          <p>
-            A briefing is the unit of analysis. It stacks scale (GDP intensity and rank, wallets
-            per 100k, share of global corridor volume, outbound versus official outflows), money
-            (inbound and outbound volume, dollarization, token mix), and rules (stage, regulator,
-            reserve-type permissions, licenses). Month-over-month badges use the previous closed
-            month as the baseline. Classification labels in §3.8 sit above those blocks so a reader
-            can decide in one glance whether they are looking at a necessity market, a remittance
-            rail, or an infrastructure jurisdiction.
-          </p>
-
-          <h3 className="display text-xl mt-8 mb-2">5.3 What the colours are not</h3>
-          <p>
-            Warm colours on the usage map are GDP-intensity rank among countries with outbound
-            corridors and a GDP figure — not “good.” Stage colours on the regulatory map are a
-            four-state taxonomy — not a recommended jurisdiction list. Grey is “no outbound
-            corridor in this period, or no GDP,” never “zero activity in the real world.”
-          </p>
-        </Section>
-
-        <Section id="limitations" kicker="Section 6" title="Limitations">
-          <p>A tracker that does not list its holes is a brochure. The important ones:</p>
-          <ul className="list-disc pl-5 space-y-2 my-4">
-            <li>
-              <strong>Wallets are not people.</strong> Custodial exchanges, shared addresses, and
-              one-person many-wallet behaviour all bias the headcount. Cross-chain identities are
-              not unified.
-            </li>
-            <li>
-              <strong>Geography is attributed, not observed at the passport.</strong> Allium’s
-              country assignment is the best public on-chain geo we have. It is still a model.
-              VPN use, travel, and institutional flow through financial centres will mis-place
-              some volume.
-            </li>
-            <li>
-              <strong>Domestic volume is omitted.</strong> In some countries most stablecoin
-              activity never crosses a border. International corridor totals will understate those
-              markets. Do not treat corridor volume as national turnover.
-            </li>
-            <li>
-              <strong>Outflow ratios are a comparison of unlike series.</strong> See §3.6.
-              Official remittances and services lag, miss informal channels, and are annual;
-              adjusted corridors still include organic payments that are not remittances or
-              imported services. Goods trade is left out of the denominator on purpose.
-            </li>
-            <li>
-              <strong>Adjusted volume is not a census of payments.</strong> CEX deposits and
-              withdrawals are excluded, so a remittance that only appears as “off an exchange,
-              then one hop” is undercounted. Newly unlabeled DEX or pump programs can leak in
-              until Allium’s weekly attribution catches them.
-            </li>
-            <li>
-              <strong>Coverage follows the sources.</strong> Chains, tokens, and countries Allium
-              does not yet attribute will be silent. Stride coverage determines who has a stage.
-              A missing country is not evidence of prohibition or of zero use.
-            </li>
-            <li>
-              <strong>Corridor geography is narrower than the wallet map.</strong> Allium’s
-              corridor query names a subset of sender countries. A country can have wallets and
-              still sit grey on the rank map because no outbound pair was attributed that month.
-            </li>
-            <li>
-              <strong>GDP vintages differ.</strong> Most countries use the latest World Bank
-              year. A few use IMF WEO, Factbook, or Wikipedia. Intensity is comparable in
-              direction, not to the last official decimal.
-            </li>
-            <li>
-              <strong>This is not advice.</strong> Nothing here is a legal opinion, an investment
-              recommendation, or a finding that a token or corridor is compliant. Read the legal
-              disclaimer on the site before relying on a figure.
-            </li>
-          </ul>
-        </Section>
-
-        <Section id="reuse" kicker="Section 7" title="Open source and reuse">
-          <p>
-            The application, the metric code, and the sync jobs are public at{' '}
-            <a
-              href="https://github.com/liquifi-org/stable-tracker"
-              className="underline decoration-[var(--hairline)] hover:decoration-[var(--brand)]"
-            >
-              github.com/liquifi-org/stable-tracker
-            </a>
-            . The frontend reads a versioned HTTP API under <code>/v1</code> (adoption, corridors,
-            country overview, regulation). Reproduce a number from the repository rather than by
-            scraping the map.
-          </p>
-          <p>
-            Allium and Stride data remain subject to those providers’ terms. World Bank indicators
-            are public. If you republish a derived chart, name the series and the month; a screenshot
-            without a period is not a citation.
-          </p>
-        </Section>
-
-        <Section id="next" kicker="Section 8" title="What comes next">
-          <p>
-            The backlog that would most improve the evidence, in order: domestic volume as a
-            separate, clearly labelled series; a documented Allium geo-confidence flag on each
-            country; chain-level and issuer-level cuts that do not collapse into “Other”; richer
-            history so a time slider can replay closed months the way CBDC Tracker replays
-            initiative status; and machine-readable downloads of the monthly snapshots the API
-              already serves. Rank-by-GDP, adjusted corridor volume, remittance, services-import,
-              and population fallbacks, and nested outbound corridors are already in the product — this paper is
-            the specification for those, not a promise of them.
-          </p>
-          <p>
-            This document will move with the code. When a formula changes, the version number at
-            the top of the page changes. A PDF saved last quarter is not the methodology.
-          </p>
-        </Section>
-
-        <Section id="cite" kicker="Citation" title="How to cite">
-          <p>Please cite the living page, including the version:</p>
-          <blockquote className="surface p-5 my-4 text-sm leading-relaxed">
-            {CITE}
-          </blockquote>
-          <p className="text-sm text-[var(--muted-ink)]">
-            Key authors: {AUTHORS.map((a) => a.name).join(', ')}. Contributing organizations: EY,
-            Allium, Stride, FirmShift. Correspondence:{' '}
-            <a href={`mailto:${AUTHORS[0].email}`} className="underline decoration-[var(--hairline)] hover:decoration-[var(--brand)]">
-              {AUTHORS[0].email}
-            </a>
-            {' · '}
-            <Link to="/contact" className="underline decoration-[var(--hairline)] hover:decoration-[var(--brand)]">
-              contact
-            </Link>
-            .
-          </p>
-        </Section>
-
-        <Section id="references" kicker="References" title="Sources referred to in the text">
-          <ol className="list-decimal pl-5 space-y-3 text-sm">
-            <li>
-              Allium. On-chain stablecoin wallet analytics, and corridor volume from
-              <code>stablecoins.intelligence.enriched_transfers</code> filtered to
-              Visa-methodology <code>is_adjusted_volume</code>.{' '}
-              <a href="https://www.allium.so" className="underline decoration-[var(--hairline)] hover:decoration-[var(--brand)]">
-                https://www.allium.so
-              </a>
-            </li>
-            <li>
-              World Bank. Population, total (<code>SP.POP.TOTL</code>). World Bank Open Data.{' '}
-              <a href="https://data.worldbank.org/indicator/SP.POP.TOTL" className="underline decoration-[var(--hairline)] hover:decoration-[var(--brand)]">
-                https://data.worldbank.org/indicator/SP.POP.TOTL
-              </a>
-            </li>
-            <li>
-              World Bank. GDP (current US$) (<code>NY.GDP.MKTP.CD</code>). World Bank Open Data.{' '}
-              <a href="https://data.worldbank.org/indicator/NY.GDP.MKTP.CD" className="underline decoration-[var(--hairline)] hover:decoration-[var(--brand)]">
-                https://data.worldbank.org/indicator/NY.GDP.MKTP.CD
-              </a>
-            </li>
-            <li>
-              World Bank. Personal remittances, paid (current US$) (<code>BM.TRF.PWKR.CD.DT</code>).{' '}
-              <a href="https://data.worldbank.org/indicator/BM.TRF.PWKR.CD.DT" className="underline decoration-[var(--hairline)] hover:decoration-[var(--brand)]">
-                https://data.worldbank.org/indicator/BM.TRF.PWKR.CD.DT
-              </a>
-              . Secondary-income fallback: <code>BM.TRF.PRVT.CD</code>.
-            </li>
-            <li>
-              World Bank. Service imports (BoP, current US$) (<code>BM.GSR.NFSV.CD</code>).{' '}
-              <a href="https://data.worldbank.org/indicator/BM.GSR.NFSV.CD" className="underline decoration-[var(--hairline)] hover:decoration-[var(--brand)]">
-                https://data.worldbank.org/indicator/BM.GSR.NFSV.CD
-              </a>
-            </li>
-            <li>
-              Central Bank of the Republic of China (Taiwan). Balance of payments, annual:
-              secondary-income payments and services debit where World Bank is silent.{' '}
-              <a href="https://www.cbc.gov.tw/en/" className="underline decoration-[var(--hairline)] hover:decoration-[var(--brand)]">
-                https://www.cbc.gov.tw/en/
-              </a>
-            </li>
-            <li>
-              International Monetary Fund. World Economic Outlook database (nominal GDP for
-              economies the World Bank does not publish, notably Taiwan).{' '}
-              <a href="https://www.imf.org/en/Publications/WEO" className="underline decoration-[var(--hairline)] hover:decoration-[var(--brand)]">
-                https://www.imf.org/en/Publications/WEO
-              </a>
-            </li>
-            <li>
-              Central Intelligence Agency. <em>The World Factbook</em> (population and official
-              exchange-rate GDP where the Bank is silent).{' '}
-              <a href="https://www.cia.gov/the-world-factbook/" className="underline decoration-[var(--hairline)] hover:decoration-[var(--brand)]">
-                https://www.cia.gov/the-world-factbook/
-              </a>
-            </li>
-            <li>
-              Stride. Stablecoin Regulation Tracker.{' '}
-              <a href="https://tracker.stride.sc" className="underline decoration-[var(--hairline)] hover:decoration-[var(--brand)]">
-                https://tracker.stride.sc
-              </a>
-            </li>
-            <li>
-              Mikhalev, I., Burchardi, K., Struchkov, I., Song, B., &amp; Gross, J. (2021).{' '}
-              <em>CBDC Tracker</em> [White paper].{' '}
-              <a href="https://cbdctracker.org/cbdc-tracker-whitepaper.pdf" className="underline decoration-[var(--hairline)] hover:decoration-[var(--brand)]">
-                https://cbdctracker.org/cbdc-tracker-whitepaper.pdf
-              </a>
-            </li>
-            <li>
-              Auer, R., Cornelli, G., &amp; Frost, J. (2020). Rise of the central bank digital
-              currencies: drivers, approaches and technologies. <em>BIS Working Papers</em>, 880.
-            </li>
-            <li>
-              Financial Stability Board. (2023). <em>High-level recommendations for the regulation,
-              supervision and oversight of global stablecoin arrangements</em>.
-            </li>
-          </ol>
-        </Section>
+        <div className="space-y-0 text-[0.975rem] leading-[1.7] text-[var(--ink-text)]">
+          <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+            {BODY}
+          </Markdown>
+        </div>
       </article>
 
       <nav
@@ -823,51 +249,22 @@ export function WhitepaperView() {
       >
         <p className="kicker mb-3">On this page</p>
         <ol className="space-y-1.5">
-          {SECTIONS.map((s) => (
-            <li key={s.id}>
+          {SECTIONS.map((section) => (
+            <li key={section.id}>
               <a
-                href={`#${s.id}`}
+                href={`#${section.id}`}
                 className={`block text-[13px] leading-snug transition-ui ${
-                  active === s.id
+                  active === section.id
                     ? 'text-[var(--ink-text)] font-semibold'
                     : 'text-[var(--muted-ink)] hover:text-[var(--ink-text)]'
                 }`}
               >
-                {s.label}
+                {section.label}
               </a>
             </li>
           ))}
         </ol>
       </nav>
-    </div>
-  );
-}
-
-function Section({
-  id,
-  kicker,
-  title,
-  children,
-}: {
-  id: string;
-  kicker: string;
-  title: string;
-  children: ReactNode;
-}) {
-  return (
-    <section id={id} className="scroll-mt-24 mb-14">
-      <p className="kicker mb-2">{kicker}</p>
-      <h2 className="display text-[1.65rem] sm:text-[1.85rem] mb-4">{title}</h2>
-      <div className="space-y-4 text-[0.975rem] leading-[1.7] text-[var(--ink-text)]">{children}</div>
-    </section>
-  );
-}
-
-function Principle({ name, body }: { name: string; body: string }) {
-  return (
-    <div>
-      <dt className="font-semibold text-[var(--ink-text)]">{name}</dt>
-      <dd className="mt-1 text-[0.975rem] leading-[1.7] text-[var(--muted-ink)]">{body}</dd>
     </div>
   );
 }

@@ -10,7 +10,7 @@ Important limits: wallets are addresses, not people; corridors are international
 
 - [Whitepaper (markdown)](https://stabletracker.org/whitepaper.md): Full methodology — metrics, sources, how to read the tracker, limitations, citation
 - [Whitepaper (HTML)](https://stabletracker.org/whitepaper): Same paper as a page
-- [Country briefings](https://stabletracker.org/countries.md): Canonical `/country/{slug}` URLs with ISO names
+- [Country briefings](https://stabletracker.org/countries.md): Index of `/country/{slug}.md` (plain) and `/country/{slug}` (SPA)
 - [Homepage overview](https://stabletracker.org/index.md): What the tracker is and how the two lenses work
 
 ## Data and source

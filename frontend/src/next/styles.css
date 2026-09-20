@@ -228,6 +228,10 @@ html.next-ia .whitepaper-article td {
   vertical-align: top;
 }
 
+html.next-ia .whitepaper-article thead th {
+  background: var(--ink);
+}
+
 @media print {
   html.next-ia .ink-header,
   html.next-ia footer,

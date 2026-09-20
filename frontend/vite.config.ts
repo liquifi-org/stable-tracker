@@ -10,6 +10,7 @@ function writeSiteDiscoveryFiles(dir: string) {
   fs.writeFileSync(path.join(dir, 'robots.txt'), fs.readFileSync(path.resolve(__dirname, 'public/robots.txt')))
   fs.writeFileSync(path.join(dir, 'sitemap.xml'), buildSitemapXml())
   fs.writeFileSync(path.join(dir, 'countries.md'), buildCountriesMarkdown())
+  fs.copyFileSync(path.resolve(__dirname, 'content/whitepaper.md'), path.join(dir, 'whitepaper.md'))
 }
 
 function siteDiscovery(): Plugin {
