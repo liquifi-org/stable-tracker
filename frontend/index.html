@@ -6,11 +6,17 @@
     <title>Stablecoin Tracker — usage, corridors and regulation by country</title>
     <meta name="description" content="See where stablecoins are used, how international corridor volume moves, and which countries have a live regulatory framework." />
     <meta name="robots" content="index,follow" />
+    <meta name="author" content="Stablecoin Tracker" />
+    <meta name="theme-color" content="#0f172a" />
+    <meta property="og:locale" content="en" />
     <meta property="og:site_name" content="Stablecoin Tracker" />
     <meta property="og:title" content="Stablecoin Tracker — usage, corridors and regulation by country" />
     <meta property="og:description" content="See where stablecoins are used, how international corridor volume moves, and which countries have a live regulatory framework." />
     <meta property="og:type" content="website" />
     <link rel="canonical" href="https://stabletracker.org/" />
+    <link rel="describedby" href="https://stabletracker.org/llms.txt" />
+    <link rel="alternate" type="text/markdown" href="https://stabletracker.org/index.md" title="Overview (markdown)" />
+    <link rel="alternate" type="text/markdown" href="https://stabletracker.org/whitepaper.md" title="Whitepaper (markdown)" />
     <meta property="og:url" content="https://stabletracker.org/" />
     <meta property="og:image" content="https://stabletracker.org/og-image.png" />
     <meta property="og:image:type" content="image/png" />
@@ -21,6 +27,10 @@
     <meta name="twitter:title" content="Stablecoin Tracker — usage, corridors and regulation by country" />
     <meta name="twitter:description" content="See where stablecoins are used, how international corridor volume moves, and which countries have a live regulatory framework." />
     <meta name="twitter:image" content="https://stabletracker.org/og-image.png" />
+    <meta name="twitter:image:alt" content="Stablecoin Tracker" />
+    <script type="application/ld+json" id="seo-site-jsonld">
+    {"@context":"https://schema.org","@graph":[{"@type":"WebSite","@id":"https://stabletracker.org/#website","url":"https://stabletracker.org/","name":"Stablecoin Tracker","description":"See where stablecoins are used, how international corridor volume moves, and which countries have a live regulatory framework.","inLanguage":"en","publisher":{"@id":"https://stabletracker.org/#org"}},{"@type":"Organization","@id":"https://stabletracker.org/#org","name":"Stablecoin Tracker","url":"https://stabletracker.org/","logo":"https://stabletracker.org/og-image.png","sameAs":["https://github.com/liquifi-org/stable-tracker","https://cbdctracker.org"]},{"@type":"Dataset","@id":"https://stabletracker.org/#dataset","name":"Stablecoin usage, corridors, and regulation by country","description":"Country-level stablecoin wallet, international corridor, and regulatory-stage observations joined to official GDP, population, remittance, and services-import series.","url":"https://stabletracker.org/","isAccessibleForFree":true,"license":"https://github.com/liquifi-org/stable-tracker","measurementTechnique":"https://stabletracker.org/whitepaper","creator":{"@id":"https://stabletracker.org/#org"}}]}
+    </script>
     <link rel="icon" href="/favicon.ico" sizes="any" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
@@ -47,6 +57,26 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      (function () {
+        var path = location.pathname.replace(/\/+$/, '') || '/';
+        var url = 'https://stabletracker.org' + (path === '/' ? '/' : path);
+        var canonical = document.querySelector('link[rel="canonical"]');
+        if (canonical) canonical.setAttribute('href', url);
+        var ogUrl = document.querySelector('meta[property="og:url"]');
+        if (ogUrl) ogUrl.setAttribute('content', url);
+      })();
+    </script>
+    <noscript>
+      <p>Stablecoin Tracker is an open-source observatory of stablecoin usage, international corridors, and regulation by country.</p>
+      <p>This interface needs JavaScript. Crawlers and language models should use the markdown sources:</p>
+      <ul>
+        <li><a href="/llms.txt">llms.txt</a></li>
+        <li><a href="/index.md">Overview</a></li>
+        <li><a href="/whitepaper.md">Whitepaper</a></li>
+        <li><a href="/countries.md">Country briefings</a></li>
+      </ul>
+    </noscript>
     <script type="module" src="/src/next/main.tsx"></script>
   </body>
 </html>

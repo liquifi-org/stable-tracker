@@ -168,6 +168,13 @@ export function WhitepaperView() {
               {copied ? 'Copied' : 'Copy citation'}
             </button>
             <a
+              href="/whitepaper.md"
+              className="inline-flex items-center gap-1.5 h-8 px-3 rounded-full border border-[var(--hairline)] text-xs font-semibold text-[var(--muted-ink)] hover:text-[var(--ink-text)] hover:border-[var(--brand)] transition-ui"
+            >
+              <FileText className="h-3.5 w-3.5" />
+              Markdown
+            </a>
+            <a
               href="https://github.com/liquifi-org/stable-tracker"
               target="_blank"
               rel="noopener noreferrer"

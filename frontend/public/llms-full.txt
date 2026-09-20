@@ -1,0 +1,66 @@
+# Stablecoin Tracker (full)
+
+> Same facts as /llms.txt, expanded so an agent can answer without fetching every page. Prefer /whitepaper.md for formulas and /countries.md for URLs.
+
+Stablecoin Tracker (https://stabletracker.org) is an open-source observatory that joins Allium on-chain wallet and international corridor snapshots with official population, GDP, remittance, and services-import series and with Stride’s country-level stablecoin regulatory taxonomy. It is a sibling of CBDC Tracker (https://cbdctracker.org). CBDCs are policy objects; stablecoins are already used as payments and savings. Read the two maps together.
+
+## Questions the product answers
+
+1. Where are stablecoins used, relative to the size of the economy?
+2. Which international routes carry the value, and in which tokens?
+3. Is there a live, stablecoin-specific framework?
+
+It does not answer “how large is outstanding supply” or “what is the price.”
+
+## Design principles
+
+- League table is outbound international corridors ÷ period GDP. Wallet counts are not the rank.
+- Map and corridor tables are cross-border only. Domestic volume is omitted on purpose.
+- Usage × rules: a live framework without usage, or heavy usage without a framework, are different environments.
+- Latest month is the previous calendar month. Never show the current month as complete.
+- Named sources: Allium (on-chain), World Bank / IMF / CIA / Wikipedia (macro), Stride (rules).
+
+## Metrics
+
+Country keys are ISO 3166-1 numeric, zero-padded (840 = United States).
+
+**Active wallets.** Allium monthly snapshot of addresses holding stablecoins attributed to that country. An address is not a person. No cross-chain or custodial de-duplication.
+
+**Wallet penetration.** active wallets ÷ population (World Bank SP.POP.TOTL, then CIA / Wikipedia). Briefings also show wallets per 100,000 people. Not the rank.
+
+**GDP intensity.** outbound corridor volume ÷ (annual GDP × period months / 12). GDP is NY.GDP.MKTP.CD, then IMF WEO / CIA / Wikipedia. Intensity is a scale label, not “percent of the economy adopted stablecoins.”
+
+**Rank.** Dense, 1-based, among countries with positive outbound volume and GDP. No wallet-count floor.
+
+**Corridor volume.** Allium `stablecoins.intelligence.enriched_transfers` with Visa-methodology `is_adjusted_volume`: organic addresses, bot/MEV/short-term-routing flags. Not a remittance series. Sender = receiver (domestic) rows are hidden. Map merges A↔B; table keeps In/Out and unwraps destinations.
+
+**Dollarization.** USD-referenced stablecoin volume ÷ total corridor volume (Allium `usdStablecoinVolume`).
+
+**Outflow ratio.** corridor volume ÷ ((personal remittances paid + services imports) × period months / 12). Remittances: BM.TRF.PWKR.CD.DT (fallbacks BM.TRF.PRVT.CD or national BOP). Services: BM.GSR.NFSV.CD (2018+). Goods trade excluded. High ratio ≠ “X% of remittances are on-chain.”
+
+**Regulatory stage (Stride, stablecoin-specific only).** 3 Live, 2 Proposed, 1 Draft, 0 no framework / restricted (or not stablecoin-specific).
+
+**Market labels (reading aids, not scores).** Necessity = material usage without a live framework. Remittance corridor = outbound ≥ 15% of remittances paid (not the widened outflows basket). Infrastructure = live rules, large wallet base, low penetration. Digital-dollar savings = USD-referenced share ≥ 55%.
+
+## How to read colours
+
+Warm usage-map colours are GDP-intensity rank among ranked countries — not “good.” Stage colours are a four-state taxonomy — not a recommended-jurisdiction list. Grey is “no outbound corridor or no GDP this period,” never “zero activity in the real world.”
+
+## Limits (do not omit)
+
+Wallets ≠ people. Geo is a model (VPN, travel, financial centres). Domestic volume omitted. Outflow ratios compare unlike series. Adjusted volume excludes CEX hops so some remittances are undercounted. Missing country ≠ prohibition. Corridor geography is narrower than the wallet map. GDP vintages differ. Not legal or investment advice.
+
+## Cite
+
+Mikhalev, I., Descamps, T., & van der Burg, S. (2026). Whitepaper: measuring stablecoin usage, corridors, and regulation. Stablecoin Tracker. https://stabletracker.org/whitepaper
+
+Key authors: Igor Mikhalev (im@c20.org), Tatiana Descamps, Silke van der Burg. Organizations: EY, Allium, Stride, FirmShift.
+
+## Files
+
+- https://stabletracker.org/llms.txt
+- https://stabletracker.org/whitepaper.md
+- https://stabletracker.org/index.md
+- https://stabletracker.org/countries.md
+- https://stabletracker.org/sitemap.xml
+- https://github.com/liquifi-org/stable-tracker

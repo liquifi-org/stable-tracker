@@ -3,12 +3,13 @@ import path from 'path'
 import fs from 'node:fs'
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
-import { buildSitemapXml } from './src/next/lib/sitemap'
+import { buildCountriesMarkdown, buildSitemapXml } from './src/next/lib/sitemap'
 
 function writeSiteDiscoveryFiles(dir: string) {
   fs.mkdirSync(dir, { recursive: true })
   fs.writeFileSync(path.join(dir, 'robots.txt'), fs.readFileSync(path.resolve(__dirname, 'public/robots.txt')))
   fs.writeFileSync(path.join(dir, 'sitemap.xml'), buildSitemapXml())
+  fs.writeFileSync(path.join(dir, 'countries.md'), buildCountriesMarkdown())
 }
 
 function siteDiscovery(): Plugin {

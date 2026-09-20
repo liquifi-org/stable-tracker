@@ -130,5 +130,17 @@ export function countryPath(ref: CountryRef): string {
 }
 
 export function allCanonicalCountrySlugs(): string[] {
-  return [...new Set(ISO_COUNTRIES.map((country) => toCountrySlug(country.name)).filter(Boolean))].sort();
+  return allCanonicalCountries().map((country) => country.slug);
+}
+
+export function allCanonicalCountries(): { slug: string; name: string; alpha2: string }[] {
+  const seen = new Set<string>();
+  const countries: { slug: string; name: string; alpha2: string }[] = [];
+  for (const country of ISO_COUNTRIES) {
+    const slug = toCountrySlug(country.name);
+    if (!slug || seen.has(slug)) continue;
+    seen.add(slug);
+    countries.push({ slug, name: shortCountryName(country.name), alpha2: country.alpha2 });
+  }
+  return countries.sort((a, b) => a.slug.localeCompare(b.slug));
 }

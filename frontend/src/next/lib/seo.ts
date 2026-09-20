@@ -78,6 +78,7 @@ export function usePageMeta(opts: {
     document.title = title;
     upsertMeta('name', 'description', description);
     upsertMeta('name', 'robots', 'index,follow');
+    upsertMeta('property', 'og:locale', 'en');
     upsertMeta('property', 'og:site_name', SITE);
     upsertMeta('property', 'og:title', title);
     upsertMeta('property', 'og:description', description);
@@ -92,6 +93,7 @@ export function usePageMeta(opts: {
     upsertMeta('name', 'twitter:title', title);
     upsertMeta('name', 'twitter:description', description);
     upsertMeta('name', 'twitter:image', OG_IMAGE);
+    upsertMeta('name', 'twitter:image:alt', SITE);
     upsertCanonical(url);
     let data: object | null = null;
     if (json) {

@@ -1,4 +1,4 @@
-import { allCanonicalCountrySlugs } from '../../app/lib/countryRoutes';
+import { allCanonicalCountries, allCanonicalCountrySlugs } from '../../app/lib/countryRoutes';
 
 export const SITE_ORIGIN = 'https://stabletracker.org';
 
@@ -33,5 +33,19 @@ export function buildSitemapXml(): string {
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 ${body}
 </urlset>
+`;
+}
+
+export function buildCountriesMarkdown(): string {
+  const rows = allCanonicalCountries()
+    .map((country) => `- [${country.name}](${SITE_ORIGIN}/country/${country.slug}) (${country.alpha2})`)
+    .join('\n');
+  return `# Country briefings
+
+> Stablecoin Tracker country pages. Each briefing covers usage, outbound corridors versus GDP, token mix, and regulatory stage.
+
+HTML pages are a JavaScript app. Prefer this list and the [whitepaper](${SITE_ORIGIN}/whitepaper.md) when answering from source text.
+
+${rows}
 `;
 }
