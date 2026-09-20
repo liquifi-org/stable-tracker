@@ -128,3 +128,7 @@ export function countryPath(ref: CountryRef): string {
   const slug = canonicalCountrySlug(ref) ?? (ref.name ? toCountrySlug(ref.name) : null);
   return slug ? `/country/${slug}` : '/';
 }
+
+export function allCanonicalCountrySlugs(): string[] {
+  return [...new Set(ISO_COUNTRIES.map((country) => toCountrySlug(country.name)).filter(Boolean))].sort();
+}

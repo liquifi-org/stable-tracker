@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /v1/
+Disallow: /api/
+Disallow: /api-docs
+
+Sitemap: https://stabletracker.org/sitemap.xml
