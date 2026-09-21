@@ -15,8 +15,8 @@ export const DATASET_CREATOR = {
   url: SITE_ORIGIN,
 } as const;
 
-/** Google Dataset search wants a versioned license URL, not a GitHub repo. */
-export const DATASET_LICENSE = 'https://creativecommons.org/licenses/by/4.0/';
+/** OSI MIT — Google wants a license URL, not a GitHub repo. */
+export const DATASET_LICENSE = 'https://opensource.org/licenses/MIT';
 
 export function datasetSpatialCoverage(placeName: string, countryCode?: string | null) {
   if (!countryCode) {

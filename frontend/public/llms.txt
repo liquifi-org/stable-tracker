@@ -16,7 +16,7 @@ Important limits: wallets are addresses, not people; corridors are international
 ## Data and source
 
 - [HTTP API](https://stabletracker.org/v1): Versioned adoption, corridor, country, and regulation endpoints (use the repo, do not scrape the map)
-- [GitHub](https://github.com/liquifi-org/stable-tracker): Application, metric code, and sync jobs
+- [GitHub](https://github.com/liquifi-org/stable-tracker): Application, metric code, and sync jobs (MIT)
 - [Sitemap](https://stabletracker.org/sitemap.xml): Indexable HTML URLs
 
 ## Optional
