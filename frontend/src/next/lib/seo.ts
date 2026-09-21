@@ -1,8 +1,33 @@
 import { useEffect } from 'react';
 
 const SITE = 'Stablecoin Tracker';
-const SITE_ORIGIN = 'https://stabletracker.org';
+export const SITE_ORIGIN = 'https://stabletracker.org';
 const OG_IMAGE = `${SITE_ORIGIN}/og-image.png`;
+
+/** Dataset creator — Google needs an inline Person, not an @id-only ref. */
+export const DATASET_CREATOR = {
+  '@type': 'Person',
+  '@id': `${SITE_ORIGIN}/#igor-mikhalev`,
+  name: 'Igor Mikhalev',
+  givenName: 'Igor',
+  familyName: 'Mikhalev',
+  email: 'im@c20.org',
+  url: SITE_ORIGIN,
+} as const;
+
+/** Google Dataset search wants a versioned license URL, not a GitHub repo. */
+export const DATASET_LICENSE = 'https://creativecommons.org/licenses/by/4.0/';
+
+export function datasetSpatialCoverage(placeName: string, countryCode?: string | null) {
+  if (!countryCode) {
+    return { '@type': 'Place' as const, name: placeName };
+  }
+  return {
+    '@type': 'Place' as const,
+    name: placeName,
+    address: { '@type': 'PostalAddress' as const, addressCountry: countryCode },
+  };
+}
 
 export const SEO = {
   site: SITE,
@@ -76,6 +101,7 @@ export function usePageMeta(opts: {
     if (!title) return;
     const url = `${window.location.origin}${path ?? window.location.pathname}`;
     document.title = title;
+    upsertMeta('name', 'author', DATASET_CREATOR.name);
     upsertMeta('name', 'description', description);
     upsertMeta('name', 'robots', 'index,follow');
     upsertMeta('property', 'og:locale', 'en');

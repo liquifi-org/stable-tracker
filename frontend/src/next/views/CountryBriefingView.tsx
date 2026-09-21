@@ -27,7 +27,7 @@ import { classifyMarket, stageLabel } from '../lib/marketType';
 import { fmtPct, fmtPer100k } from '../lib/format';
 import { TokenMixBar } from '../components/TokenMixBar';
 import { canonicalCountrySlug, countryAlpha2, countryDisplayName, prettyCountryName } from '../../app/lib/countryRoutes';
-import { SEO, usePageMeta } from '../lib/seo';
+import { DATASET_CREATOR, DATASET_LICENSE, datasetSpatialCoverage, SEO, usePageMeta } from '../lib/seo';
 import { trackCountryPage } from '../lib/analytics';
 import { isDisplayableCorridorVolume } from '../../app/lib/displayFloors';
 
@@ -301,8 +301,11 @@ export function CountryBriefingView() {
               '@type': 'Dataset',
               name: `${name} stablecoin usage`,
               description: `Country briefing for ${name}: adoption, corridors, and regulation.`,
-              spatialCoverage: { '@type': 'Country', name },
               url: `${origin}/country/${canonicalSlug ?? param}`,
+              isAccessibleForFree: true,
+              license: DATASET_LICENSE,
+              creator: { ...DATASET_CREATOR },
+              spatialCoverage: datasetSpatialCoverage(name, countryAlpha2(numericId)),
             },
           ],
         }

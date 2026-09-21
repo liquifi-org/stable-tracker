@@ -116,6 +116,11 @@ export function WhitepaperView() {
       dateModified: '2026-09-10',
       inLanguage: 'en',
       url: `${typeof window !== 'undefined' ? window.location.origin : WHITEPAPER_SITE}/whitepaper`,
+      creator: {
+        '@type': 'Person',
+        name: WHITEPAPER_AUTHORS[0].name,
+        email: WHITEPAPER_AUTHORS[0].email,
+      },
       author: WHITEPAPER_AUTHORS.map((author) => ({
         '@type': 'Person',
         name: author.name,

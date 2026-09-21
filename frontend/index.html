@@ -6,7 +6,7 @@
     <title>Stablecoin Tracker — usage, corridors and regulation by country</title>
     <meta name="description" content="See where stablecoins are used, how international corridor volume moves, and which countries have a live regulatory framework." />
     <meta name="robots" content="index,follow" />
-    <meta name="author" content="Stablecoin Tracker" />
+    <meta name="author" content="Igor Mikhalev" />
     <meta name="theme-color" content="#0f172a" />
     <meta property="og:locale" content="en" />
     <meta property="og:site_name" content="Stablecoin Tracker" />
@@ -29,7 +29,63 @@
     <meta name="twitter:image" content="https://stabletracker.org/og-image.png" />
     <meta name="twitter:image:alt" content="Stablecoin Tracker" />
     <script type="application/ld+json" id="seo-site-jsonld">
-    {"@context":"https://schema.org","@graph":[{"@type":"WebSite","@id":"https://stabletracker.org/#website","url":"https://stabletracker.org/","name":"Stablecoin Tracker","description":"See where stablecoins are used, how international corridor volume moves, and which countries have a live regulatory framework.","inLanguage":"en","publisher":{"@id":"https://stabletracker.org/#org"}},{"@type":"Organization","@id":"https://stabletracker.org/#org","name":"Stablecoin Tracker","url":"https://stabletracker.org/","logo":"https://stabletracker.org/og-image.png","sameAs":["https://github.com/liquifi-org/stable-tracker","https://cbdctracker.org"]},{"@type":"Dataset","@id":"https://stabletracker.org/#dataset","name":"Stablecoin usage, corridors, and regulation by country","description":"Country-level stablecoin wallet, international corridor, and regulatory-stage observations joined to official GDP, population, remittance, and services-import series.","url":"https://stabletracker.org/","isAccessibleForFree":true,"license":"https://github.com/liquifi-org/stable-tracker","measurementTechnique":"https://stabletracker.org/whitepaper","creator":{"@id":"https://stabletracker.org/#org"}}]}
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "WebSite",
+          "@id": "https://stabletracker.org/#website",
+          "url": "https://stabletracker.org/",
+          "name": "Stablecoin Tracker",
+          "description": "See where stablecoins are used, how international corridor volume moves, and which countries have a live regulatory framework.",
+          "inLanguage": "en",
+          "publisher": { "@id": "https://stabletracker.org/#org" },
+          "creator": { "@id": "https://stabletracker.org/#igor-mikhalev" }
+        },
+        {
+          "@type": "Organization",
+          "@id": "https://stabletracker.org/#org",
+          "name": "Stablecoin Tracker",
+          "url": "https://stabletracker.org/",
+          "logo": "https://stabletracker.org/og-image.png",
+          "founder": { "@id": "https://stabletracker.org/#igor-mikhalev" },
+          "sameAs": ["https://github.com/liquifi-org/stable-tracker", "https://cbdctracker.org"]
+        },
+        {
+          "@type": "Person",
+          "@id": "https://stabletracker.org/#igor-mikhalev",
+          "name": "Igor Mikhalev",
+          "givenName": "Igor",
+          "familyName": "Mikhalev",
+          "email": "im@c20.org",
+          "url": "https://stabletracker.org/"
+        },
+        {
+          "@type": "Dataset",
+          "@id": "https://stabletracker.org/#dataset",
+          "name": "Stablecoin usage, corridors, and regulation by country",
+          "description": "Country-level stablecoin wallet, international corridor, and regulatory-stage observations joined to official GDP, population, remittance, and services-import series.",
+          "url": "https://stabletracker.org/",
+          "isAccessibleForFree": true,
+          "license": "https://creativecommons.org/licenses/by/4.0/",
+          "creator": {
+            "@type": "Person",
+            "@id": "https://stabletracker.org/#igor-mikhalev",
+            "name": "Igor Mikhalev",
+            "givenName": "Igor",
+            "familyName": "Mikhalev",
+            "email": "im@c20.org",
+            "url": "https://stabletracker.org/"
+          },
+          "publisher": { "@id": "https://stabletracker.org/#org" },
+          "measurementTechnique": "https://stabletracker.org/whitepaper",
+          "spatialCoverage": {
+            "@type": "Place",
+            "name": "World"
+          }
+        }
+      ]
+    }
     </script>
     <link rel="icon" href="/favicon.ico" sizes="any" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
