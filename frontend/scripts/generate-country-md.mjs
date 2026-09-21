@@ -386,11 +386,14 @@ fs.writeFileSync(
   insertBeforeHeading(editorialDataset, '## Sidebar → query', `${snapshot}${tickerLine}`),
 );
 
-for (const name of ['llms.txt', 'llms-full.txt']) {
-  const source = fs.readFileSync(path.resolve(process.cwd(), `public/${name}`), 'utf8');
-  const heading = name === 'llms.txt' ? '## Docs' : '## Questions the product answers';
-  fs.writeFileSync(path.join(OUT, name), insertBeforeHeading(source, heading, snapshot));
-}
+const editorialLlms = fs.readFileSync(path.resolve(process.cwd(), 'public/llms.txt'), 'utf8');
+fs.writeFileSync(path.join(OUT, 'llms.txt'), editorialLlms);
+
+const editorialFull = fs.readFileSync(path.resolve(process.cwd(), 'public/llms-full.txt'), 'utf8');
+fs.writeFileSync(
+  path.join(OUT, 'llms-full.txt'),
+  insertBeforeHeading(editorialFull, '## Questions the product answers', snapshot),
+);
 
 console.log(`Wrote ${indexRows.length} country markdown files for ${period} → ${countryDir}`);
-console.log(`Wrote closed-month snapshot (${periodLabel}) to index.md, dataset.md, llms.txt, llms-full.txt`);
+console.log(`Wrote closed-month snapshot (${periodLabel}) to index.md, dataset.md, llms-full.txt`);
