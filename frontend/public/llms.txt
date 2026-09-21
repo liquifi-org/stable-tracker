@@ -11,11 +11,12 @@ Important limits: wallets are addresses, not people; corridors are international
 - [Whitepaper (markdown)](https://stabletracker.org/whitepaper.md): Full methodology — metrics, sources, how to read the tracker, limitations, citation
 - [Whitepaper (HTML)](https://stabletracker.org/whitepaper): Same paper as a page
 - [Country briefings](https://stabletracker.org/countries.md): Index of `/country/{slug}.md` (plain) and `/country/{slug}` (SPA)
-- [Homepage overview](https://stabletracker.org/index.md): What the tracker is and how the two lenses work
+- [Homepage overview](https://stabletracker.org/index.md): What the tracker is, latest closed-month insight cards, how the two lenses work
+- [Filter the dataset](https://stabletracker.org/dataset.md): Same controls as the sidebar — year/month, reference currency, stablecoin, region from/to — via `/v1/analytics`
 
 ## Data and source
 
-- [HTTP API](https://stabletracker.org/v1): Versioned adoption, corridor, country, and regulation endpoints (use the repo, do not scrape the map)
+- [HTTP API](https://stabletracker.org/v1): Versioned adoption, corridor, country, and regulation endpoints. For filtered arguments use `/v1/analytics` as in [dataset.md](https://stabletracker.org/dataset.md); do not scrape the map
 - [GitHub](https://github.com/liquifi-org/stable-tracker): Application, metric code, and sync jobs (MIT)
 - [Sitemap](https://stabletracker.org/sitemap.xml): Indexable HTML URLs
 

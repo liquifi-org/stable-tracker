@@ -1,5 +1,8 @@
 User-agent: *
 Allow: /
+Allow: /v1/analytics
+Disallow: /v1/admin
+Disallow: /v1/contact
 Disallow: /v1/
 Disallow: /api/
 Disallow: /api-docs

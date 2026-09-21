@@ -97,6 +97,59 @@ function padId(id) {
   return String(id).trim().padStart(3, '0');
 }
 
+function previousPeriod({ year, month }) {
+  return month === 1 ? { year: year - 1, month: 12 } : { year, month: month - 1 };
+}
+
+function corridorStats(corridors, adoption) {
+  const volume = corridors.reduce((sum, flow) => sum + (flow.value?.amount ?? 0), 0);
+  const usd = corridors.reduce(
+    (sum, flow) => sum + (flow.value?.amount ?? 0) * (flow.dollarizationIndex ?? 0),
+    0,
+  );
+  const official = adoption
+    .filter((row) => (row.outboundVolume ?? 0) > 0)
+    .reduce((sum, row) => sum + (row.officialOutflows ?? 0), 0);
+  return {
+    volume,
+    dollarization: volume > 0 ? usd / volume : null,
+    outflowRatio: official > 0 ? volume / official : null,
+  };
+}
+
+function pctChange(current, previous) {
+  return previous > 0 ? ((current - previous) / previous) * 100 : null;
+}
+
+function formatSignedPct(n) {
+  if (n == null || !Number.isFinite(n)) return '—';
+  const arrow = n > 0 ? '↑' : n < 0 ? '↓' : '→';
+  return `${arrow} ${Math.abs(n).toFixed(1)}% vs prev. mo.`;
+}
+
+function formatCardUsd(n) {
+  if (n == null || !Number.isFinite(n)) return '—';
+  const abs = Math.abs(n);
+  const sign = n < 0 ? '-' : '';
+  if (abs >= 1e9) return `${sign}$${(abs / 1e9).toFixed(1)}B`;
+  if (abs >= 1e6) return `${sign}$${(abs / 1e6).toFixed(0)}M`;
+  if (abs >= 1e3) return `${sign}$${(abs / 1e3).toFixed(0)}K`;
+  return `${sign}$${abs.toLocaleString('en-US')}`;
+}
+
+function formatCardPct(ratio) {
+  if (ratio == null || !Number.isFinite(ratio)) return '—';
+  return `${(ratio * 100).toFixed(1)}%`;
+}
+
+function insertBeforeHeading(markdown, heading, section) {
+  const index = markdown.indexOf(heading);
+  if (index < 0) return `${markdown.trim()}\n\n${section}\n`;
+  return `${markdown.slice(0, index)}${section}\n${markdown.slice(index)}`;
+}
+
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
 async function getJson(base, urlPath) {
   const url = `${base}${urlPath}`;
   const response = await fetch(url, { headers: { Accept: 'application/json' } });
@@ -108,13 +161,14 @@ async function loadPeriodData(year, month) {
   let lastError;
   for (const base of API_CANDIDATES) {
     try {
-      const [adoption, regulationPage, corridors] = await Promise.all([
+      const [adoption, regulationPage, corridors, insights] = await Promise.all([
         getJson(base, `/analytics/adoption?year=${year}&month=${month}`),
         getJson(base, '/countries?pageSize=200'),
         getJson(base, `/analytics/corridors?year=${year}&month=${month}`),
+        getJson(base, `/analytics/global-insights?year=${year}&month=${month}`),
       ]);
       console.log(`Country markdown source: ${base}`);
-      return { adoption, regulationPage, corridors };
+      return { base, adoption, regulationPage, corridors, insights };
     } catch (error) {
       lastError = error;
     }
@@ -136,8 +190,10 @@ const period = `${year}-${String(month).padStart(2, '0')}`;
 let adoption;
 let regulationPage;
 let corridors;
+let insights;
+let apiBase;
 try {
-  ({ adoption, regulationPage, corridors } = await loadPeriodData(year, month));
+  ({ base: apiBase, adoption, regulationPage, corridors, insights } = await loadPeriodData(year, month));
 } catch (error) {
   const message = error instanceof Error ? error.message : String(error);
   if (REQUIRED) throw error;
@@ -267,4 +323,68 @@ ${indexRows.map((row) => row.line).join('\n')}
 
 fs.writeFileSync(path.join(OUT, 'countries.md'), index);
 
+const prev = previousPeriod({ year, month });
+const prevPeriod = `${prev.year}-${String(prev.month).padStart(2, '0')}`;
+let prevAdoption = [];
+let prevCorridors = [];
+let prevInsights = {};
+let tickers = [];
+try {
+  [prevAdoption, prevCorridors, prevInsights, tickers] = await Promise.all([
+    getJson(apiBase, `/analytics/adoption?year=${prev.year}&month=${prev.month}`),
+    getJson(apiBase, `/analytics/corridors?year=${prev.year}&month=${prev.month}`),
+    getJson(apiBase, `/analytics/global-insights?year=${prev.year}&month=${prev.month}`),
+    getJson(apiBase, `/analytics/corridors/stablecoins?year=${year}&month=${month}`),
+  ]);
+} catch (error) {
+  const message = error instanceof Error ? error.message : String(error);
+  console.warn(`Previous-period snapshot incomplete (${message})`);
+}
+
+const currentStats = corridorStats(corridors, adoption);
+const previousStats = Array.isArray(prevCorridors) ? corridorStats(prevCorridors, Array.isArray(prevAdoption) ? prevAdoption : []) : { volume: 0, dollarization: null, outflowRatio: null };
+const wallets = insights?.totalActiveWallets ?? null;
+const prevWallets = prevInsights?.totalActiveWallets ?? null;
+const periodLabel = `${MONTH_NAMES[month - 1]} ${year}`;
+const snapshot = `## Latest closed month (${periodLabel})
+
+Same four homepage insight cards, generated at deploy from \`/v1\` with **all sidebar filters = All**. Previous month is ${prevPeriod}. To slice like the sidebar (token, reference currency, region from/to), use [${SITE}/dataset.md](${SITE}/dataset.md) and recompute.
+
+- Attributed wallets: ${wallets != null ? wallets.toLocaleString('en-US') : '—'} (${formatSignedPct(wallets != null && prevWallets != null ? pctChange(wallets, prevWallets) : null)})
+- International corridor volume: ${formatCardUsd(currentStats.volume)} (${formatSignedPct(pctChange(currentStats.volume, previousStats.volume))})
+- Corridors vs official outflows (remittances paid + services imports): ${formatCardPct(currentStats.outflowRatio)} (${formatSignedPp(
+  currentStats.outflowRatio != null && previousStats.outflowRatio != null
+    ? (currentStats.outflowRatio - previousStats.outflowRatio) * 100
+    : null,
+  1,
+)})
+- Dollarization (USD-referenced share of corridor volume): ${formatCardPct(currentStats.dollarization)} (${formatSignedPp(
+  currentStats.dollarization != null && previousStats.dollarization != null
+    ? (currentStats.dollarization - previousStats.dollarization) * 100
+    : null,
+  2,
+)})
+
+Wallets are addresses, not people. Corridors are international only. These headlines are the unfiltered month. A filtered argument is a different number — name the filters.
+`;
+
+const editorialIndex = fs.readFileSync(path.resolve(process.cwd(), 'public/index.md'), 'utf8');
+fs.writeFileSync(path.join(OUT, 'index.md'), insertBeforeHeading(editorialIndex, '## What it answers', snapshot));
+
+const editorialDataset = fs.readFileSync(path.resolve(process.cwd(), 'public/dataset.md'), 'utf8');
+const tickerLine = Array.isArray(tickers) && tickers.length
+  ? `\nTickers present in ${period} (sidebar Stablecoin list): ${tickers.join(', ')}.\n`
+  : '\n';
+fs.writeFileSync(
+  path.join(OUT, 'dataset.md'),
+  insertBeforeHeading(editorialDataset, '## Sidebar → query', `${snapshot}${tickerLine}`),
+);
+
+for (const name of ['llms.txt', 'llms-full.txt']) {
+  const source = fs.readFileSync(path.resolve(process.cwd(), `public/${name}`), 'utf8');
+  const heading = name === 'llms.txt' ? '## Docs' : '## Questions the product answers';
+  fs.writeFileSync(path.join(OUT, name), insertBeforeHeading(source, heading, snapshot));
+}
+
 console.log(`Wrote ${indexRows.length} country markdown files for ${period} → ${countryDir}`);
+console.log(`Wrote closed-month snapshot (${periodLabel}) to index.md, dataset.md, llms.txt, llms-full.txt`);
