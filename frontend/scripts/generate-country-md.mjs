@@ -142,6 +142,12 @@ function formatCardPct(ratio) {
   return `${(ratio * 100).toFixed(1)}%`;
 }
 
+function formatSignedPp(n, digits) {
+  if (n == null || !Number.isFinite(n)) return '—';
+  const arrow = n > 0 ? '↑' : n < 0 ? '↓' : '→';
+  return `${arrow} ${Math.abs(n).toFixed(digits)}pp vs prev. mo.`;
+}
+
 function insertBeforeHeading(markdown, heading, section) {
   const index = markdown.indexOf(heading);
   if (index < 0) return `${markdown.trim()}\n\n${section}\n`;
