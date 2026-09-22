@@ -2,7 +2,7 @@
 
 The homepage right-hand filters map onto `/v1` query parameters. Use these when arguing about a slice (USDC only, from Southeast Asia, July, …). Do not scrape the map. HTML country URLs need JavaScript; prefer this file, `/countries.md`, and `/country/{slug}.md`.
 
-Base: `https://stabletracker.org/v1`
+Base: `https://stabletracker.org/v1` (JSON index of endpoints). Human docs: `https://stabletracker.org/api-docs`.
 
 Default in the app (and in the generated markdown snapshot): **previous closed calendar month**, Reference currency **All**, Stablecoin **All**, Region from **All**, Region to **All**. Never treat the current month as complete.
 

@@ -1,11 +1,12 @@
 User-agent: *
 Allow: /
+Allow: /v1/$
 Allow: /v1/analytics
+Allow: /api-docs
 Disallow: /v1/admin
 Disallow: /v1/contact
 Disallow: /v1/
 Disallow: /api/
-Disallow: /api-docs
 
 User-agent: GPTBot
 Allow: /

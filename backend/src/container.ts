@@ -141,6 +141,22 @@ export function buildV1Router(): Router {
 
     // Router composition
     const v1 = Router();
+    v1.get('/', (_req, res) => {
+        res.status(200).json({
+            name: 'Stablecoin Tracker API',
+            version: 'v1',
+            docs: 'https://stabletracker.org/api-docs',
+            filters: 'https://stabletracker.org/dataset.md',
+            endpoints: {
+                index: '/v1/',
+                analytics: '/v1/analytics',
+                globalInsights: '/v1/analytics/global-insights?year=&month=',
+                adoption: '/v1/analytics/adoption?year=&month=',
+                corridors: '/v1/analytics/corridors?year=&month=&referenceAsset=&stablecoinId=&regionFrom=&regionTo=',
+                countries: '/v1/countries?pageSize=200',
+            },
+        });
+    });
     v1.use('/countries', createCountryRouter(countryController));
     v1.use('/issuers', createIssuerRouter(issuerController));
     v1.use('/stablecoins', createStablecoinRouter(stablecoinController));

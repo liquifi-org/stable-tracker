@@ -16,7 +16,7 @@ Important limits: wallets are addresses, not people; corridors are international
 
 ## Data and source
 
-- [HTTP API](https://stabletracker.org/v1): Versioned adoption, corridor, country, and regulation endpoints. For filtered arguments use `/v1/analytics` as in [dataset.md](https://stabletracker.org/dataset.md); do not scrape the map
+- [HTTP API](https://stabletracker.org/v1): JSON index of adoption, corridor, and country endpoints. Sidebar filters: [dataset.md](https://stabletracker.org/dataset.md). Human docs: [api-docs](https://stabletracker.org/api-docs). Do not scrape the map.
 - [GitHub](https://github.com/liquifi-org/stable-tracker): Application, metric code, and sync jobs (MIT)
 - [Sitemap](https://stabletracker.org/sitemap.xml): Indexable HTML URLs
 
