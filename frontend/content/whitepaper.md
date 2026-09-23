@@ -4,9 +4,9 @@ Whitepaper · v1.4 · 10 September 2026
 Living methodology for https://stabletracker.org  
 HTML: https://stabletracker.org/whitepaper
 
-Key authors: Igor Mikhalev (im@c20.org), Tatiana Descamps, Silke van der Burg.
+Key authors: Igor Mikhalev (im@c20.org), Tatiana Descamps, Silke van der Burg, Roeland Hooijmans.
 
-Cite: Mikhalev, I., Descamps, T., & van der Burg, S. (2026). Whitepaper: measuring stablecoin usage, corridors, and regulation (v1.4). Stablecoin Tracker. https://stabletracker.org/whitepaper
+Cite: Mikhalev, I., Descamps, T., van der Burg, S., & Hooijmans, R. (2026). Whitepaper: measuring stablecoin usage, corridors, and regulation (v1.4). Stablecoin Tracker. https://stabletracker.org/whitepaper
 
 ## Abstract
 

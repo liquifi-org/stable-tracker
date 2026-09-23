@@ -41,4 +41,4 @@ Allium (wallets, corridors), World Bank (population, GDP, remittances, services 
 
 ## Citation
 
-Mikhalev, I., Descamps, T., & van der Burg, S. (2026). Whitepaper: measuring stablecoin usage, corridors, and regulation. Stablecoin Tracker. https://stabletracker.org/whitepaper
+Mikhalev, I., Descamps, T., van der Burg, S., & Hooijmans, R. (2026). Whitepaper: measuring stablecoin usage, corridors, and regulation. Stablecoin Tracker. https://stabletracker.org/whitepaper

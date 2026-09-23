@@ -6,10 +6,11 @@ export const WHITEPAPER_AUTHORS = [
   { name: 'Igor Mikhalev', email: 'im@c20.org' },
   { name: 'Tatiana Descamps', email: 't.a.descamps@gmail.com' },
   { name: 'Silke van der Burg', email: 'silkevanderburg@gmail.com' },
+  { name: 'Roeland Hooijmans', email: 'roelandhooijmans@gmail.com' },
 ] as const;
 
 export const WHITEPAPER_CITE =
-  `Mikhalev, I., Descamps, T., & van der Burg, S. (2026). Whitepaper: measuring stablecoin usage, corridors, and regulation (v${WHITEPAPER_VERSION}). Stablecoin Tracker. ${WHITEPAPER_SITE}/whitepaper`;
+  `Mikhalev, I., Descamps, T., van der Burg, S., & Hooijmans, R. (2026). Whitepaper: measuring stablecoin usage, corridors, and regulation (v${WHITEPAPER_VERSION}). Stablecoin Tracker. ${WHITEPAPER_SITE}/whitepaper`;
 
 export function slugifyHeading(text: string): string {
   return text
