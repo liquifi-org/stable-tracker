@@ -33,7 +33,7 @@ export function Footer() {
               </a>
             </li>
             <li>
-              <a href="https://tracker.stride.sc" target="_blank" rel="noopener noreferrer" title="Stride">
+              <a href="https://stride.sc/" target="_blank" rel="noopener noreferrer" title="Stride">
                 <span className="footer-logo-stride">
                   <img src={strideLogoWhite} alt="Stride" />
                 </span>
