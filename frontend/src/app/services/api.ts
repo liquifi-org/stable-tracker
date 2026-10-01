@@ -291,6 +291,8 @@ export const api = {
     return fetchJson<GlobalInsights>(`/analytics/global-insights?${params}`);
   },
 
+  getLatestPeriod: () => fetchJson<{ year: number; month: number }>('/analytics/latest-period'),
+
   /** Average EUR/USD rate stored for the given month (see backend/script/general/sync-exchange-rates.ts). */
   getExchangeRate: async (year: number, month: number): Promise<number | null> => {
     const date = `${year}-${String(month).padStart(2, '0')}-01`;

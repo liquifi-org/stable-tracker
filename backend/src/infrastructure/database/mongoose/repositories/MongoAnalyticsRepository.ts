@@ -770,4 +770,15 @@ export class MongoAnalyticsRepository implements IAnalyticsRepository {
 
         return symbols.filter((s): s is string => typeof s === 'string' && s.length > 0).sort();
     }
+
+    async getLatestReportingPeriod(): Promise<{ year: number; month: number } | null> {
+        const tx = await TransactionModel.findOne({ type: 'corridor', source: 'allium' })
+            .sort({ period: -1 })
+            .select({ period: 1 })
+            .lean();
+        const period = typeof tx?.period === 'string' ? tx.period : null;
+        if (!period || !/^\d{4}-\d{2}$/.test(period)) return null;
+        const [year, month] = period.split('-').map(Number);
+        return { year, month };
+    }
 }

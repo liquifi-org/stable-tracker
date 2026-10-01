@@ -33,6 +33,7 @@ import { GetCountryOverviewUseCase } from './application/use-cases/analytics/Get
 import { GetCountryCorridorsUseCase } from './application/use-cases/analytics/GetCountryCorridorsUseCase';
 import { GetGlobalInsightsUseCase } from './application/use-cases/analytics/GetGlobalInsightsUseCase';
 import { GetCorridorStablecoinsUseCase } from './application/use-cases/analytics/GetCorridorStablecoinsUseCase';
+import { GetLatestReportingPeriodUseCase } from './application/use-cases/analytics/GetLatestReportingPeriodUseCase';
 import { SendContactMessageUseCase } from './application/use-cases/contact/SendContactMessageUseCase';
 
 // ---- Controllers ----
@@ -108,6 +109,7 @@ export function buildV1Router(): Router {
     const getCountryCorridors = new GetCountryCorridorsUseCase(analyticsRepo);
     const getGlobalInsights = new GetGlobalInsightsUseCase(analyticsRepo);
     const getCorridorStablecoins = new GetCorridorStablecoinsUseCase(analyticsRepo);
+    const getLatestReportingPeriod = new GetLatestReportingPeriodUseCase(analyticsRepo);
 
     // Controllers
     const countryController = new CountryController(
@@ -133,6 +135,7 @@ export function buildV1Router(): Router {
         getCountryCorridors,
         getGlobalInsights,
         getCorridorStablecoins,
+        getLatestReportingPeriod,
     );
     const adminController = new AdminController();
     const telegramNotifier = new TelegramNotifier();

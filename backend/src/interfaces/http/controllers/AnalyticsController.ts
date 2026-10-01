@@ -6,6 +6,7 @@ import type { GetCountryOverviewUseCase } from '../../../application/use-cases/a
 import type { GetCountryCorridorsUseCase } from '../../../application/use-cases/analytics/GetCountryCorridorsUseCase';
 import type { GetGlobalInsightsUseCase } from '../../../application/use-cases/analytics/GetGlobalInsightsUseCase';
 import type { GetCorridorStablecoinsUseCase } from '../../../application/use-cases/analytics/GetCorridorStablecoinsUseCase';
+import type { GetLatestReportingPeriodUseCase } from '../../../application/use-cases/analytics/GetLatestReportingPeriodUseCase';
 import {
     AdoptionQuerySchema,
     CorridorQuerySchema,
@@ -25,6 +26,7 @@ export class AnalyticsController {
         private readonly getCountryCorridors: GetCountryCorridorsUseCase,
         private readonly getGlobalInsights: GetGlobalInsightsUseCase,
         private readonly getCorridorStablecoins: GetCorridorStablecoinsUseCase,
+        private readonly getLatestPeriod: GetLatestReportingPeriodUseCase,
     ) {}
 
     adoption = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
@@ -83,6 +85,19 @@ export class AnalyticsController {
         try {
             const query = GlobalInsightsQuerySchema.parse(req.query);
             const result = await this.getGlobalInsights.execute(query);
+            res.status(200).json(result);
+        } catch (error) {
+            next(error);
+        }
+    };
+
+    latestPeriod = async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            const result = await this.getLatestPeriod.execute();
+            if (!result) {
+                res.status(404).json({ year: null, month: null });
+                return;
+            }
             res.status(200).json(result);
         } catch (error) {
             next(error);

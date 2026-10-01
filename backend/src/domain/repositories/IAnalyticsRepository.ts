@@ -168,4 +168,6 @@ export interface IAnalyticsRepository {
     getGlobalInsights(params: GlobalInsightsParams): Promise<GlobalInsightsMetric>;
     /** Distinct stablecoin ticker symbols actually present in corridor data for the period — used to populate the stablecoin filter with real values. */
     getCorridorStablecoins(params: CorridorStablecoinsParams): Promise<string[]>;
+    /** Latest YYYY-MM that has corridor transactions (the series that does not carry forward). */
+    getLatestReportingPeriod(): Promise<{ year: number; month: number } | null>;
 }

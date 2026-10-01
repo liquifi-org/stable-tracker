@@ -8,6 +8,7 @@ export function createAnalyticsRouter(ctrl: AnalyticsController): Router {
             name: 'Stablecoin Tracker analytics',
             filters: 'https://stabletracker.org/dataset.md',
             endpoints: [
+                '/v1/analytics/latest-period',
                 '/v1/analytics/global-insights?year=&month=',
                 '/v1/analytics/adoption?year=&month=',
                 '/v1/analytics/adoption/regions?year=&month=',
@@ -18,6 +19,7 @@ export function createAnalyticsRouter(ctrl: AnalyticsController): Router {
             ],
         });
     });
+    router.get('/latest-period', ctrl.latestPeriod);
     router.get('/global-insights', ctrl.globalInsights);
     router.get('/adoption/regions', ctrl.adoptionByRegion);
     router.get('/adoption', ctrl.adoption);

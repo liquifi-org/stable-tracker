@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useFilters, MAX_YEAR, maxMonthForYear, MONTHS } from '../../app/context/FilterContext';
+import { useFilters, MONTHS } from '../../app/context/FilterContext';
 import { api } from '../../app/services/api';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { Filter, X } from 'lucide-react';
@@ -37,6 +37,8 @@ export function FilterPanel() {
     setStablecoin,
     setRegionFrom,
     setRegionTo,
+    maxYear,
+    maxMonthForYear,
   } = useFilters();
 
   const showCorridorFilters = mapType !== 'regulation';
@@ -60,16 +62,16 @@ export function FilterPanel() {
   }, [showCorridorFilters, year, month]);
 
   const hasNonDefaultFilters =
-    year !== MAX_YEAR ||
-    month !== maxMonthForYear(MAX_YEAR) ||
+    year !== maxYear ||
+    month !== maxMonthForYear(maxYear) ||
     referenceAsset !== 'All' ||
     stablecoin !== 'All' ||
     regionFrom !== 'All' ||
     regionTo !== 'All';
 
   const handleResetFilters = () => {
-    setYear(MAX_YEAR);
-    setMonth(maxMonthForYear(MAX_YEAR));
+    setYear(maxYear);
+    setMonth(maxMonthForYear(maxYear));
     setReferenceAsset('All');
     setStablecoin('All');
     setRegionFrom('All');
@@ -77,13 +79,13 @@ export function FilterPanel() {
   };
 
   const chips: { key: string; label: string; onClear: () => void }[] = [];
-  if (year !== MAX_YEAR || month !== maxMonthForYear(MAX_YEAR)) {
+  if (year !== maxYear || month !== maxMonthForYear(maxYear)) {
     chips.push({
       key: 'period',
       label: `${MONTHS[month - 1]} ${year}`,
       onClear: () => {
-        setYear(MAX_YEAR);
-        setMonth(maxMonthForYear(MAX_YEAR));
+        setYear(maxYear);
+        setMonth(maxMonthForYear(maxYear));
       },
     });
   }
@@ -100,7 +102,7 @@ export function FilterPanel() {
     chips.push({ key: 'to', label: `To ${regionTo}`, onClear: () => setRegionTo('All') });
   }
 
-  const yearOptions = Array.from({ length: MAX_YEAR - 2025 + 1 }, (_, i) => {
+  const yearOptions = Array.from({ length: maxYear - 2025 + 1 }, (_, i) => {
     const y = 2025 + i;
     return { value: String(y), label: String(y) };
   });
@@ -297,17 +299,19 @@ export function MobileFilterBar() {
     setStablecoin,
     setRegionFrom,
     setRegionTo,
+    maxYear,
+    maxMonthForYear,
   } = useFilters();
 
   const showCorridorFilters = mapType !== 'regulation';
   const chips: { key: string; label: string; onClear: () => void }[] = [];
-  if (year !== MAX_YEAR || month !== maxMonthForYear(MAX_YEAR)) {
+  if (year !== maxYear || month !== maxMonthForYear(maxYear)) {
     chips.push({
       key: 'period',
       label: `${MONTHS[month - 1]} ${year}`,
       onClear: () => {
-        setYear(MAX_YEAR);
-        setMonth(maxMonthForYear(MAX_YEAR));
+        setYear(maxYear);
+        setMonth(maxMonthForYear(maxYear));
       },
     });
   } else {
@@ -331,8 +335,8 @@ export function MobileFilterBar() {
   }
 
   const hasNonDefault =
-    year !== MAX_YEAR ||
-    month !== maxMonthForYear(MAX_YEAR) ||
+    year !== maxYear ||
+    month !== maxMonthForYear(maxYear) ||
     referenceAsset !== 'All' ||
     stablecoin !== 'All' ||
     regionFrom !== 'All' ||

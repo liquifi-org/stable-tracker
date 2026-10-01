@@ -190,7 +190,21 @@ function topPartners(flows, nameKey, limit = 8) {
     .join('\n');
 }
 
-const { year, month } = closedPeriod();
+async function loadLatestPeriod() {
+  let lastError;
+  for (const base of API_CANDIDATES) {
+    try {
+      const latest = await getJson(base, '/analytics/latest-period');
+      if (latest?.year && latest?.month) return { year: latest.year, month: latest.month };
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  if (lastError) console.warn(`latest-period fallback (${lastError instanceof Error ? lastError.message : lastError})`);
+  return closedPeriod();
+}
+
+const { year, month } = await loadLatestPeriod();
 const period = `${year}-${String(month).padStart(2, '0')}`;
 
 let adoption;
