@@ -120,9 +120,6 @@ html.next-ia .footer-logo-firmshift {
   height: calc(var(--footer-ey-height) * 1.35 / 1.85);
   filter: brightness(0) invert(1);
 }
-html.next-ia .footer-logo-stablecoin-insider {
-  height: calc(var(--footer-ey-height) * 1.7 / 1.85);
-}
 html.next-ia .footer-logo-stride {
   display: block;
   height: calc(var(--footer-ey-height) * 0.95 / 1.85);
