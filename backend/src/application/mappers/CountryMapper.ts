@@ -9,6 +9,7 @@ export class CountryMapper {
             name: country.name,
             region: country.region,
             stage: country.stage,
+            digitalAssetStage: country.digitalAssetStage,
             regulatorName: country.regulatorName,
             regulatorDescription: country.regulatorDescription,
             description: country.description,

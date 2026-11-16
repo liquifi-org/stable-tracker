@@ -29,7 +29,8 @@ export interface ICountryDoc extends Document {
     regulatedIssuerIds: string[];
     regulatedReserveTypes: string[];
     // Stride API fields
-    stage?: number;                  // 0=none/banned 1=draft 2=proposed 3=live
+    stage?: number;                  // stablecoin framework: 0 none/banned, 1 draft, 2 proposed, 3 live
+    digitalAssetStage?: number;      // overall digital-asset regulation, same scale
     regulatorName?: string;
     regulatorDescription?: string;
     description?: string;
@@ -71,6 +72,7 @@ const CountrySchema = new Schema<ICountryDoc>(
         regulatedReserveTypes: { type: [String], default: [] },
         // Stride API fields
         stage:                 { type: Number },
+        digitalAssetStage:     { type: Number },
         regulatorName:         { type: String },
         regulatorDescription:  { type: String },
         description:           { type: String },

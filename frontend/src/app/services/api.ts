@@ -7,6 +7,8 @@ export interface ApiCountry {
   name: string;
   region?: string;
   stage: number;
+  /** Overall digital-asset regulation, same 0–3 scale. The map uses `stage`. */
+  digitalAssetStage?: number;
   isStablecoinSpecific?: number;
   fiatBacked?: number;
   fiatAlert?: string | null;
@@ -129,6 +131,7 @@ export interface CountryRegulationInfo {
   name: string;
   region: string;
   stage?: number;
+  digitalAssetStage?: number;
   regulatorName?: string;
   regulatorDescription?: string;
   description?: string;

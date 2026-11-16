@@ -78,7 +78,7 @@ Remittances: World Bank `BM.TRF.PWKR.CD.DT` (fallbacks `BM.TRF.PRVT.CD` or natio
 
 ### 3.7 Regulatory stage
 
-Ingested from Stride only when the framework is stablecoin-specific. Otherwise stored as 0.
+Stored from Stride's `stablecoin_specific_stage`. A live general crypto law does not raise it. A stablecoin draft or proposal stays 1 or 2, rather than being collapsed to 0.
 
 | Stage | Label | Meaning |
 | --- | --- | --- |

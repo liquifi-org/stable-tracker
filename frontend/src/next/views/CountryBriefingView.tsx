@@ -23,7 +23,7 @@ import { useCurrencyFormat } from '../../app/hooks/useCurrencyFormat';
 import { TrendBadge } from '../../app/components/TrendBadge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../app/components/ui/dialog';
 import { Tooltip, TooltipTrigger, TooltipContent } from '../../app/components/ui/tooltip';
-import { classifyMarket, stageLabel } from '../lib/marketType';
+import { classifyMarket, generalLawLabel, stageLabel } from '../lib/marketType';
 import { fmtPct, fmtPer100k } from '../lib/format';
 import { TokenMixBar } from '../components/TokenMixBar';
 import { canonicalCountrySlug, countryAlpha2, countryDisplayName, prettyCountryName } from '../../app/lib/countryRoutes';
@@ -511,7 +511,12 @@ export function CountryBriefingView() {
             </span>
           )}
         </div>
-        <p className="text-xs text-slate-500">Regulatory status does not move with the month slider.</p>
+        <p className="text-xs text-slate-500">The badge is the stablecoin framework. It does not move with the month slider.</p>
+        {apiRegulatory?.countryDetail && generalLawLabel(apiRegulatory.countryDetail.stage, apiRegulatory.countryDetail.digitalAssetStage) && (
+          <p className="text-sm text-slate-600 dark:text-slate-300">
+            General digital-asset law: {generalLawLabel(apiRegulatory.countryDetail.stage, apiRegulatory.countryDetail.digitalAssetStage)}.
+          </p>
+        )}
         <div className="surface p-5 sm:p-6 space-y-4">
           {apiRegulatory?.countryDetail && (
             <div className="space-y-1 text-sm text-slate-500 dark:text-slate-400">

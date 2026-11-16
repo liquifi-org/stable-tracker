@@ -27,9 +27,17 @@ async function syncCountryDetail(
     const detail = await strideFetch<StrideCountryDetail>(`/countries/${listItem.id}`);
     if (detail === null) return;
 
-    const isStablecoinSpecific =
-        table?.is_stablecoin_specific === 1 || detail.is_stablecoin_specific === 1;
-    const stage = isStablecoinSpecific ? (detail.stage ?? 0) : 0;
+    // `stage` on the feed is overall digital-asset regulation. The tracker
+    // displays stablecoin_specific_stage and must not zero it when the
+    // deprecated is_stablecoin_specific flag is 0 (that made Singapore,
+    // a live payments law with a stablecoin draft, read as "no framework").
+    const digitalAssetStage = detail.stage ?? table?.stage ?? 0;
+    const fromFeed = table?.stablecoin_specific_stage ?? detail.stablecoin_specific_stage;
+    const stage = fromFeed ?? 0;
+    if (fromFeed === undefined) {
+        console.warn(`  ⚠ ${detail.name}: stablecoin_specific_stage missing, storing 0`);
+    }
+    const isStablecoinSpecific = stage === 3;
 
     await CountryModel.updateOne(
         { countryId },
@@ -37,6 +45,7 @@ async function syncCountryDetail(
             $set: {
                 name:                  detail.name,
                 stage,
+                digitalAssetStage,
                 regulatorName:         detail.regulator_name        ?? undefined,
                 regulatorDescription:  detail.regulator_description ?? undefined,
                 description:           detail.description           ?? undefined,

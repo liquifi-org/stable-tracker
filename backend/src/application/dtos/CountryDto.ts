@@ -5,6 +5,7 @@ export interface CountryDto {
     region: string;
     // Stride API fields
     stage?: number;
+    digitalAssetStage?: number;
     regulatorName?: string;
     regulatorDescription?: string;
     description?: string;

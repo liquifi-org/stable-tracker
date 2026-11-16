@@ -72,7 +72,7 @@ export function UsageRegulationMatrix({ rows }: { rows: UsageRuleRow[] }) {
     <div className="space-y-2">
       <p className="text-xs text-slate-500 dark:text-slate-400">
         High usage = at or above median outbound-vs-GDP among countries with corridor volume and GDP.
-        Live rules = stage 3 (not month-dependent).
+        Live rules = a live stablecoin framework. A general crypto law does not count, and neither moves with the month.
       </p>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Cell

@@ -23,7 +23,10 @@ export interface StrideCountryTableItem {
     commodity_alert: string | null;
     algorithm_backed: number;
     algorithm_alert: string | null;
-    is_stablecoin_specific: number;
+    /** Deprecated. 1 only when stablecoin_specific_stage is 3. */
+    is_stablecoin_specific?: number;
+    /** Stablecoin framework stage, 0–3. This is the stage the tracker displays. */
+    stablecoin_specific_stage?: number;
 }
 
 export interface StrideCountryTableResponse {
@@ -46,7 +49,10 @@ export interface StrideCountryDetail {
     commodity_alert?: string | null;
     algorithm_backed?: number;
     algorithm_alert?: string | null;
+    /** Deprecated. 1 only when stablecoin_specific_stage is 3. */
     is_stablecoin_specific?: number;
+    /** Stablecoin framework stage, 0–3. */
+    stablecoin_specific_stage?: number;
 }
 
 export interface StrideIssuer {

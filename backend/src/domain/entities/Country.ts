@@ -8,6 +8,7 @@ export interface CountryProps {
     regulatedReserveTypes: string[];
     // Stride API fields
     stage?: number;
+    digitalAssetStage?: number;
     regulatorName?: string;
     regulatorDescription?: string;
     description?: string;
@@ -32,6 +33,7 @@ export class Country {
     readonly regulatedIssuerIds: ReadonlyArray<string>;
     readonly regulatedReserveTypes: ReadonlyArray<string>;
     readonly stage: number | undefined;
+    readonly digitalAssetStage: number | undefined;
     readonly regulatorName: string | undefined;
     readonly regulatorDescription: string | undefined;
     readonly description: string | undefined;
@@ -55,6 +57,7 @@ export class Country {
         this.regulatedIssuerIds = Object.freeze([...props.regulatedIssuerIds]);
         this.regulatedReserveTypes = Object.freeze([...props.regulatedReserveTypes]);
         this.stage = props.stage;
+        this.digitalAssetStage = props.digitalAssetStage;
         this.regulatorName = props.regulatorName;
         this.regulatorDescription = props.regulatorDescription;
         this.description = props.description;

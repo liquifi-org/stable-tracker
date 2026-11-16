@@ -243,7 +243,7 @@ export function FilterPanel() {
           <b className="text-slate-600 dark:text-slate-300">Vs official outflows</b> is outbound corridors ÷ (World Bank personal remittances paid + services imports), each annual figure divided by 12. Goods trade is excluded. The global card sums only countries with outbound corridors.
         </p>
         <p>
-          <b className="text-slate-600 dark:text-slate-300">Live framework</b> is regulatory stage and does not change with the month slider.
+          <b className="text-slate-600 dark:text-slate-300">Live framework</b> is the stablecoin stage. A general crypto law can be further along. Neither moves with the month slider.
         </p>
         <p>
           Corridor maps are <b className="text-slate-600 dark:text-slate-300">international pairs only</b>, using Allium adjusted volume (CEX / DEX / infra / MEV / short-term routing stripped). Domestic volume is not in this dataset.

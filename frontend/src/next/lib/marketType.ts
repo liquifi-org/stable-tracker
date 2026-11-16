@@ -67,3 +67,12 @@ export function stageLabel(stage: number | undefined): string {
   if (stage === 0) return 'No framework / restricted';
   return 'Unknown';
 }
+
+/** A broader crypto law that is not the same step as the stablecoin framework. */
+export function generalLawLabel(
+  stablecoinStage: number | undefined,
+  digitalAssetStage: number | undefined,
+): string | null {
+  if (digitalAssetStage == null || digitalAssetStage === stablecoinStage) return null;
+  return stageLabel(digitalAssetStage);
+}

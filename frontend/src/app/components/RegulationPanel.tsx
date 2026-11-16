@@ -171,7 +171,7 @@ export function RegulationPanel({
     },
     {
       key: 'stage',
-      header: 'Stage',
+      header: 'Stablecoin',
       render: (value: number | undefined) => {
         const info = value !== undefined ? STAGE_INFO[value] : undefined;
         if (!info) return <span className="text-xs text-slate-400">No data</span>;
@@ -183,6 +183,18 @@ export function RegulationPanel({
             {info.label}
           </span>
         );
+      },
+    },
+    {
+      key: 'digitalAssetStage',
+      header: 'General law',
+      render: (value: number | undefined, row: CountryRegulationInfo) => {
+        if (value === undefined || value === row.stage) {
+          return <span className="text-xs text-slate-300">—</span>;
+        }
+        const info = STAGE_INFO[value];
+        if (!info) return <span className="text-xs text-slate-400">No data</span>;
+        return <span className="text-xs text-slate-600 dark:text-slate-300">{info.label}</span>;
       },
     },
     ...RESERVE_TYPE_DEFS.map(({ key, label }) => ({
@@ -317,11 +329,19 @@ export function RegulationPanel({
       </div>
       <div className="px-4 py-3 text-xs space-y-2">
         <div className="flex justify-between items-center">
-          <span className="text-slate-500 dark:text-slate-400">Stage</span>
+          <span className="text-slate-500 dark:text-slate-400">Stablecoin</span>
           <span className="text-slate-800 dark:text-slate-100 font-semibold">
             {pinnedCountry.stage !== undefined ? STAGE_INFO[pinnedCountry.stage]?.label ?? '—' : 'No data'}
           </span>
         </div>
+        {pinnedCountry.digitalAssetStage !== undefined && pinnedCountry.digitalAssetStage !== pinnedCountry.stage && (
+          <div className="flex justify-between items-center">
+            <span className="text-slate-500 dark:text-slate-400">General law</span>
+            <span className="text-slate-800 dark:text-slate-100 font-semibold">
+              {STAGE_INFO[pinnedCountry.digitalAssetStage]?.label ?? '—'}
+            </span>
+          </div>
+        )}
         {RESERVE_TYPE_DEFS.map(({ key, label }) => (
           <div key={key} className="flex justify-between items-center">
             <span className="text-slate-500 dark:text-slate-400">{label}</span>
@@ -404,6 +424,9 @@ export function RegulationPanel({
                     </div>
                     <div className="mt-1 text-[11px] text-white/70">
                       {hoveredCountry.stage !== undefined ? STAGE_INFO[hoveredCountry.stage]?.label ?? 'No data' : 'No data'}
+                      {hoveredCountry.digitalAssetStage !== undefined && hoveredCountry.digitalAssetStage !== hoveredCountry.stage
+                        ? ` · General law ${STAGE_INFO[hoveredCountry.digitalAssetStage]?.label ?? ''}`
+                        : ''}
                       {hoveredCountry.region ? ` · ${hoveredCountry.region}` : ''}
                     </div>
                   </div>
@@ -420,7 +443,7 @@ export function RegulationPanel({
               />
             )}
             <div className="absolute bottom-[max(1rem,env(safe-area-inset-bottom))] left-3 sm:left-4 z-10">
-              <MapLegendFold title="Regulatory stage">
+              <MapLegendFold title="Stablecoin framework">
                 <div className="space-y-1">
                   {[3, 2, 1, 0].map((stage) => (
                     <div key={stage} className="flex items-center gap-1.5">

@@ -39,7 +39,8 @@ interface StrideCountryTableItem {
     commodity_alert: string | null;
     algorithm_backed: number;
     algorithm_alert: string | null;
-    is_stablecoin_specific: number;
+    is_stablecoin_specific?: number;
+    stablecoin_specific_stage?: number;
 }
 
 interface StrideCountryTableResponse {
@@ -63,6 +64,7 @@ interface StrideCountryDetail {
     algorithm_backed?: number;
     algorithm_alert?: string | null;
     is_stablecoin_specific?: number;
+    stablecoin_specific_stage?: number;
 }
 
 interface StrideIssuer {
@@ -203,11 +205,10 @@ async function syncCountry(
     const detail = await strideFetch<StrideCountryDetail>(`/countries/${listItem.id}`);
     if (detail === null) return;
 
-    const isStablecoinSpecific =
-        table?.is_stablecoin_specific === 1 || detail.is_stablecoin_specific === 1;
-
-    // Per Stride docs: if not stablecoin-specific, treat stage as 0
-    const stage = isStablecoinSpecific ? (detail.stage ?? 0) : 0;
+    const digitalAssetStage = detail.stage ?? table?.stage ?? 0;
+    const fromFeed = table?.stablecoin_specific_stage ?? detail.stablecoin_specific_stage;
+    const stage = fromFeed ?? 0;
+    const isStablecoinSpecific = stage === 3;
 
     const now = new Date();
     await CountryModel.updateOne(
@@ -216,6 +217,7 @@ async function syncCountry(
             $set: {
                 name:                  detail.name,
                 stage,
+                digitalAssetStage,
                 regulatorName:         detail.regulator_name        ?? undefined,
                 regulatorDescription:  detail.regulator_description ?? undefined,
                 description:           detail.description           ?? undefined,
