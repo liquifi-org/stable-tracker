@@ -16,6 +16,7 @@ import {
     StrideCountryListItem, StrideCountryTableItem, StrideCountryTableResponse,
     StrideCountryDetail, StrideIssuer, StrideLaw,
 } from './_client';
+import { applyCountryEditorial, applyLawEditorial } from './editorial';
 
 async function syncCountryDetail(
     listItem: StrideCountryListItem,
@@ -42,7 +43,7 @@ async function syncCountryDetail(
     await CountryModel.updateOne(
         { countryId },
         {
-            $set: {
+            $set: applyCountryEditorial(countryId, {
                 name:                  detail.name,
                 stage,
                 digitalAssetStage,
@@ -60,7 +61,7 @@ async function syncCountryDetail(
                 algorithmAlert:        table?.algorithm_alert   ?? detail.algorithm_alert   ?? undefined,
                 isStablecoinSpecific,
                 syncedAt: new Date(),
-            },
+            }),
             $setOnInsert: { region: WorldRegion.OTHER },
         },
         { upsert: true },
@@ -77,14 +78,14 @@ export async function syncLaws(countryId: number): Promise<void> {
         updateOne: {
             filter: { lawId: String(law.id) },
             update: {
-                $set: {
+                $set: applyLawEditorial(String(law.id), {
                     countryId:   padCountryId(law.country_id),
                     title:       law.title,
                     enactedDate: law.enacted_date  ?? undefined,
                     description: law.description   ?? undefined,
                     citation:    law.citation       ?? undefined,
                     syncedAt:    now,
-                },
+                }),
             },
             upsert: true,
         },

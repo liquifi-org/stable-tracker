@@ -19,6 +19,7 @@ import { StablecoinModel } from '../src/infrastructure/database/mongoose/models/
 import { LicenseModel } from '../src/infrastructure/database/mongoose/models/LicenseModel';
 import { LawModel } from '../src/infrastructure/database/mongoose/models/LawModel';
 import { WorldRegion } from '../src/domain/value-objects/WorldRegion';
+import { applyCountryEditorial, applyLawEditorial } from './stride/editorial';
 
 // ── Stride API response types ────────────────────────────────────────────────
 
@@ -214,7 +215,7 @@ async function syncCountry(
     await CountryModel.updateOne(
         { countryId },
         {
-            $set: {
+            $set: applyCountryEditorial(countryId, {
                 name:                  detail.name,
                 stage,
                 digitalAssetStage,
@@ -232,7 +233,7 @@ async function syncCountry(
                 algorithmAlert:        table?.algorithm_alert   ?? detail.algorithm_alert   ?? undefined,
                 isStablecoinSpecific,
                 syncedAt: now,
-            },
+            }),
             // Region only set when creating a document not in our seed
             $setOnInsert: { region: WorldRegion.OTHER },
         },
@@ -252,14 +253,14 @@ async function syncLaws(countryId: number): Promise<void> {
         updateOne: {
             filter: { lawId: String(law.id) },
             update: {
-                $set: {
+                $set: applyLawEditorial(String(law.id), {
                     countryId:   padCountryId(law.country_id),
                     title:       law.title,
                     enactedDate: law.enacted_date  ?? undefined,
                     description: law.description   ?? undefined,
                     citation:    law.citation       ?? undefined,
                     syncedAt:    now,
-                },
+                }),
             },
             upsert: true,
         },

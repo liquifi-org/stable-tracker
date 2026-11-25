@@ -122,17 +122,15 @@ html.next-ia .footer-logo-firmshift {
 }
 html.next-ia .footer-logo-stride {
   display: block;
-  height: calc(var(--footer-ey-height) * 0.95 / 1.85);
-  width: calc(var(--footer-ey-height) * 0.95 / 1.85 * 1012 / 211);
-  overflow: hidden;
+  height: calc(var(--footer-ey-height) * 2.05 / 1.85);
+  width: auto;
   opacity: 0.88;
 }
 html.next-ia .footer-logo-stride img {
   display: block;
-  height: calc(var(--footer-ey-height) * 0.95 / 1.85 * 446 / 211);
+  height: 100%;
   width: auto;
   max-width: none;
-  margin-top: calc(var(--footer-ey-height) * 0.95 / 1.85 * -15 / 211);
 }
 
 @media (max-width: 80rem) {

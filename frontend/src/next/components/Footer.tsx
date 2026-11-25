@@ -1,6 +1,6 @@
 import { Link } from 'react-router';
 import alliumLogo from '../../assets/logos/allium.svg';
-import strideLogoWhite from '../../assets/logos/stride_white.svg';
+import strideLogoWhite from '../../assets/logos/stride_lockup_white.png';
 import firmshiftLogo from '../../assets/logos/firmshift.svg';
 import eyLogoWhite from '../../assets/logos/ey_white.png';
 
