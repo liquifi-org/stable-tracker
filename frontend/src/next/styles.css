@@ -84,7 +84,7 @@ html.next-ia .ink-header {
 html.next-ia .footer-logos {
   display: flex;
   flex-wrap: nowrap;
-  align-items: flex-end;
+  align-items: center;
   gap: 3.5rem;
   list-style: none;
   padding: 0;
@@ -93,7 +93,7 @@ html.next-ia .footer-logos {
 html.next-ia .footer-logos li,
 html.next-ia .footer-logos a {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   flex-shrink: 0;
   line-height: 0;
 }
@@ -112,17 +112,14 @@ html.next-ia .footer-logo-ey {
   width: var(--footer-ey-width);
   height: auto;
 }
-html.next-ia .footer-logo-allium {
-  height: calc(var(--footer-ey-height) * 1.55 / 1.85);
-  filter: brightness(0) invert(1);
-}
+html.next-ia .footer-logo-allium,
 html.next-ia .footer-logo-firmshift {
-  height: calc(var(--footer-ey-height) * 1.35 / 1.85);
+  height: calc(var(--footer-ey-height) * 0.84);
   filter: brightness(0) invert(1);
 }
 html.next-ia .footer-logo-stride {
   display: block;
-  height: calc(var(--footer-ey-height) * 2.05 / 1.85);
+  height: var(--footer-ey-height);
   width: auto;
   opacity: 0.88;
 }
@@ -131,6 +128,9 @@ html.next-ia .footer-logo-stride img {
   height: 100%;
   width: auto;
   max-width: none;
+  /* The wordmark sits in the top half of the lockup. Shift it onto the
+   * same center line as the other marks; the tagline hangs below. */
+  transform: translateY(22%);
 }
 
 @media (max-width: 80rem) {
